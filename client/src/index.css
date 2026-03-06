@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@tailwind utilities;
+
+@theme {
+  /* ── Fonts ── */
+  --font-sans: "Inter", sans-serif;
+  --font-serif: "DM Serif Display", serif;
+
+  /* ── Landing design (FinPilot redesigned) ── */
+  --emerald:       #10b981;
+  --emerald-d:     #059669;
+  --emerald-l:     #d1fae5;
+  --indigo:        #6366f1;
+  --indigo-d:      #4f46e5;
+  --gold:          #d4a853;
+  --gray-50:       #f9fafb;
+  --gray-100:      #f3f4f6;
+  --gray-200:      #e5e7eb;
+  --gray-300:      #d1d5db;
+  --gray-400:      #9ca3af;
+  --gray-500:      #6b7280;
+  --gray-600:      #4b5563;
+  --gray-700:      #374151;
+  --gray-800:      #1f2937;
+  --gray-900:      #111827;
+  --gradient-primary: linear-gradient(135deg, var(--emerald) 0%, var(--indigo) 100%);
+
+  /* ── Legacy / other pages ── */
+  --color-primary:       #2563eb;
+  --color-primary-dark:  #1d4ed8;
+  --color-primary-light: #60a5fa;
+  --color-dark:       #0c0f18;
+  --color-dark-2:     #141720;
+  --color-dark-3:     #1c2030;
+  --color-dark-card:  #171b28;
+  --color-dark-card2: #1e2235;
+  --color-cream:      #f5f0e8;
+  --color-muted:      #8b90a0;
+  --color-muted2:     #6b7080;
+  --color-surface:    #f8f9fc;
+  --animate-blink:   blink 2s infinite;
+  --animate-fade-up: fadeUp 0.6s ease-out;
+  --animate-float:   float 4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.95); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+/* ── Base ── */
+html { scroll-behavior: smooth; }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+/* ── Custom utilities ── */
+@utility bg-hero {
+  background-color: #020617;
+  background-image:
+    radial-gradient(ellipse at 0% 0%, rgba(37,99,235,0.26) 0%, transparent 55%),
+    radial-gradient(ellipse at 90% 5%, rgba(59,130,246,0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 60%, rgba(30,64,175,0.45) 0%, transparent 65%);
+}
+
+@utility glass {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+}
+
+@utility dark-border {
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+@utility shadow-teal {
+  box-shadow: 0 0 30px rgba(37,99,235,0.24);
+}
+
+@utility text-gold {
+  color: #60a5fa;
+}
+
+@utility text-gradient-teal {
+  background: linear-gradient(135deg, #2563eb, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Landing page gradient text (emerald → indigo) */
+@utility text-gradient-primary {
+  background: linear-gradient(135deg, #10b981 0%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
