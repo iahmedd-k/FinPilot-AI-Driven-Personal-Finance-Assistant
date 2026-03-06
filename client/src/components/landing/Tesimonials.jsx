@@ -47,7 +47,7 @@ export default function Testimonials() {
 
       {/* Cards: show all 3 on desktop, carousel on mobile */}
       <div className="max-w-[1200px] mx-auto">
-        <div className="hidden md:grid grid-cols-3 gap-8">
+        <div className="hidden md:grid grid-cols-3 gap-6 md:gap-8">
           {testimonials.map((t) => (
             <div
               key={t.name}
@@ -69,18 +69,18 @@ export default function Testimonials() {
         </div>
 
         {/* Mobile carousel */}
-        <div className="md:hidden overflow-hidden">
+        <div className="md:hidden overflow-x-auto pb-2">
           <div
-            className="flex transition-transform duration-300 ease-out"
+            className="flex transition-transform duration-300 ease-out min-w-full"
             style={{ transform: `translateX(-${index * 100}%)` }}
           >
             {testimonials.map((t) => (
               <div
                 key={t.name}
-                className="w-full shrink-0 px-2"
+                className="w-full min-w-[90vw] max-w-[95vw] shrink-0 px-2"
               >
                 <div
-                  className="rounded-[28px] p-8 flex flex-col min-h-[260px]"
+                  className="rounded-[28px] p-5 sm:p-8 flex flex-col min-h-[220px] sm:min-h-[260px]"
                   style={{
                     background: t.gradient,
                     boxShadow: "0 24px 48px rgba(0,0,0,0.25)",

@@ -24,7 +24,7 @@ export default function HowItWorks() {
 
   return (
     <section id="how-it-works" className="py-24 px-6 bg-[#f9fafb]">
-      <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+      <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
         <div>
           <span className="inline-block py-1.5 px-4 rounded-full text-sm font-semibold mb-4" style={{ background: "#d1fae5", color: "#059669" }}>
             Meet Your AI Co-Pilot

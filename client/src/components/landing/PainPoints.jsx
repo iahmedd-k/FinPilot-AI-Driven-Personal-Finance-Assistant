@@ -18,7 +18,7 @@ export default function PainPoints() {
           You're not alone. Most people struggle with these financial pain points.
         </p>
       </div>
-      <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="max-w-[1200px] mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
         {cards.map((c) => (
           <div
             key={c.title}

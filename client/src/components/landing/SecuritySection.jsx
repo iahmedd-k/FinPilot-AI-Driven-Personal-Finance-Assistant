@@ -8,7 +8,7 @@ const items = [
 export default function SecuritySection() {
   return (
     <section id="security" className="py-20 px-6 bg-white border-t border-b border-[#e5e7eb]">
-      <div className="max-w-[1200px] mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 text-center">
+      <div className="max-w-[1200px] mx-auto grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 text-center">
         {items.map((item) => (
           <div key={item.label} className="flex flex-col items-center gap-3">
             <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl" style={{ background: "#d1fae5" }}>

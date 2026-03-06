@@ -34,7 +34,7 @@ export default function PricingSection() {
           Start free. Upgrade only if you love it.
         </p>
       </div>
-      <div className="max-w-[1000px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="max-w-[1000px] mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
         <div
           className="p-10 rounded-2xl border-2 border-[#e5e7eb] transition-all relative bg-white"
         >
