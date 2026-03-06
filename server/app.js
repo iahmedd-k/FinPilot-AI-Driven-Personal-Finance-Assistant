@@ -27,6 +27,11 @@ const globalLimiter = rateLimit({
 });
 app.use("/api", globalLimiter);
 
+
+// ─── Stripe Webhook (must be before body parsers) ───
+const { handleWebhook } = require("./controllers/subscription.controller");
+app.post("/api/subscription/webhook", express.raw({ type: "application/json" }), handleWebhook);
+
 // ─── Core Middleware ───────────────────────────────────
 const allowedOrigins = [
   process.env.CLIENT_URL?.replace(/\/+$/, ""),
@@ -50,10 +55,6 @@ app.use(
     credentials: true, // Allow cookies
   })
 );
-
-// Stripe webhook must receive raw body for signature verification
-const { handleWebhook } = require("./controllers/subscription.controller");
-app.post("/api/subscription/webhook", express.raw({ type: "application/json" }), handleWebhook);
 
 app.use(express.json({ limit: "10kb" }));   // Parse JSON, limit body size
 app.use(express.urlencoded({ extended: true }));

@@ -43,8 +43,9 @@ export default function Subscription() {
   const canceled = searchParams.get("canceled") === "true";
 
   useEffect(() => {
-    if (success) {
+    if (success && !sessionStorage.getItem("pro-upgrade-toast-shown")) {
       toast.success("Welcome to Pro! Your account is upgraded.");
+      sessionStorage.setItem("pro-upgrade-toast-shown", "1");
       fetchMe();
     }
   }, [success, fetchMe]);
