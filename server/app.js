@@ -28,10 +28,28 @@ const globalLimiter = rateLimit({
 app.use("/api", globalLimiter);
 
 // ─── Core Middleware ───────────────────────────────────
-app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true,                        // Allow cookies
-}));
+const allowedOrigins = [
+  process.env.CLIENT_URL?.replace(/\/+$/, ""),
+  // Add additional allowed origins here (comma-separated list in env if needed)
+  ...(process.env.ADDITIONAL_CORS_ORIGINS
+    ? process.env.ADDITIONAL_CORS_ORIGINS.split(",").map((o) => o.trim().replace(/\/+$/, ""))
+    : []),
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser clients (curl, Postman) that have no origin header
+      if (!origin) return callback(null, true);
+
+      const cleanedOrigin = origin.replace(/\/+$/, "");
+      if (allowedOrigins.includes(cleanedOrigin)) return callback(null, true);
+
+      callback(new Error(`CORS policy does not allow access from origin ${origin}`));
+    },
+    credentials: true, // Allow cookies
+  })
+);
 
 // Stripe webhook must receive raw body for signature verification
 const { handleWebhook } = require("./controllers/subscription.controller");
