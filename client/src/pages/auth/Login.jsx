@@ -272,8 +272,8 @@ export default function Login() {
   return (
     <div className="min-h-screen px-3 py-3 md:px-5" style={{ background: "#f7f5f1" }}>
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1660px] gap-3 rounded-[28px] border border-black/8 bg-[#fcfbf8] p-3 shadow-[0_10px_40px_rgba(15,23,42,0.06)] lg:grid-cols-[1.08fr_0.92fr]">
-        <div className="flex rounded-[24px] border border-black/8 bg-[#fcfbf8] px-6 py-7 md:px-9 lg:px-12">
-          <div className="mx-auto flex w-full max-w-[510px] flex-col justify-center">
+        <div className="flex rounded-[24px] border border-black/8 bg-[#fcfbf8] px-6 py-7 md:px-9 lg:px-12" style={{ color: "#0b0914" }}>
+          <div className="mx-auto flex w-full max-w-[510px] flex-col justify-center text-[#0b0914]">
             <div className="mb-5 flex flex-col items-center text-center">
               <Logo size="md" dark className="pointer-events-none select-none text-[1.6rem]" />
               <h1 className="mt-7 text-[1.75rem] leading-none tracking-[-0.04em] text-[#0b0914] md:text-[2rem]" style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}>
@@ -319,7 +319,8 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={handleGoogleClick}
-                      className="mx-auto flex w-full max-w-[452px] items-center justify-center gap-3 rounded-2xl border border-[#d6d5dc] bg-[#d9d9de] px-4 py-3 text-[0.96rem] font-medium text-[#111019] transition hover:bg-[#d1d1d8]"
+                      className="mx-auto flex w-full max-w-[452px] items-center justify-center gap-3 rounded-2xl border border-[#d6d5dc] bg-[#f3f3f6] px-4 py-3 text-[0.96rem] font-medium text-[#111019] transition hover:bg-[#eaeaee]"
+                      style={{ color: "#111019" }}
                     >
                       <GoogleIcon />
                       {authMode === AUTH_MODES.SIGN_UP ? "Sign up with Google" : "Continue with Google"}
@@ -327,7 +328,7 @@ export default function Login() {
 
                     <div className="mx-auto my-6 flex w-full max-w-[452px] items-center gap-4">
                       <div className="h-px flex-1 bg-[#e5e1d9]" />
-                      <span className="text-sm text-slate-500">{authMode === AUTH_MODES.SIGN_UP ? "Or create an account with email" : "Or sign in with email"}</span>
+                      <span className="text-sm text-slate-600">{authMode === AUTH_MODES.SIGN_UP ? "Or create an account with email" : "Or sign in with email"}</span>
                       <div className="h-px flex-1 bg-[#e5e1d9]" />
                     </div>
                   </>
@@ -367,7 +368,7 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => switchMode(AUTH_MODES.FORGOT)}
-                      className="mt-1 text-center text-[0.98rem] text-slate-500 no-underline underline-offset-4 hover:text-slate-700 hover:underline"
+                      className="mt-1 text-center text-[0.98rem] text-slate-600 no-underline underline-offset-4 hover:text-slate-700 hover:underline"
                     >
                       Forgot your password?
                     </button>
@@ -377,6 +378,7 @@ export default function Login() {
                       disabled={isLoggingIn}
                       whileTap={{ scale: 0.985 }}
                       className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3.25 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ color: "white" }}
                     >
                       {isLoggingIn ? (
                         <>
@@ -387,12 +389,13 @@ export default function Login() {
                       )}
                     </motion.button>
 
-                    <p className="mt-4 text-center text-[0.98rem] text-slate-500">
+                    <p className="mt-4 text-center text-[0.98rem] text-slate-600">
                       Don&apos;t have an account yet?{" "}
                       <button
                         type="button"
                         onClick={() => switchMode(AUTH_MODES.SIGN_UP)}
-                        className="border-none bg-transparent p-0 text-slate-600 underline underline-offset-4 hover:text-slate-900"
+                        className="border-none bg-transparent p-0 text-slate-700 underline underline-offset-4 hover:text-slate-900"
+                        style={{ color: "#475569" }}
                       >
                         Sign up
                       </button>
@@ -446,6 +449,7 @@ export default function Login() {
                       disabled={isRegistering}
                       whileTap={{ scale: 0.985 }}
                       className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3.25 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ color: "white" }}
                     >
                       {isRegistering ? (
                         <>
@@ -456,12 +460,13 @@ export default function Login() {
                       )}
                     </motion.button>
 
-                    <p className="mt-4 text-center text-[0.98rem] text-slate-500">
+                    <p className="mt-4 text-center text-[0.98rem] text-slate-600">
                       Already have an account?{" "}
                       <button
                         type="button"
                         onClick={() => switchMode(AUTH_MODES.SIGN_IN)}
-                        className="border-none bg-transparent p-0 text-slate-600 underline underline-offset-4 hover:text-slate-900"
+                        className="border-none bg-transparent p-0 text-slate-700 underline underline-offset-4 hover:text-slate-900"
+                        style={{ color: "#475569" }}
                       >
                         Sign in
                       </button>
@@ -496,7 +501,7 @@ export default function Login() {
                       )}
                     </motion.button>
 
-                    <p className="mt-4 text-center text-[0.98rem] text-slate-500">
+                    <p className="mt-4 text-center text-[0.98rem] text-slate-600">
                       Remembered it?{" "}
                       <button
                         type="button"

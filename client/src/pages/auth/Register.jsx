@@ -203,6 +203,7 @@ export default function Register() {
           style={{
             background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
             boxShadow: "0 0 24px rgba(99,102,241,0.35)",
+            color: "white",
           }}
         >
           {isRegistering ? (
@@ -214,13 +215,13 @@ export default function Register() {
 
         <div className="flex items-center gap-3 my-0">
           <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
-          <span className="text-xs text-zinc-600">or</span>
+          <span className="text-xs text-zinc-400">or</span>
           <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
         </div>
 
-        <p className="text-center text-sm text-zinc-500">
+        <p className="text-center text-sm text-zinc-400">
           Already have an account?{" "}
-          <Link to={ROUTES.LOGIN} className="text-indigo-400 font-semibold no-underline hover:text-indigo-300 transition-colors">
+          <Link to={ROUTES.LOGIN} className="text-indigo-300 font-semibold no-underline hover:text-indigo-200 transition-colors">
             Sign in
           </Link>
         </p>
