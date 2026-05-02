@@ -43,7 +43,7 @@ export default function Navbar() {
                 <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
               </div>
             </div>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb", letterSpacing: "-0.02em", fontFamily: "Inter, sans-serif" }}>FinPilot</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb", letterSpacing: "-0.02em", fontFamily: "var(--font-sans)" }}>FinPilot</span>
           </Link>
         </div>
 
@@ -75,7 +75,7 @@ export default function Navbar() {
               color: "#fff",
               fontSize: 12,
               fontWeight: 700,
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "var(--font-sans)",
               textDecoration: "none",
               letterSpacing: "0.15em",
               textTransform: "uppercase",
@@ -173,7 +173,7 @@ export default function Navbar() {
           font-size: 15px;
           font-weight: 500;
           text-decoration: none;
-          font-family: 'Inter', sans-serif;
+          font-family: var(--font-sans);
           transition: color 0.2s ease;
           padding: 8px 0;
           cursor: pointer;
@@ -246,7 +246,7 @@ export default function Navbar() {
           font-size: 14px;
           font-weight: 500;
           text-decoration: none;
-          font-family: 'Inter', sans-serif;
+          font-family: var(--font-sans);
           transition: color 0.2s ease, background 0.2s ease;
         }
 
@@ -357,7 +357,7 @@ export default function Navbar() {
           color: rgba(255,255,255,0.7);
           font-size: 15px;
           font-weight: 500;
-          font-family: 'Inter', sans-serif;
+          font-family: var(--font-sans);
           text-decoration: none;
           cursor: pointer;
           transition: all 0.15s ease;

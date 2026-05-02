@@ -116,6 +116,9 @@ export const C = {
   lhTight: "var(--leading-tight)",
   lhBase: "var(--leading-normal)",
   lhRelax: "var(--leading-relaxed)",
+
+  /* Font Family */
+  fFamilySans: "var(--font-sans)",
 };
 
 /* ─── Category/transaction icon & color map ───────────────── */

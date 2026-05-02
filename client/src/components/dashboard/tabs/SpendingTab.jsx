@@ -579,7 +579,7 @@ function SpendingPage({
     background: C.white,
     color: C.text,
     outline: "none",
-    fontFamily: "'DM Sans',sans-serif",
+    fontFamily: "var(--font-sans)",
     width: "100%",
     appearance: "none",
     WebkitAppearance: "none",

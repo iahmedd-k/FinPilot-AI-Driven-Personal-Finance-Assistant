@@ -235,7 +235,7 @@ function AccordionItem({ heading, body }) {
       >
         <span
           className="text-[0.97rem] font-semibold text-gray-900"
-          style={{ fontFamily: "'DM Sans', 'Inter', sans-serif", letterSpacing: "-0.01em" }}
+          style={{ fontFamily: "var(--font-sans)", letterSpacing: "-0.01em" }}
         >
           {heading}
         </span>
@@ -255,7 +255,7 @@ function AccordionItem({ heading, body }) {
       >
         <p
           className="pb-5 text-[0.94rem] leading-7 text-gray-500"
-          style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}
+          style={{ fontFamily: "var(--font-sans)" }}
         >
           {body}
         </p>
@@ -271,7 +271,7 @@ export default function DocsPage() {
   /* ── 404 state ── */
   if (!doc) {
     return (
-      <div className="min-h-screen bg-white px-4 py-10" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-white px-4 py-10" style={{ fontFamily: "var(--font-sans)" }}>
         <div className="mx-auto max-w-2xl">
           <div className="mb-10 flex items-center justify-between">
             <Logo size="md" dark />
@@ -295,7 +295,7 @@ export default function DocsPage() {
 
   /* ── Main page ── */
   return (
-    <div className="min-h-screen bg-white px-4 py-10 text-gray-900" style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}>
+    <div className="min-h-screen bg-white px-4 py-10 text-gray-900" style={{ fontFamily: "var(--font-sans)" }}>
       <div className="mx-auto max-w-2xl">
 
         {/* Top nav */}
@@ -321,7 +321,7 @@ export default function DocsPage() {
 
           <h1
             className="text-[2rem] font-bold leading-tight tracking-[-0.03em] text-gray-900 md:text-[2.4rem]"
-            style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+            style={{ fontFamily: "var(--font-sans)" }}
           >
             {doc.title}
           </h1>

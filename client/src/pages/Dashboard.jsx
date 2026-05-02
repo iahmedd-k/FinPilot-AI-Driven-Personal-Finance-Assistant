@@ -366,7 +366,7 @@ html,body { height:100%; background:${C.bg}; }
 .tx-row:hover { background:var(--border-subtle) !important; }
 .sug-btn { transition:all 0.15s; }
 .sug-btn:hover { background:${C.greenBg} !important; border-color:#6ee7b7 !important; color:${C.greenMid} !important; }
-.tab-pill { transition:all 0.15s; border:none; cursor:pointer; font-family:'DM Sans',sans-serif; }
+.tab-pill { transition:all 0.15s; border:none; cursor:pointer; font-family:var(--font-sans); }
 .tab-pill:hover { background:#e8e5de !important; }
 .stat-badge-up   { background:${C.greenBg}; color:${C.greenMid}; }
 .stat-badge-down { background:${C.redBg};   color:${C.red}; }
@@ -415,7 +415,7 @@ html,body { height:100%; background:${C.bg}; }
   transform:translateY(-50%);white-space:nowrap;pointer-events:none;
   transition:opacity 0.15s;z-index:100; }
 .tooltip-container:hover .tooltip-text { visibility:visible;opacity:1; }
-.display-serif { font-family: var(--font-serif); letter-spacing: -0.01em; }
+.display-serif { font-family: var(--font-sans); letter-spacing: -0.01em; }
 .anim-1, .anim-2, .anim-3, .anim-4 { opacity: 1; transform: none; animation: none; }
 .fp-dashboard-shell,
 .fp-dashboard-shell *,
