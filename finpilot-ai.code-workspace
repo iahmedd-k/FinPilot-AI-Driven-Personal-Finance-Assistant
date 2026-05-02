@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "finpilot-ai",
+			"path": "."
+		}
+	],
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"git add": true,
+			"git commit": true,
+			"git push": true,
+			"npm run dev": true
+		}
+	}
+}
