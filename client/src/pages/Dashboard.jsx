@@ -852,8 +852,10 @@ function HomeTabWrapper(props) {
         const key = toLocalKey(d);
         if (!dayBuckets[key]) return;
         const amt = Math.abs(Number(t.amount) || 0);
-        if (t.type === "income") dayBuckets[key].income += amt;
-        if (t.type === "expense") dayBuckets[key].expense += amt;
+        const isInc = t.type === "income" || t.type === "deposit" || t.type === "credit";
+        const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
+        if (isInc) dayBuckets[key].income += amt;
+        if (isExp) dayBuckets[key].expense += amt;
       });
 
       let cumulative = 0;
@@ -2397,7 +2399,8 @@ function SpendingCalendar({ C, apiTransactions, summary, setActiveNav }) {
   const daySpend = useMemo(() => {
     const map = {};
     (apiTransactions || []).forEach(t => {
-      if (t.type !== "expense") return;
+      const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
+      if (!isExp) return;
       const d = new Date(t.date);
       if (d.getFullYear() === year && d.getMonth() === month) {
         const day = d.getDate();
@@ -3761,8 +3764,10 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const bucket = dayMap.get(key);
         if (!bucket) return;
-        if (t.type === "income") bucket.net += Math.abs(t.amount || 0);
-        if (t.type === "expense") bucket.net -= Math.abs(t.amount || 0);
+        const isInc = t.type === "income" || t.type === "deposit" || t.type === "credit";
+        const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
+        if (isInc) bucket.net += Math.abs(t.amount || 0);
+        if (isExp) bucket.net -= Math.abs(t.amount || 0);
       });
 
       let cumulative = 0;

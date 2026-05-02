@@ -262,7 +262,8 @@ export function DashboardProvider({ children }) {
     const discCats  = ["Dining","Entertainment","Shopping"];
     const discSpend = apiTransactions
       .filter((t) => {
-        if (t.type !== "expense" || !discCats.includes(t.category)) return false;
+        const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
+        if (!isExp || !discCats.includes(t.category)) return false;
         if (!t.date) return false;
         const txDate = new Date(t.date);
         return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
