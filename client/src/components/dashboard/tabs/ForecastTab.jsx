@@ -194,7 +194,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   // [FIX] cashFlowForecast was computed but unused; kept for potential display use
   const cashFlowForecast = currentBalance + predictedIncome - predictedExpense;
 
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const AGE_START = FORECAST_MIN_AGE;
   const AGE_END = FORECAST_MAX_AGE;
 
@@ -206,7 +206,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   }, [showModal, draftCustomData, customizationRes]);
 
   const configuredBirthDate = customData.birthDate;
-  const currentAge = (() => {
+  const currentAge = useMemo(() => {
     const fallbackAge = 30;
     if (!configuredBirthDate) return fallbackAge;
     const birth = new Date(configuredBirthDate);
@@ -215,16 +215,16 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     const monthDiff = now.getMonth() - birth.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age -= 1;
     return Math.min(89, Math.max(18, age));
-  })();
+  }, [configuredBirthDate, now]);
 
-  const timelineBirthYear = (() => {
+  const timelineBirthYear = useMemo(() => {
     if (!configuredBirthDate) return now.getFullYear() - currentAge;
     const birth = new Date(configuredBirthDate);
     return Number.isNaN(birth.getTime()) ? now.getFullYear() - currentAge : birth.getFullYear();
-  })();
+  }, [configuredBirthDate, currentAge, now]);
 
-  const netWorthBase = currentNetWorth - (Number(customData.liabilities) || 0);
-  let growthInput = Number(customData.portfolioGrowth);
+  const netWorthBase = currentNetWorth - (parseFinValue(customData.liabilities) || 0);
+  let growthInput = parseFinValue(customData.portfolioGrowth);
   if (!Number.isFinite(growthInput)) growthInput = 0.05;
   if (Math.abs(growthInput) > 1) growthInput = growthInput / 100;
   const annualGrowthRate = Math.min(0.25, Math.max(-0.5, growthInput));
@@ -243,13 +243,17 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   };
 
   const projectionCurrentAge = currentAge;
-  const projectionEndAge = Math.min(FORECAST_MAX_AGE, Math.max(projectionCurrentAge + 1, Number.isFinite(Number(customData.lifeExpectancy)) ? Math.round(Number(customData.lifeExpectancy)) : FORECAST_MAX_AGE));
-  const projectionBirthYear = getBirthYear(configuredBirthDate, projectionCurrentAge, now);
-  const projectionStartMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const projectionMonths = Math.max(12, (projectionEndAge - projectionCurrentAge) * 12);
-  const projectionLiabilities = Number(customData.liabilities) || 0;
-  const projectionBaseIncome = customData.annualIncome != null && customData.annualIncome !== "" && !Number.isNaN(Number(customData.annualIncome)) ? Number(customData.annualIncome) / 12 : predictedIncome;
-  const projectionBaseExpense = customData.monthlyExpenses != null && customData.monthlyExpenses !== "" && !Number.isNaN(Number(customData.monthlyExpenses)) ? Number(customData.monthlyExpenses) : predictedExpense;
+  const projectionEndAge = useMemo(() => {
+    const customLimit = parseFinValue(customData.lifeExpectancy);
+    return Math.min(FORECAST_MAX_AGE, Math.max(projectionCurrentAge + 1, Number.isFinite(customLimit) && customLimit > 0 ? Math.round(customLimit) : FORECAST_MAX_AGE));
+  }, [customData.lifeExpectancy, projectionCurrentAge]);
+
+  const projectionBirthYear = useMemo(() => getBirthYear(configuredBirthDate, projectionCurrentAge, now), [configuredBirthDate, projectionCurrentAge, now]);
+  const projectionStartMonth = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1), [now]);
+  const projectionMonths = useMemo(() => Math.max(12, (projectionEndAge - projectionCurrentAge) * 12), [projectionEndAge, projectionCurrentAge]);
+  const projectionLiabilities = parseFinValue(customData.liabilities) || 0;
+  const projectionBaseIncome = customData.annualIncome != null && customData.annualIncome !== "" ? parseFinValue(customData.annualIncome) / 12 : predictedIncome;
+  const projectionBaseExpense = customData.monthlyExpenses != null && customData.monthlyExpenses !== "" ? parseFinValue(customData.monthlyExpenses) : predictedExpense;
   const projectionLiabilityDrag = projectionLiabilities > 0 ? projectionLiabilities / 120 : 0;
   const projectionMonthlyGrowthRate = Math.pow(1 + annualGrowthRate, 1 / 12) - 1;
 
@@ -260,19 +264,22 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     const events = showModal
       ? draftEvents
       : (customizationRes?.customizations?.events || []);
+
     return events
       .filter((event) => event?.enabled === true)
       .map((event, index) => {
         const details = event?.details || {};
         const explicitMonth = parseYearMonth(details.month);
         let monthOffset = 0;
+
         if (explicitMonth) {
           monthOffset = Math.max(0, (explicitMonth.year - projectionStartMonth.getFullYear()) * 12 + (explicitMonth.month - (projectionStartMonth.getMonth() + 1)));
-        } else if (Number.isFinite(Number(details.age))) {
-          monthOffset = Math.max(0, Math.round((Number(details.age) - projectionCurrentAge) * 12));
+        } else if (Number.isFinite(parseFinValue(details.age))) {
+          monthOffset = Math.max(0, Math.round((parseFinValue(details.age) - projectionCurrentAge) * 12));
         } else if (event.type === "retirement") {
-          monthOffset = Math.max(0, Math.round(((Number(details.age) || 67) - projectionCurrentAge) * 12));
+          monthOffset = Math.max(0, Math.round(((parseFinValue(details.age) || 67) - projectionCurrentAge) * 12));
         }
+
         return {
           ...event,
           monthOffset,
@@ -299,15 +306,87 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     let runningInvestments = Math.round(totalAssetsNow);
     let runningLiabilities = Math.round(projectionLiabilities);
 
-    // [FIX] Start recurringExpenseDelta at 0 — liability drag is already baked into
-    // the startPoint display and applied from month 1 onwards via this delta.
     let recurringIncomeDelta = 0;
-    let recurringExpenseDelta = projectionLiabilityDrag; // ongoing liability repayment cost
+    let recurringExpenseDelta = projectionLiabilityDrag;
     let incomeMultiplier = 1;
 
-    // [FIX] Track home purchase price separately so sale correctly removes the
-    // right investment value (purchase price) rather than the sale price.
-    let homePurchaseValue = 0;
+    // Track stateful objects that can be removed
+    let activeMortgages = []; // { id, monthlyPayment, costBasis, loanAmount }
+
+    // [FIX] Process events for month 0 (Today) BEFORE creating the startPoint
+    // so that "Current Net Worth" and the first point on the graph reflect immediate changes.
+    const eventsToday = eventMap.get(0) || [];
+    let oneTimeIncomeToday = 0;
+    let oneTimeExpenseToday = 0;
+
+    eventsToday.forEach((event) => {
+      const details = event.details || {};
+      switch (event.type) {
+        case "retirement": {
+          const ratio = Number.isFinite(parseFinValue(details.incomeReplacement))
+            ? Math.max(0, parseFinValue(details.incomeReplacement)) / 100
+            : 0.3;
+          incomeMultiplier *= ratio;
+          break;
+        }
+        case "home_purchase": {
+          const amount = parseFinValue(details.amount) || 0;
+          const downPayment = Math.min(parseFinValue(details.downPayment) || 0, amount);
+          const loanAmount = Math.max(0, amount - downPayment);
+          const payment = mortgagePayment(loanAmount);
+
+          oneTimeExpenseToday += downPayment;
+          runningInvestments += amount;
+          runningLiabilities += loanAmount;
+          recurringExpenseDelta += payment;
+
+          activeMortgages.push({
+            id: event.id,
+            monthlyPayment: payment,
+            costBasis: amount,
+            loanAmount: loanAmount,
+          });
+          break;
+        }
+        case "home_sale": {
+          const saleAmount = parseFinValue(details.amount) || 0;
+          oneTimeIncomeToday += saleAmount;
+          if (activeMortgages.length > 0) {
+            const mortgage = activeMortgages.shift();
+            runningInvestments = Math.max(0, runningInvestments - mortgage.costBasis);
+            runningLiabilities = Math.max(0, runningLiabilities - mortgage.loanAmount);
+            recurringExpenseDelta = Math.max(0, recurringExpenseDelta - mortgage.monthlyPayment);
+          } else {
+            runningInvestments = Math.max(0, runningInvestments - saleAmount);
+          }
+          break;
+        }
+        case "windfall":
+        case "equity":
+          oneTimeIncomeToday += parseFinValue(details.amount) || 0;
+          break;
+        case "child":
+          recurringExpenseDelta += (parseFinValue(details.annualCost) || 0) / 12;
+          break;
+        case "college":
+          recurringExpenseDelta += (parseFinValue(details.annualContribution) || 0) / 12;
+          break;
+        case "additional_income":
+          recurringIncomeDelta += parseFinValue(details.amount) || 0;
+          break;
+        case "custom": {
+          const amount = parseFinValue(details.amount) || 0;
+          if (amount >= 0) oneTimeIncomeToday += amount;
+          else oneTimeExpenseToday += Math.abs(amount);
+          break;
+        }
+        default:
+          break;
+      }
+    });
+
+    // Apply today's one-time items to running balance
+    runningBalance += (oneTimeIncomeToday - oneTimeExpenseToday);
 
     const startPoint = {
       monthOffset: 0,
@@ -316,16 +395,17 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
       dateLabel: projectionStartMonth.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
       balance: runningBalance,
       netWorth: Math.round(runningInvestments + runningBalance - runningLiabilities),
-      income: Math.round(projectionBaseIncome),
-      expense: Math.round(projectionBaseExpense + projectionLiabilityDrag),
+      income: Math.round(projectionBaseIncome + oneTimeIncomeToday),
+      expense: Math.round(projectionBaseExpense + recurringExpenseDelta + oneTimeExpenseToday),
       year: projectionStartMonth.getFullYear(),
-      events: [],
-      eventCount: 0,
+      events: eventsToday.map((e) => e.title),
+      eventCount: eventsToday.length,
     };
 
     const points = [startPoint];
 
-    for (let monthOffset = 0; monthOffset < projectionMonths; monthOffset += 1) {
+    // Start loop from month 1 (next month)
+    for (let monthOffset = 1; monthOffset <= projectionMonths; monthOffset += 1) {
       const eventsThisMonth = eventMap.get(monthOffset) || [];
       let oneTimeIncome = 0;
       let oneTimeExpense = 0;
@@ -334,56 +414,62 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
         const details = event.details || {};
         switch (event.type) {
           case "retirement": {
-            const ratio = Number.isFinite(Number(details.incomeReplacement))
-              ? Math.max(0, Number(details.incomeReplacement)) / 100
+            const ratio = Number.isFinite(parseFinValue(details.incomeReplacement))
+              ? Math.max(0, parseFinValue(details.incomeReplacement)) / 100
               : 0.3;
             incomeMultiplier *= ratio;
             break;
           }
           case "home_purchase": {
-            const amount = Number(details.amount) || 0;
-            const downPayment = Math.min(Number(details.downPayment) || 0, amount);
+            const amount = parseFinValue(details.amount) || 0;
+            const downPayment = Math.min(parseFinValue(details.downPayment) || 0, amount);
             const loanAmount = Math.max(0, amount - downPayment);
-            // Down payment is an immediate cash outflow
+            const payment = mortgagePayment(loanAmount);
+
             oneTimeExpense += downPayment;
-            // Track the home as a separate asset bucket (not mixed with portfolio)
-            homePurchaseValue += amount;
-            runningInvestments += amount; // home value enters investment pool
-            // Loan is a new liability
+            runningInvestments += amount;
             runningLiabilities += loanAmount;
-            // Mortgage payment added to recurring expenses
-            recurringExpenseDelta += mortgagePayment(loanAmount);
+            recurringExpenseDelta += payment;
+
+            activeMortgages.push({
+              id: event.id,
+              monthlyPayment: payment,
+              costBasis: amount,
+              loanAmount: loanAmount,
+            });
             break;
           }
           case "home_sale": {
-            const saleAmount = Number(details.amount) || 0;
-            // [FIX] Cash from sale goes to balance
+            const saleAmount = parseFinValue(details.amount) || 0;
             oneTimeIncome += saleAmount;
-            // [FIX] Remove the original home value from investments (not the sale price),
-            // and eliminate remaining mortgage liability.
-            // If homePurchaseValue > 0 we tracked a prior purchase; otherwise assume
-            // the user is selling a home that existed before the forecast.
-            const costBasis = homePurchaseValue > 0 ? homePurchaseValue : saleAmount;
-            runningInvestments = Math.max(0, runningInvestments - costBasis);
-            homePurchaseValue = 0; // reset after sale
-            // Capital gain stays in balance (already added to oneTimeIncome)
+
+            // If we have a tracked mortgage, remove it. Otherwise assume general home sale.
+            if (activeMortgages.length > 0) {
+              const mortgage = activeMortgages.shift(); // Remove the oldest one
+              runningInvestments = Math.max(0, runningInvestments - mortgage.costBasis);
+              runningLiabilities = Math.max(0, runningLiabilities - mortgage.loanAmount);
+              recurringExpenseDelta = Math.max(0, recurringExpenseDelta - mortgage.monthlyPayment);
+            } else {
+              // Fallback for untracked homes
+              runningInvestments = Math.max(0, runningInvestments - saleAmount);
+            }
             break;
           }
           case "windfall":
           case "equity":
-            oneTimeIncome += Number(details.amount) || 0;
+            oneTimeIncome += parseFinValue(details.amount) || 0;
             break;
           case "child":
-            recurringExpenseDelta += (Number(details.annualCost) || 0) / 12;
+            recurringExpenseDelta += (parseFinValue(details.annualCost) || 0) / 12;
             break;
           case "college":
-            recurringExpenseDelta += (Number(details.annualContribution) || 0) / 12;
+            recurringExpenseDelta += (parseFinValue(details.annualContribution) || 0) / 12;
             break;
           case "additional_income":
-            recurringIncomeDelta += Number(details.amount) || 0;
+            recurringIncomeDelta += parseFinValue(details.amount) || 0;
             break;
           case "custom": {
-            const amount = Number(details.amount) || 0;
+            const amount = parseFinValue(details.amount) || 0;
             if (amount >= 0) oneTimeIncome += amount;
             else oneTimeExpense += Math.abs(amount);
             break;
@@ -397,24 +483,20 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
       const monthlyExpenseValue = Math.max(0, projectionBaseExpense + recurringExpenseDelta);
       const monthlyNet = (monthlyIncomeValue + oneTimeIncome) - (monthlyExpenseValue + oneTimeExpense);
 
-      // Cash balance accumulates net monthly cash flow
       runningBalance += monthlyNet;
-
-      // Investment portfolio grows at monthly rate (compounding)
       runningInvestments = runningInvestments * (1 + projectionMonthlyGrowthRate);
 
-      // Net worth = investments + cash - liabilities
       const currentNW = Math.round(runningInvestments + runningBalance - runningLiabilities);
 
       const pointDate = new Date(
         projectionStartMonth.getFullYear(),
-        projectionStartMonth.getMonth() + monthOffset + 1,
+        projectionStartMonth.getMonth() + monthOffset,
         1
       );
 
       points.push({
-        monthOffset: monthOffset + 1,
-        age: Number((projectionCurrentAge + (monthOffset + 1) / 12).toFixed(2)),
+        monthOffset: monthOffset,
+        age: Number((projectionCurrentAge + monthOffset / 12).toFixed(2)),
         label: pointDate.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
         dateLabel: pointDate.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
         balance: Math.round(runningBalance),
@@ -440,6 +522,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     projectionMonthlyGrowthRate,
     projectionStartMonth,
     projectionCurrentAge,
+    projectionEndAge,
   ]);
 
   const projectionAgeTicks = (() => {
@@ -497,9 +580,12 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     : projectionSeries[projectionSeries.length - 1]?.balance ?? currentBalance;
 
   const displayFutureCF12 = projectionFuturePoint?.balance ?? futureCF12;
-  const displayNWGain = displayFutureNW12 - currentNetWorth;
-  const displayCFGain = displayFutureCF12 - currentBalance;
-  const displayNWGainPct = Math.abs(currentNetWorth) > 0 ? (displayNWGain / Math.abs(currentNetWorth)) * 100 : null;
+  const displayCurrentNW = projectionSeries[0]?.netWorth ?? currentNetWorth;
+  const displayCurrentCF = projectionSeries[0]?.balance ?? currentBalance;
+
+  const displayNWGain = displayFutureNW12 - displayCurrentNW;
+  const displayCFGain = displayFutureCF12 - displayCurrentCF;
+  const displayNWGainPct = Math.abs(displayCurrentNW) > 0 ? (displayNWGain / Math.abs(displayCurrentNW)) * 100 : null;
 
   const projectionFirstYear = projectionSeries.slice(1, 13);
   const projectionAvgIncome = projectionFirstYear.length
@@ -626,7 +712,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
       enabled: !!e.enabled,
       details: Object.keys(e.details || {}).reduce((acc, key) => {
         const val = e.details[key];
-        acc[key] = (key === "title" || key === "month") ? val : parseFinValue(val);
+        // Don't parse strings that are meant to be text
+        acc[key] = (key === "title" || key === "month" || key === "note") ? val : parseFinValue(val);
         return acc;
       }, {}),
     }));
@@ -762,8 +849,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Current net worth</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: currentNetWorth < 0 ? C.red : C.text }}>{fmt(currentNetWorth)}</div>
-                  {currentNetWorth < 0 && <div style={{ fontSize: 10.5, color: C.red, marginTop: 2, fontWeight: 600 }}>In debt</div>}
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: displayCurrentNW < 0 ? C.red : C.text }}>{fmt(displayCurrentNW)}</div>
+                  {displayCurrentNW < 0 && <div style={{ fontSize: 10.5, color: C.red, marginTop: 2, fontWeight: 600 }}>In debt</div>}
                 </div>
                 <div style={{ padding: "9px 11px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>In 12 months</div>
@@ -779,8 +866,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, flexWrap: "wrap", gap: 14 }}>
                 <div>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Current net worth</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: currentNetWorth < 0 ? C.red : C.text }}>{fmt(currentNetWorth)}</div>
-                  {currentNetWorth < 0 && <div style={{ fontSize: 11, color: C.red, marginTop: 4, fontWeight: 600 }}>In debt</div>}
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayCurrentNW < 0 ? C.red : C.text }}>{fmt(displayCurrentNW)}</div>
+                  {displayCurrentNW < 0 && <div style={{ fontSize: 11, color: C.red, marginTop: 4, fontWeight: 600 }}>In debt</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecast net worth in 12 months</div>
@@ -946,7 +1033,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
                 <div style={{ fontSize: bodyTextSize, color: C.sub, lineHeight: 1.5 }}>
-                  Net worth moves from {fmt(currentNetWorth)} → {fmt(displayFutureNW12)} over 12 months ({fmt(displayNWGain)} change).
+                  Net worth moves from {fmt(displayCurrentNW)} → {fmt(displayFutureNW12)} over 12 months ({fmt(displayNWGain)} change).
                 </div>
               </div>
             </div>
@@ -969,7 +1056,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Current balance</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: currentBalance < 0 ? C.red : C.text }}>{fmt(currentBalance)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
                 </div>
                 <div style={{ padding: "9px 11px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>In 12 months</div>
@@ -985,7 +1072,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, flexWrap: "wrap", gap: 14 }}>
                 <div>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Current cash balance</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: currentBalance < 0 ? C.red : C.text }}>{fmt(currentBalance)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecasted in 12 months</div>
@@ -1003,7 +1090,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             <div style={{ margin: isMobile ? "10px 10px 0" : "12px 22px 0", padding: "8px 10px", background: C.greenBg, border: `1px solid ${C.border}`, borderRadius: 10, display: "flex", alignItems: "flex-start", gap: 8 }}>
               <TrendingUp size={13} style={{ color: "#10b981", flexShrink: 0, marginTop: 1 }} />
               <span style={{ fontSize: bodyTextSize, color: C.text, lineHeight: 1.5 }}>
-                Balance ({fmt(currentBalance)}) + avg income ({fmt(projectionAvgIncome)}) − expenses ({fmt(projectionAvgExpense)}) = <strong>{fmt(projectionCashFlowFormula)}</strong>
+                Balance ({fmt(displayCurrentCF)}) + avg income ({fmt(projectionAvgIncome)}) − expenses ({fmt(projectionAvgExpense)}) = <strong>{fmt(projectionCashFlowFormula)}</strong>
               </span>
             </div>
 
@@ -1153,7 +1240,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
                 <div style={{ fontSize: bodyTextSize, color: C.sub, lineHeight: 1.5 }}>
-                  Cash balance moves from {fmt(currentBalance)} → {fmt(displayFutureCF12)} over 12 months.
+                  Cash balance moves from {fmt(displayCurrentCF)} → {fmt(displayFutureCF12)} over 12 months.
                 </div>
               </div>
             </div>
