@@ -11,7 +11,10 @@ const {
   getForecastCustomizations,
   saveForecastCustomizations,
   resetForecastCustomizations,
-  exportDashboardData
+  exportDashboardData,
+  getSavedReports,
+  saveReport,
+  deleteSavedReport,
 } = require('../controllers/dashboard.controller');
 const { protect } = require('../middleware/authMiddleware');
 const { requirePro } = require('../middleware/requirePro');
@@ -29,5 +32,10 @@ router.post('/export', protect, requirePro, exportDashboardData);
 router.get('/forecast/customizations', protect, getForecastCustomizations);
 router.post('/forecast/customizations', protect, saveForecastCustomizations);
 router.post('/forecast/customizations/reset', protect, resetForecastCustomizations);
+
+// Reports routes
+router.get('/reports', protect, getSavedReports);
+router.post('/reports', protect, saveReport);
+router.delete('/reports/:id', protect, deleteSavedReport);
 
 module.exports = router;

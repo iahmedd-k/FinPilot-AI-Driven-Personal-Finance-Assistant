@@ -2,6 +2,7 @@ const Transaction = require("../models/Transaction");
 const Goal = require("../models/Goal");
 const User = require("../models/User");
 const ForecastCustomization = require("../models/ForecastCustomization");
+const SavedReport = require("../models/SavedReport");
 const calculateFinancialScore = require("../services/ai/financialScoreService");
 const calculateForecast = require("../services/ai/forecastService");
 
@@ -693,6 +694,65 @@ const exportDashboardData = async (req, res, next) => {
   }
 };
 
+// @GET /api/dashboard/reports
+const getSavedReports = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const reports = await SavedReport.find({ userId }).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, reports });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @POST /api/dashboard/reports
+const saveReport = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { name, tab, viewBy, dateFrom, dateTo, showIncome, showExpense, showNetTrend, selectedMonthKey } = req.body;
+
+    if (!name || !tab || !viewBy || !dateFrom || !dateTo) {
+      return res.status(400).json({ success: false, message: "Missing required report fields" });
+    }
+
+    const report = new SavedReport({
+      userId,
+      name,
+      tab,
+      viewBy,
+      dateFrom,
+      dateTo,
+      showIncome: showIncome !== undefined ? showIncome : true,
+      showExpense: showExpense !== undefined ? showExpense : true,
+      showNetTrend: showNetTrend !== undefined ? showNetTrend : false,
+      selectedMonthKey: selectedMonthKey || null,
+    });
+
+    await report.save();
+
+    res.status(201).json({ success: true, report, message: "Report saved successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @DELETE /api/dashboard/reports/:id
+const deleteSavedReport = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const reportId = req.params.id;
+
+    const report = await SavedReport.findOneAndDelete({ _id: reportId, userId });
+    if (!report) {
+      return res.status(404).json({ success: false, message: "Report not found" });
+    }
+
+    res.status(200).json({ success: true, message: "Report deleted successfully" });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getDashboard,
   getSummary,
@@ -705,4 +765,7 @@ module.exports = {
   saveForecastCustomizations,
   resetForecastCustomizations,
   exportDashboardData,
+  getSavedReports,
+  saveReport,
+  deleteSavedReport,
 };

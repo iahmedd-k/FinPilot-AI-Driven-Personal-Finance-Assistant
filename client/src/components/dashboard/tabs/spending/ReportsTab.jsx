@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { dashboardService } from "../../../../services/dashboardService";
 import {
   ResponsiveContainer,
   CartesianGrid,
@@ -93,16 +95,33 @@ function ReportsTab({
   const [saveName, setSaveName] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
 
-  const REPORTS_STORAGE_KEY = "finpilot:spending:reports:v1";
-  const [savedReports, setSavedReports] = useState(() => {
-    try {
-      if (typeof window === "undefined") return [];
-      const raw = window.localStorage.getItem(REPORTS_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter((r) => r?.id && r?.name && r?.tab && r?.dateFrom && r?.dateTo);
-    } catch { return []; }
+  const queryClient = useQueryClient();
+
+  const { data: savedReportsRes, isLoading: isLoadingSaved } = useQuery({
+    queryKey: ["saved-reports"],
+    queryFn: () => dashboardService.getSavedReports().then((res) => res.data),
+  });
+
+  const userSavedReports = useMemo(() => savedReportsRes?.reports || [], [savedReportsRes]);
+
+  const saveReportMutation = useMutation({
+    mutationFn: (payload) => dashboardService.saveReport(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saved-reports"] });
+      dedupToast.success("Report saved");
+      setSaveName("");
+      setSaveOpen(false);
+    },
+    onError: () => dedupToast.error("Failed to save report"),
+  });
+
+  const deleteReportMutation = useMutation({
+    mutationFn: (id) => dashboardService.deleteSavedReport(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saved-reports"] });
+      dedupToast.success("Report removed");
+    },
+    onError: () => dedupToast.error("Failed to remove report"),
   });
 
   const viewByRef = useRef(null);
@@ -162,17 +181,6 @@ function ReportsTab({
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-
-  // Persist saved reports
-  useEffect(() => {
-    try { window.localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(savedReports)); } catch { /* noop */ }
-  }, [savedReports]);
-
-  // ── User saved reports ────────────────────────────────────────────────────
-  const userSavedReports = useMemo(() => {
-    const uid = String(user?._id || "");
-    return savedReports.filter((r) => r?.userId && String(r.userId) === uid);
-  }, [savedReports, user?._id]);
 
   // ── Normalize transactions ────────────────────────────────────────────────
   const normalizedTransactions = useMemo(() => {
@@ -406,16 +414,32 @@ function ReportsTab({
     const now = new Date();
     const fb = `Report ${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })} ${now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
     const name = saveName.trim() || fb;
-    const dedup = userSavedReports.some((r) => r.name.toLowerCase() === name.toLowerCase())
-      ? `${name} (${userSavedReports.length + 1})` : name;
-    setSavedReports((prev) => [...prev, { id: Date.now(), name: dedup, userId: user?._id || "anonymous", tab: reportTab, dateFrom, dateTo }]);
-    dedupToast.success("Report saved");
-    setSaveName(""); setSaveOpen(false);
+    
+    saveReportMutation.mutate({
+      name,
+      tab: reportTab,
+      viewBy,
+      dateFrom,
+      dateTo,
+      showIncome,
+      showExpense,
+      showNetTrend,
+      selectedMonthKey
+    });
   };
 
   const loadReport = (r) => {
-    setReportTab(r.tab); setDateFrom(r.dateFrom); setDateTo(r.dateTo);
-    setDraftFrom(r.dateFrom); setDraftTo(r.dateTo);
+    setReportTab(r.tab);
+    setViewBy(r.viewBy || "Month");
+    setDateFrom(r.dateFrom);
+    setDateTo(r.dateTo);
+    setDraftFrom(r.dateFrom);
+    setDraftTo(r.dateTo);
+    setShowIncome(r.showIncome !== undefined ? r.showIncome : true);
+    setShowExpense(r.showExpense !== undefined ? r.showExpense : true);
+    setShowNetTrend(r.showNetTrend !== undefined ? r.showNetTrend : false);
+    setSelectedMonthKey(r.selectedMonthKey || null);
+    dedupToast.info(`Loaded report: ${r.name}`);
   };
 
   const toggleTableSort = (key) => {
@@ -976,8 +1000,9 @@ function ReportsTab({
                     <span style={{ fontSize: 12.5, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{r.name}</span>
                   </button>
                   <button type="button"
-                    onClick={(e) => { e.stopPropagation(); setSavedReports((p) => p.filter((x) => x.id !== r.id)); dedupToast.success("Report removed"); }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, padding: 2, display: "flex", flexShrink: 0 }}>
+                    disabled={deleteReportMutation.isPending}
+                    onClick={(e) => { e.stopPropagation(); deleteReportMutation.mutate(r._id); }}
+                    style={{ background: "none", border: "none", cursor: deleteReportMutation.isPending ? "not-allowed" : "pointer", color: C.muted, padding: 2, display: "flex", flexShrink: 0 }}>
                     <X size={11} />
                   </button>
                 </div>
@@ -997,8 +1022,9 @@ function ReportsTab({
                 />
                 <div style={{ display: "flex", gap: 6 }}>
                   <button type="button" onClick={handleSave}
-                    style={{ flex: 2, padding: "7px 0", borderRadius: 8, border: "none", background: C.strong, color: C.onStrong, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                    Save
+                    disabled={saveReportMutation.isPending}
+                    style={{ flex: 2, padding: "7px 0", borderRadius: 8, border: "none", background: C.strong, color: C.onStrong, fontSize: 12, fontWeight: 600, cursor: saveReportMutation.isPending ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: saveReportMutation.isPending ? 0.7 : 1 }}>
+                    {saveReportMutation.isPending ? "Saving…" : "Save"}
                   </button>
                   <button type="button" onClick={() => { setSaveOpen(false); setSaveName(""); }}
                     style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: "var(--bg-secondary)", color: C.sub, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>

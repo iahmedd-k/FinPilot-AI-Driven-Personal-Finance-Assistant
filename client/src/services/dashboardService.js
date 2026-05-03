@@ -10,4 +10,7 @@ export const dashboardService = {
   saveForecastCustomizations: (payload) => api.post("/dashboard/forecast/customizations", payload),
   resetForecastCustomizations: () => api.post("/dashboard/forecast/customizations/reset"),
   exportData: () => api.post("/dashboard/export"),
+  getSavedReports: () => api.get("/dashboard/reports"),
+  saveReport: (payload) => api.post("/dashboard/reports", payload),
+  deleteSavedReport: (id) => api.delete(`/dashboard/reports/${id}`),
 };
