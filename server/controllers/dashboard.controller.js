@@ -473,8 +473,8 @@ const saveForecastCustomizations = async (req, res, next) => {
       details: event?.details && typeof event.details === "object" ? event.details : {},
     }));
 
-    const MIN_EVENT_AGE = 30;
-    const MAX_EVENT_AGE = 90;
+    const MIN_EVENT_AGE = 18;
+    const MAX_EVENT_AGE = 100;
     const isValidMonth = (month) => !month || /^\d{4}-\d{2}$/.test(String(month));
     const hasValidNonNegativeNumber = (value) => Number.isFinite(Number(value)) && Number(value) >= 0;
 

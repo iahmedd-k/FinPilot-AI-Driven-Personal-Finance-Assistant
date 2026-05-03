@@ -126,6 +126,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const [collapsedEventIndexes, setCollapsedEventIndexes] = useState([]);
   const [activeMilestoneHint, setActiveMilestoneHint] = useState(null);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [selectedRange, setSelectedRange] = useState("lifetime"); // "12m", "5y", "10y", "lifetime"
 
   const { data: customizationRes } = useQuery({
     queryKey: ["forecast-customizations"],
@@ -566,26 +567,35 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     };
   });
 
-  // [FIX] projectionFuturePoint: use index 12 (12 months ahead) not Math.min(12, len-1)
-  // which would give month 12 regardless of series length — now gracefully falls back.
-  const projectionFuturePoint = projectionSeries.length > 12
-    ? projectionSeries[12]
-    : projectionSeries[projectionSeries.length - 1];
+  const targetMonthIndex = useMemo(() => {
+    if (selectedRange === "12m") return 12;
+    if (selectedRange === "5y") return 60;
+    if (selectedRange === "10y") return 120;
+    return projectionMonths;
+  }, [selectedRange, projectionMonths]);
 
-  const displayFutureNW12 = projectionFuturePoint?.netWorth ?? currentNetWorth;
+  const projectionFuturePoint = useMemo(() => {
+    if (!projectionSeries.length) return null;
+    const idx = Math.min(targetMonthIndex, projectionSeries.length - 1);
+    return projectionSeries[idx];
+  }, [projectionSeries, targetMonthIndex]);
 
-  // [FIX] futureCF12 was referenced but never defined — now correctly derived from projectionSeries
-  const futureCF12 = projectionSeries.length > 12
-    ? projectionSeries[12].balance
-    : projectionSeries[projectionSeries.length - 1]?.balance ?? currentBalance;
+  const displayFutureNW = projectionFuturePoint?.netWorth ?? currentNetWorth;
+  const displayFutureCF = projectionFuturePoint?.balance ?? currentBalance;
 
-  const displayFutureCF12 = projectionFuturePoint?.balance ?? futureCF12;
   const displayCurrentNW = projectionSeries[0]?.netWorth ?? currentNetWorth;
   const displayCurrentCF = projectionSeries[0]?.balance ?? currentBalance;
 
-  const displayNWGain = displayFutureNW12 - displayCurrentNW;
-  const displayCFGain = displayFutureCF12 - displayCurrentCF;
+  const displayNWGain = displayFutureNW - displayCurrentNW;
+  const displayCFGain = displayFutureCF - displayCurrentCF;
   const displayNWGainPct = Math.abs(displayCurrentNW) > 0 ? (displayNWGain / Math.abs(displayCurrentNW)) * 100 : null;
+
+  const rangeLabel = {
+    "12m": "12 months",
+    "5y": "5 years",
+    "10y": "10 years",
+    "lifetime": "lifetime",
+  }[selectedRange] || "lifetime";
 
   const projectionFirstYear = projectionSeries.slice(1, 13);
   const projectionAvgIncome = projectionFirstYear.length
@@ -595,7 +605,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     ? Math.round(projectionFirstYear.reduce((sum, p) => sum + (p.expense || 0), 0) / projectionFirstYear.length)
     : predictedExpense;
 
-  const projectionCashFlowFormula = displayFutureCF12;
+  const projectionCashFlowFormula = displayFutureCF;
   const projectionMinNW = Math.min(...projectionNWData.map((p) => p.netWorth));
   const projectionMaxNW = Math.max(...projectionNWData.map((p) => p.netWorth));
   const projectionShowDebtBaseline = projectionMinNW < 0 && projectionMaxNW > 0;
@@ -835,6 +845,34 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                 </div>
                 <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text }}>Net Worth Forecast</div>
               </div>
+
+              <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}` }}>
+                {[
+                  { id: "12m", label: "1Y" },
+                  { id: "5y", label: "5Y" },
+                  { id: "10y", label: "10Y" },
+                  { id: "lifetime", label: "Lifetime" }
+                ].map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedRange(r.id)}
+                    style={{
+                      padding: isMobile ? "4px 8px" : "6px 12px",
+                      borderRadius: 8,
+                      fontSize: isMobile ? 10 : 11,
+                      fontWeight: 700,
+                      border: "none",
+                      background: selectedRange === r.id ? C.white : "transparent",
+                      color: selectedRange === r.id ? C.text : C.muted,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      boxShadow: selectedRange === r.id ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={openSettingsModal}
@@ -853,8 +891,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   {displayCurrentNW < 0 && <div style={{ fontSize: 10.5, color: C.red, marginTop: 2, fontWeight: 600 }}>In debt</div>}
                 </div>
                 <div style={{ padding: "9px 11px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>In 12 months</div>
-                  <div style={{ fontSize: secondaryValueSize, fontWeight: 700, letterSpacing: "-0.4px", color: C.text }}>{fmt(displayFutureNW12)}</div>
+                  <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Forecast ({rangeLabel})</div>
+                  <div style={{ fontSize: secondaryValueSize, fontWeight: 700, letterSpacing: "-0.4px", color: C.text }}>{fmt(displayFutureNW)}</div>
                   {displayNWGain !== 0 && (
                     <div style={{ fontSize: 11, fontWeight: 600, color: displayNWGain >= 0 ? "#10b981" : C.red, marginTop: 3 }}>
                       {displayNWGain >= 0 ? "+" : ""}{fmt(displayNWGain)}{displayNWGainPct != null ? ` (${displayNWGain >= 0 ? "+" : ""}${displayNWGainPct.toFixed(1)}%)` : ""}
@@ -870,8 +908,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   {displayCurrentNW < 0 && <div style={{ fontSize: 11, color: C.red, marginTop: 4, fontWeight: 600 }}>In debt</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecast net worth in 12 months</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: C.text }}>{fmt(displayFutureNW12)}</div>
+                  <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecast ({rangeLabel})</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: C.text }}>{fmt(displayFutureNW)}</div>
                   {displayNWGain !== 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: displayNWGain >= 0 ? "#10b981" : C.red, marginTop: 4 }}>
                       {displayNWGain >= 0 ? "+" : ""}{fmt(displayNWGain)}{displayNWGainPct != null ? ` (${displayNWGain >= 0 ? "+" : ""}${displayNWGainPct.toFixed(1)}%)` : ""}
@@ -1033,7 +1071,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
                 <div style={{ fontSize: bodyTextSize, color: C.sub, lineHeight: 1.5 }}>
-                  Net worth moves from {fmt(displayCurrentNW)} → {fmt(displayFutureNW12)} over 12 months ({fmt(displayNWGain)} change).
+                  Net worth moves from {fmt(displayCurrentNW)} → {fmt(displayFutureNW)} over {rangeLabel} ({fmt(displayNWGain)} change).
                 </div>
               </div>
             </div>
@@ -1059,8 +1097,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
                 </div>
                 <div style={{ padding: "9px 11px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>In 12 months</div>
-                  <div style={{ fontSize: secondaryValueSize, fontWeight: 700, letterSpacing: "-0.4px", color: displayFutureCF12 < 0 ? C.red : C.text }}>{fmt(displayFutureCF12)}</div>
+                  <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Forecast ({rangeLabel})</div>
+                  <div style={{ fontSize: secondaryValueSize, fontWeight: 700, letterSpacing: "-0.4px", color: displayFutureCF < 0 ? C.red : C.text }}>{fmt(displayFutureCF)}</div>
                   {displayCFGain !== 0 && (
                     <div style={{ fontSize: 11, fontWeight: 600, color: displayCFGain >= 0 ? "#10b981" : C.red, marginTop: 3 }}>
                       {displayCFGain >= 0 ? "+" : ""}{fmt(displayCFGain)}
@@ -1075,11 +1113,11 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecasted in 12 months</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayFutureCF12 < 0 ? C.red : C.text }}>{fmt(displayFutureCF12)}</div>
+                  <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecasted in {rangeLabel}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayFutureCF < 0 ? C.red : C.text }}>{fmt(displayFutureCF)}</div>
                   {displayCFGain !== 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: displayCFGain >= 0 ? "#10b981" : C.red, marginTop: 4 }}>
-                      {displayCFGain >= 0 ? "+" : ""}{fmt(displayCFGain)} over 12 months
+                      {displayCFGain >= 0 ? "+" : ""}{fmt(displayCFGain)} over {rangeLabel}
                     </div>
                   )}
                 </div>
@@ -1090,7 +1128,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             <div style={{ margin: isMobile ? "10px 10px 0" : "12px 22px 0", padding: "8px 10px", background: C.greenBg, border: `1px solid ${C.border}`, borderRadius: 10, display: "flex", alignItems: "flex-start", gap: 8 }}>
               <TrendingUp size={13} style={{ color: "#10b981", flexShrink: 0, marginTop: 1 }} />
               <span style={{ fontSize: bodyTextSize, color: C.text, lineHeight: 1.5 }}>
-                Balance ({fmt(displayCurrentCF)}) + avg income ({fmt(projectionAvgIncome)}) − expenses ({fmt(projectionAvgExpense)}) = <strong>{fmt(projectionCashFlowFormula)}</strong>
+                Balance ({fmt(displayCurrentCF)}) + avg income ({fmt(projectionAvgIncome)}) − expenses ({fmt(projectionAvgExpense)}) = <strong>{fmt(displayFutureCF)}</strong>
               </span>
             </div>
 
@@ -1240,7 +1278,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
                 <div style={{ fontSize: bodyTextSize, color: C.sub, lineHeight: 1.5 }}>
-                  Cash balance moves from {fmt(displayCurrentCF)} → {fmt(displayFutureCF12)} over 12 months.
+                  Cash balance moves from {fmt(displayCurrentCF)} → {fmt(displayFutureCF)} over {rangeLabel}.
                 </div>
               </div>
             </div>

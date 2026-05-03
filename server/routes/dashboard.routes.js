@@ -26,8 +26,8 @@ router.post('/spending-settings', protect, saveSpendingSettings);
 router.post('/export', protect, requirePro, exportDashboardData);
 
 // New forecast customization endpoints
-router.get('/forecast/customizations', protect, requirePro, getForecastCustomizations);
-router.post('/forecast/customizations', protect, requirePro, saveForecastCustomizations);
-router.post('/forecast/customizations/reset', protect, requirePro, resetForecastCustomizations);
+router.get('/forecast/customizations', protect, getForecastCustomizations);
+router.post('/forecast/customizations', protect, saveForecastCustomizations);
+router.post('/forecast/customizations/reset', protect, resetForecastCustomizations);
 
 module.exports = router;
