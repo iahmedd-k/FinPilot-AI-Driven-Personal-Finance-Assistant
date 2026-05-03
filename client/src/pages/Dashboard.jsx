@@ -3310,6 +3310,20 @@ function MiniSparkline({ prices, up, width = 80, height = 36 }) {
 }
 
 
+const COIN_MAPPING = {
+  btc: "bitcoin", eth: "ethereum", usdt: "tether", bnb: "binancecoin", sol: "solana", 
+  usdc: "usd-coin", xrp: "ripple", ada: "cardano", avax: "avalanche-2", doge: "dogecoin", 
+  dot: "polkadot", matic: "matic-network", shib: "shiba-inu", ltc: "litecoin", trx: "tron", 
+  link: "chainlink", bch: "bitcoin-cash", ton: "the-open-network", xlm: "stellar", 
+  atom: "cosmos", uni: "uniswap", xmr: "monero", etc: "ethereum-classic"
+};
+
+const getCoinGeckoId = (coinStr) => {
+  if (!coinStr) return "";
+  const lower = coinStr.toLowerCase().trim();
+  return COIN_MAPPING[lower] || lower;
+};
+
 function CryptoHoldingsWidget({ C, setActiveNav }) {
   const { assets, loading } = usePortfolio();
   const cryptos = (assets || []).filter(a => a.assetType === "crypto" || (!a.assetType && a.coin));
@@ -3322,8 +3336,9 @@ function CryptoHoldingsWidget({ C, setActiveNav }) {
     unique.forEach(async (coin) => {
       if (sparklines[coin]) return; // already fetched
       try {
+        const cgId = getCoinGeckoId(coin);
         const res = await fetch(
-          `https://api.coingecko.com/api/v3/coins/${coin}/market_chart?vs_currency=usd&days=7&interval=daily`
+          `https://api.coingecko.com/api/v3/coins/${cgId}/market_chart?vs_currency=usd&days=7&interval=daily`
         );
         const data = await res.json();
         if (data.prices) {

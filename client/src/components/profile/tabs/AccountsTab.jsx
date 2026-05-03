@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Building2, Car, DollarSign, Eye, EyeOff, Gem, Heart, Home, Landmark, Layers, MoreVertical, PiggyBank, Plus, Search, Shield, Trophy, TrendingUp, X } from "lucide-react";
+import { ArrowUp, Building2, Car, DollarSign, Eye, EyeOff, Gem, Heart, Home, Landmark, Layers, MoreVertical, PiggyBank, Plus, Search, Shield, Trophy, TrendingUp, X, Upload } from "lucide-react";
 import { useAuthContext } from "../../../hooks/useAuthContext";
 import { cryptoService } from "../../../services/cryptoService";
 import { dashboardService } from "../../../services/dashboardService";
