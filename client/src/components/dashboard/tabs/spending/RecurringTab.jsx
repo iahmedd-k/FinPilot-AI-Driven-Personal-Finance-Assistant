@@ -262,26 +262,26 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           
           {/* Calendar Panel */}
-          <div style={panelStyle(C, { padding: 24 })}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+          <div style={panelStyle(C, { padding: isMobile ? 16 : 24 })}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 10 }}>
+              <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
                 Upcoming this {viewMonth.getMonth() === new Date().getMonth() && viewMonth.getFullYear() === new Date().getFullYear() ? "month" : viewMonth.toLocaleDateString('en-US', { month: 'long' })}
               </div>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <button onClick={() => changeMonth(-1)} style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${C.border}`, background: "var(--bg-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.text, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)" }}>
-                  <ChevronLeft size={18} />
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button onClick={() => changeMonth(-1)} style={{ width: 32, height: 32, borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--bg-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.text, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)" }}>
+                  <ChevronLeft size={16} />
                 </button>
-                <button onClick={() => changeMonth(1)} style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${C.border}`, background: "var(--bg-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.text, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)" }}>
-                  <ChevronRight size={18} />
+                <button onClick={() => changeMonth(1)} style={{ width: 32, height: 32, borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--bg-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.text, boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)" }}>
+                  <ChevronRight size={16} />
                 </button>
               </div>
             </div>
 
             {/* Calendar Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: isMobile ? 2 : 4 }}>
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
-                <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", paddingBottom: 12 }}>
-                  {d}
+                <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em", paddingBottom: 8 }}>
+                  {isMobile ? d.charAt(0) : d}
                 </div>
               ))}
               {calendarDays.map((day, i) => {
@@ -316,9 +316,9 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
 
                 return (
                   <div key={i} style={{
-                    height: 64,
-                    padding: 8,
-                    borderRadius: 14,
+                    height: isMobile ? 44 : 64,
+                    padding: isMobile ? 4 : 8,
+                    borderRadius: isMobile ? 10 : 14,
                     background: bg,
                     border,
                     boxShadow: shadow,
@@ -328,15 +328,15 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                     opacity: day.currentMonth ? 1 : 0.3,
                     transition: "all 0.2s"
                   }}>
-                    <div style={{ fontSize: 12, fontWeight: hasAny && day.currentMonth ? 700 : 500, color: dayNumColor }}>
+                    <div style={{ fontSize: isMobile ? 11 : 12, fontWeight: hasAny && day.currentMonth ? 700 : 500, color: dayNumColor }}>
                       {day.day}
                     </div>
                     {day.currentMonth && hasAny && (
-                      <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <div style={{ display: "flex", gap: isMobile ? 2 : 3, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         {day.occurrences?.map((occ, idx) => (
                           <div key={idx} style={{
-                            width: 7,
-                            height: 7,
+                            width: isMobile ? 5 : 7,
+                            height: isMobile ? 5 : 7,
                             borderRadius: "50%",
                             background: occ.type === "income" ? "#10b981" : "#0D7377",
                             boxShadow: occ.type === "income"
@@ -353,7 +353,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
             
             {recurringItems.length === 0 && (
                <div style={{ marginTop: 24, padding: "32px 0", textAlign: "center", borderTop: `1px solid ${C.border2}` }}>
-                 <p style={{ fontSize: 14, color: C.muted, maxWidth: 300, margin: "0 auto" }}>
+                 <p style={{ fontSize: 13, color: C.muted, maxWidth: 300, margin: "0 auto" }}>
                    Add your recurring bills and subscriptions to see what's coming up.
                  </p>
                </div>
@@ -368,7 +368,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
             width: "100%",
             fontFamily: "inherit"
           }}>
-            <div style={{ padding: 20 }}>
+            <div style={{ padding: isMobile ? 16 : 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.text }}>
                   <Sparkles size={16} />
@@ -417,7 +417,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
           
           {/* Net Recurring Card */}
           <div style={panelStyle(C)}>
-            <div style={{ padding: 20 }}>
+            <div style={{ padding: isMobile ? 16 : 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
                 <span style={{ fontSize: 13, color: C.muted, fontWeight: 500 }}>Net recurring</span>
                 <Info size={14} color={C.muted} />
@@ -427,7 +427,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
               </div>
             </div>
             <div style={{ height: 1, background: C.border2, width: "100%" }} />
-            <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ padding: isMobile ? 16 : 20, display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
                   <span style={{ color: C.muted }}>Income</span>
@@ -451,7 +451,15 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
 
           {/* Upcoming List Card */}
           <div style={panelStyle(C)}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ 
+              padding: isMobile ? "14px 16px" : "16px 20px", 
+              borderBottom: `1px solid ${C.border2}`, 
+              display: "flex", 
+              flexDirection: isMobile ? "column" : "row",
+              justifyContent: "space-between", 
+              alignItems: isMobile ? "flex-start" : "center",
+              gap: isMobile ? 12 : 0
+            }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Upcoming this month</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>Show inferred</span>

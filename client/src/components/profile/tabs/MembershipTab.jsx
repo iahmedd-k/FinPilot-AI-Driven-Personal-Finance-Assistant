@@ -4,7 +4,7 @@ import { subscriptionService } from "../../../services/subscriptionService";
 import { BG, BORDER, Card, CardHeader, GREEN, MUTED, RED, SURFACE_STRONG, TEXT, TEXT_ON_STRONG } from "../shared";
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 
-export default function MembershipTab({ user, navigate }) {
+export default function MembershipTab({ user, navigate, isMobile }) {
   const { data: billing, isLoading } = useQuery({
     queryKey: ["billing-status"],
     queryFn: () => subscriptionService.getBillingStatus(),
@@ -37,7 +37,7 @@ export default function MembershipTab({ user, navigate }) {
         <CardHeader
           label="Your Current Plan"
           right={
-            <button type="button" onClick={() => navigate(ROUTES.SUBSCRIPTION)} style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: SURFACE_STRONG, color: TEXT_ON_STRONG, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            <button type="button" onClick={() => navigate(ROUTES.SUBSCRIPTION)} style={{ padding: isMobile ? "7px 14px" : "9px 20px", borderRadius: 10, border: "none", background: SURFACE_STRONG, color: TEXT_ON_STRONG, fontSize: isMobile ? 12 : 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
               Manage membership
             </button>
           }
@@ -48,7 +48,7 @@ export default function MembershipTab({ user, navigate }) {
             <span style={{ fontSize: 12, fontWeight: 700, color: badge.color, textTransform: "uppercase", letterSpacing: "0.02em" }}>{badge.label}</span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 16 : 24 }}>
             {[
               { label: "Plan Tier", value: isPro ? "FinPilot Pro" : "Standard Free" },
               { label: "Member Since", value: since },
@@ -66,7 +66,7 @@ export default function MembershipTab({ user, navigate }) {
       {!isPro && (
         <Card>
           <CardHeader label="Monthly Usage" />
-          <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ padding: isMobile ? "14px 16px" : "16px 20px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
             {[{ label: "Transactions", used: user?.transactionsUsed ?? 0, limit: 10 }, { label: "AI Queries", used: user?.aiQueriesUsed ?? 0, limit: 5 }].map((stat) => {
               const pct = Math.min((stat.used / stat.limit) * 100, 100);
               const over = stat.used >= stat.limit;

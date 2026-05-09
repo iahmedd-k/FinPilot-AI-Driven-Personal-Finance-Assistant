@@ -40,7 +40,7 @@ export const labelSx = {
 };
 
 export const fi = (e) => {
-  e.target.style.borderColor = "#999";
+  e.target.style.borderColor = "var(--text-muted)";
 };
 
 export const fo = (e) => {
@@ -72,7 +72,7 @@ export function FloatingInput({ label, value, onChange, type = "text", readOnly 
           top: lifted ? 10 : "50%",
           transform: lifted ? "none" : "translateY(-50%)",
           fontSize: lifted ? 11 : 14,
-          color: focused ? "#555" : MUTED,
+          color: focused ? "var(--text-primary)" : MUTED,
           transition: "all 0.15s ease",
           pointerEvents: "none",
           zIndex: 1,
@@ -91,7 +91,7 @@ export function FloatingInput({ label, value, onChange, type = "text", readOnly 
         onBlur={() => setFocused(false)}
         style={{
           width: "100%",
-          border: `1px solid ${focused ? "#aaa" : BORDER}`,
+          border: `1px solid ${focused ? "var(--border-strong)" : BORDER}`,
           borderRadius: 12,
           padding: lifted ? "24px 16px 8px" : "16px 16px",
           fontSize: 14,
@@ -124,7 +124,7 @@ export function FloatingSelect({ label, value, onChange, options }) {
         onBlur={() => setFocused(false)}
         style={{
           width: "100%",
-          border: `1px solid ${focused ? "#aaa" : BORDER}`,
+          border: `1px solid ${focused ? "var(--border-strong)" : BORDER}`,
           borderRadius: 12,
           padding: "24px 40px 8px 16px",
           fontSize: 14,

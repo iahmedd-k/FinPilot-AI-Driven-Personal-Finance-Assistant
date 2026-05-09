@@ -58,8 +58,8 @@ input[type=number] {
 
   /* Text colors — Clear hierarchy */
   --text-primary: #111111;
-  --text-secondary: #6B7280;
-  --text-muted: #9CA3AF;
+  --text-secondary: #4B5563;
+  --text-muted: #5D6470;
   --text-inverse: #FFFFFF;
   --text-on-strong: #FFFFFF;
   --text-disabled: #D1D5DB;
@@ -162,8 +162,8 @@ input[type=number] {
 
   /* Text colors — Optimal for dark mode */
   --text-primary: #FFFFFF;
-  --text-secondary: #A6A5A2;
-  --text-muted: #7A7975;
+  --text-secondary: #D1D5DB;
+  --text-muted: #9CA3AF;
   --text-inverse: #111111;
   --text-on-strong: #111111;
   --text-disabled: #4A4945;

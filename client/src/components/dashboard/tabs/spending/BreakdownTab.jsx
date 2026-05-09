@@ -1006,8 +1006,8 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
                 </div>
               </div>
 
-              {/* Largest + Most Frequent — 2-col grid on mobile */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {/* Largest + Most Frequent — 1-col on mobile, 2-col on tablet/small screens */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:12 }}>
                 {/* Largest Transactions */}
                 <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 14px" }}>
                   <div style={{ fontSize:9, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.10em", marginBottom:12 }}>

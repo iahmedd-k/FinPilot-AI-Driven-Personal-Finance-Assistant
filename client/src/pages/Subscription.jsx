@@ -37,7 +37,7 @@ const O = {
 function BrandLockup() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <Logo size="md" dark />
+      <Logo size="md" textColor="#FFFFFF" accentColor="rgba(255,255,255,0.75)" />
     </div>
   );
 }
@@ -80,6 +80,13 @@ export default function Subscription() {
   const [searchParams] = useSearchParams();
   const { user, fetchMe } = useAuthContext();
   const [loadingAction, setLoadingAction] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 920);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 920);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const isPro = String(user?.subscriptionTier || "").toLowerCase() === "pro";
   const canceled = searchParams.get("canceled") === "true";
@@ -163,16 +170,19 @@ export default function Subscription() {
 
   return (
     <div style={{ minHeight: "100vh", background: O.bg, color: O.textPrimary, fontFamily: "Inter, sans-serif" }}>
-      <style>{`
-        @media (max-width: 1024px) {
-          .subscription-layout {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
-
-      <div className="subscription-layout" style={{ display: "grid", gridTemplateColumns: "minmax(320px, 420px) minmax(0, 1fr)", minHeight: "100vh" }}>
-        <section style={{ background: O.navy, color: "#FFFFFF", padding: "40px 32px", display: "flex", flexDirection: "column", gap: 28 }}>
+      <div className="subscription-layout" style={{ 
+        display: "grid", 
+        gridTemplateColumns: isMobile ? "1fr" : "minmax(320px, 420px) minmax(0, 1fr)", 
+        minHeight: "100vh" 
+      }}>
+        <section style={{ 
+          background: O.navy, 
+          color: "#FFFFFF", 
+          padding: isMobile ? "32px 20px" : "40px 32px", 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: isMobile ? 24 : 28 
+        }}>
           <BrandLockup />
 
           <div style={{ marginTop: 12, display: "grid", gap: 16 }}>
@@ -181,11 +191,11 @@ export default function Subscription() {
               {isPro ? "Pro Active" : "Free Plan"}
             </div>
 
-            <div style={{ fontSize: 34, lineHeight: 1.1, letterSpacing: "-0.04em", fontWeight: 800 }}>
+            <div style={{ fontSize: isMobile ? 28 : 34, lineHeight: 1.1, letterSpacing: "-0.04em", fontWeight: 800 }}>
               {isPro ? "Your Pro access is active." : "Upgrade to Pro with Stripe Checkout."}
             </div>
 
-            <div style={{ fontSize: 15, lineHeight: 1.65, color: "rgba(255,255,255,0.7)", maxWidth: 360 }}>
+            <div style={{ fontSize: isMobile ? 14 : 15, lineHeight: 1.65, color: "rgba(255,255,255,0.7)", maxWidth: 360 }}>
               {isPro
                 ? "Your account already has Pro access. Billing is managed in Stripe, and your dashboard tools stay unlocked."
                 : "Free users can upgrade straight to Pro. Stripe handles payment details securely, so this page only shows plan details and the upgrade action."}
@@ -204,15 +214,15 @@ export default function Subscription() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.DASHBOARD)}
-            style={{ marginTop: "auto", width: "fit-content", border: "none", background: "transparent", padding: 0, display: "flex", alignItems: "center", gap: 10, color: "#FFFFFF", fontSize: 15, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
+            style={{ marginTop: isMobile ? 40 : "auto", width: "fit-content", border: "none", background: "transparent", padding: 0, display: "flex", alignItems: "center", gap: 10, color: "#FFFFFF", fontSize: 15, cursor: "pointer", fontFamily: "Inter, sans-serif" }}
           >
             <ArrowLeft size={17} />
             Return to dashboard
           </button>
         </section>
 
-        <section style={{ padding: "40px 32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: "100%", maxWidth: 760, background: O.cardBg, border: `1px solid ${O.border}`, borderRadius: 24, boxShadow: O.cardShadow, padding: "32px 28px" }}>
+        <section style={{ padding: isMobile ? "24px 16px" : "40px 32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: "100%", maxWidth: 760, background: O.cardBg, border: `1px solid ${O.border}`, borderRadius: 24, boxShadow: O.cardShadow, padding: isMobile ? "24px 20px" : "32px 28px" }}>
             {!billingConfigured ? (
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start", border: `1px solid ${C.warningBorder}`, background: C.warningBg, borderRadius: 14, padding: "13px 14px", marginBottom: 20 }}>
                 <AlertCircle size={16} color={C.warningText} style={{ marginTop: 2, flexShrink: 0 }} />
@@ -229,15 +239,15 @@ export default function Subscription() {
                   {isPro ? "Pro membership" : "Free membership"}
                 </div>
 
-                <div style={{ marginTop: 18, fontSize: 30, lineHeight: 1.1, letterSpacing: "-0.04em", fontWeight: 800, color: O.textPrimary }}>
+                <div style={{ marginTop: 18, fontSize: isMobile ? 24 : 30, lineHeight: 1.1, letterSpacing: "-0.04em", fontWeight: 800, color: O.textPrimary }}>
                   {isPro ? "FinPilot Pro" : "Upgrade to FinPilot Pro"}
                 </div>
 
-                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 700, color: O.textPrimary }}>
+                <div style={{ marginTop: 8, fontSize: isMobile ? 16 : 18, fontWeight: 700, color: O.textPrimary }}>
                   {displayAmount} per {displayInterval}
                 </div>
 
-                <div style={{ marginTop: 14, maxWidth: 560, fontSize: 15, lineHeight: 1.65, color: O.textSecondary }}>
+                <div style={{ marginTop: 14, maxWidth: 560, fontSize: isMobile ? 14 : 15, lineHeight: 1.65, color: O.textSecondary }}>
                   {isPro
                     ? `Your ${billingCycleLabel} Pro subscription is ${statusLabel}.${statusDateLabel ? ` Current access runs through ${statusDateLabel}.` : ""} If you need billing changes, invoices, or cancellation, manage everything inside Stripe.`
                     : liveSubscription?.status
@@ -246,7 +256,7 @@ export default function Subscription() {
                 </div>
               </div>
 
-              <div style={{ width: "100%", maxWidth: 280, display: "grid", gap: 12 }}>
+              <div style={{ width: "100%", maxWidth: isMobile ? "100%" : 280, display: "grid", gap: 12 }}>
                 {!isPro ? (
                   <ActionButton
                     primary
@@ -273,7 +283,7 @@ export default function Subscription() {
               </div>
             </div>
 
-                <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            <div style={{ marginTop: isMobile ? 20 : 28, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
               <div style={{ border: `1px solid ${O.border}`, borderRadius: 16, padding: "16px 18px", background: O.bg }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: O.textSecondary, textTransform: "uppercase", letterSpacing: "0.08em" }}>Plan</div>
                 <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700, color: O.textPrimary }}>{isPro ? "Pro" : "Free"}</div>

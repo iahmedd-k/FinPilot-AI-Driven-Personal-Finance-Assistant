@@ -10,7 +10,7 @@ import SecurityTab from "../components/profile/tabs/SecurityTab";
 import DocumentsTab from "../components/profile/tabs/DocumentsTab";
 import MembershipTab from "../components/profile/tabs/MembershipTab";
 import AIProfileTab from "../components/profile/tabs/AIProfileTab";
-import { C, navSections } from "../components/dashboard/dashboardShared.jsx";
+import { C, navSections, dedupToast } from "../components/dashboard/dashboardShared.jsx";
 import Logo from "../components/common/Logo";
 
 const TABS = [
@@ -308,7 +308,19 @@ export default function ProfilePage() {
   const [notifications, setNotifications] = useState([]);
   const notifRef = useRef(null);
 
-  const pushNotif = (type, text) => { void type; void text; };
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 920);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 920);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const pushNotif = (type, message) => {
+    const notify = dedupToast[type] || dedupToast.info;
+    const duration = isMobile ? 1200 : 1800;
+    notify(message, { id: message, duration });
+  };
   const queryTab = new URLSearchParams(location.search).get("tab");
   const tab = TABS.some((t) => t.id === queryTab) ? queryTab : "profile";
   const goToTab = (next) => navigate(`${ROUTES.PROFILEPAGE}?tab=${next}`, { replace: true });
@@ -465,12 +477,12 @@ export default function ProfilePage() {
         </div>
 
         <div className="profile-content-shell" style={{ width: "100%", padding: "24px 28px 80px", animation: "fadeUp 0.25s ease" }} key={tab}>
-          {tab === "profile" && <ProfileTab user={user} refreshUser={fetchMe} pushNotif={pushNotif} />}
-          {tab === "accounts" && <AccountsTab pushNotif={pushNotif} />}
-          {tab === "security" && <SecurityTab pushNotif={pushNotif} />}
-          {tab === "documents" && <DocumentsTab />}
-          {tab === "membership" && <MembershipTab user={user} navigate={navigate} />}
-          {tab === "aiprofile" && <AIProfileTab />}
+          {tab === "profile" && <ProfileTab user={user} refreshUser={fetchMe} pushNotif={pushNotif} isMobile={isMobile} />}
+          {tab === "accounts" && <AccountsTab pushNotif={pushNotif} isMobile={isMobile} />}
+          {tab === "security" && <SecurityTab pushNotif={pushNotif} isMobile={isMobile} />}
+          {tab === "documents" && <DocumentsTab isMobile={isMobile} />}
+          {tab === "membership" && <MembershipTab user={user} navigate={navigate} isMobile={isMobile} />}
+          {tab === "aiprofile" && <AIProfileTab isMobile={isMobile} />}
         </div>
       </div>
     </div>

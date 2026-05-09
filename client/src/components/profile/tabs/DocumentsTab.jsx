@@ -20,20 +20,21 @@ const ACCOUNT_DOCS = [
   { label: "Subscription Agreement", href: "/docs/subscription" },
 ];
 
-function DocGroup({ label, docs }) {
+function DocGroup({ label, docs, isMobile }) {
   return (
     <Card>
       <CardHeader label={label} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}>
         {docs.map((doc, index) => {
           const isLeft = index % 2 === 0;
-          const isLastRow = index >= docs.length - 2;
+          const isLastRow = isMobile ? index === docs.length - 1 : index >= docs.length - 2;
+          const showRightBorder = !isMobile && isLeft && index + 1 < docs.length;
 
           return (
             <Link
               key={doc.label}
               to={doc.href}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", textDecoration: "none", background: WHITE, borderRight: isLeft && index + 1 < docs.length ? `1px solid ${BORDER}` : "none", borderBottom: isLastRow ? "none" : `1px solid ${BORDER}`, transition: "background 0.12s" }}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", textDecoration: "none", background: WHITE, borderRight: showRightBorder ? `1px solid ${BORDER}` : "none", borderBottom: isLastRow ? "none" : `1px solid ${BORDER}`, transition: "background 0.12s" }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = BG;
               }}
@@ -54,11 +55,11 @@ function DocGroup({ label, docs }) {
   );
 }
 
-export default function DocumentsTab() {
+export default function DocumentsTab({ isMobile }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <DocGroup label="FinPilot Docs" docs={FINPILOT_DOCS} />
-      <DocGroup label="Account Policies" docs={ACCOUNT_DOCS} />
+      <DocGroup label="FinPilot Docs" docs={FINPILOT_DOCS} isMobile={isMobile} />
+      <DocGroup label="Account Policies" docs={ACCOUNT_DOCS} isMobile={isMobile} />
     </div>
   );
 }

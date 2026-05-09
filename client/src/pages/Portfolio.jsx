@@ -590,7 +590,8 @@ function AssetCard({ a, idx, onEdit, onDelete }) {
 }
 
 /* ── Main Portfolio ──────────────────────────────────────── */
-export default function Portfolio() {
+export default function Portfolio({ isMobile: isMobileProp }) {
+  const isMobile = isMobileProp ?? (typeof window !== "undefined" && window.innerWidth <= 768);
   const { user } = useAuthContext();
   const navigate = useNavigate();
   const currencyCode = getUserCurrency(user);
@@ -932,8 +933,21 @@ export default function Portfolio() {
           </div>
         </div>
 
-        {/* ── Table ── */}
-        <div className="pf-table-outer" style={{ overflowX: "auto" }}>
+        {/* ── Table / Cards List ── */}
+        {isMobile ? (
+          <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {loading ? (
+              <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>Loading assets…</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 13 }}>No assets found</div>
+            ) : (
+              filtered.map((a, idx) => (
+                <AssetCard key={a._id} a={a} idx={idx} onEdit={openEdit} onDelete={setConfirmId} />
+              ))
+            )}
+          </div>
+        ) : (
+          <div className="pf-table-outer" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
             <thead>
               <tr style={{ background: C.bg }}>
@@ -1085,6 +1099,8 @@ export default function Portfolio() {
             </tbody>
           </table>
         </div>
+      )}
+      </div>
 
         {/* Footer */}
         {!loading && assets.length > 0 && (

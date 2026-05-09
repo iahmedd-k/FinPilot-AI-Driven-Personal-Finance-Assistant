@@ -232,7 +232,7 @@ const SLabel = ({ text }) => (
 /* ─────────────────────────────────────────────────────────
    ProfileTab
 ───────────────────────────────────────────────────────── */
-export default function ProfileTab({ user, refreshUser, pushNotif }) {
+export default function ProfileTab({ user, refreshUser, pushNotif, isMobile }) {
   const currencyCode = getUserCurrency(user);
   const [form, setForm] = useState({
     fullName:     user?.name         || "",
@@ -349,24 +349,24 @@ export default function ProfileTab({ user, refreshUser, pushNotif }) {
       `}</style>
 
       {/* ══ Personal Information ══════════════════════════ */}
-      <div className="profile-tab-card" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20, width: "100%", boxSizing: "border-box" }}>
+      <div className="profile-tab-card" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, padding: isMobile ? 16 : 20, width: "100%", boxSizing: "border-box" }}>
         <SLabel text="Personal Information" />
 
         {/* Row 1 — Full name + DOB */}
-        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <FloatingInput label="Full legal name" value={form.fullName} onChange={set("fullName")} />
           <DatePicker label="Date of birth" value={form.dob} onChange={setVal("dob")} />
         </div>
 
         {/* Row 2 — PHONE (left half) + ADDRESS (right half) */}
-        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
 
           {/* Left: Phone section */}
           <div>
             <SLabel text="Phone" />
-            <div className="profile-phone-row" style={{ display: "flex", gap: 10 }}>
+            <div className="profile-phone-row" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {/* Country dropdown */}
-              <div className="profile-phone-country" style={{ position: "relative", flex: "0 0 130px" }}>
+              <div className="profile-phone-country" style={{ position: "relative", flex: isMobile ? "1 1 100%" : "0 0 130px" }}>
                 <select
                   value={form.country}
                   onChange={set("country")}
@@ -409,11 +409,11 @@ export default function ProfileTab({ user, refreshUser, pushNotif }) {
       </div>
 
       {/* ══ Taxes and Income Details ══════════════════════ */}
-      <div className="profile-tab-card" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20, width: "100%", boxSizing: "border-box" }}>
+      <div className="profile-tab-card" style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, padding: isMobile ? 16 : 20, width: "100%", boxSizing: "border-box" }}>
         <SLabel text="Taxes and Income Details" />
 
         {/* Row 1 — Employment + Income */}
-        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div style={{ position: "relative", width: "100%" }}>
             <label style={{ position: "absolute", left: 16, top: 10, fontSize: 11, color: MUTED, pointerEvents: "none", zIndex: 1, fontWeight: 500 }}>
               Employment status
@@ -463,7 +463,7 @@ export default function ProfileTab({ user, refreshUser, pushNotif }) {
         </div>
 
         {/* Row 2 — Tax filing status full width */}
-        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div className="profile-grid-two" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div style={{ position: "relative", width: "100%" }}>
             <label style={{ position: "absolute", left: 16, top: 10, fontSize: 11, color: MUTED, pointerEvents: "none", zIndex: 1, fontWeight: 500 }}>
               Preferred currency
@@ -526,7 +526,7 @@ export default function ProfileTab({ user, refreshUser, pushNotif }) {
         <SLabel text="Dependents" />
 
         {form.dependents.length > 0 && (
-          <div className="profile-dependent-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div className="profile-dependent-grid" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
             {form.dependents.map((dep, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {/* DatePicker — custom, so no duplicate browser calendar icon */}
@@ -566,7 +566,7 @@ export default function ProfileTab({ user, refreshUser, pushNotif }) {
       {/* ══ Footer ════════════════════════════════════════ */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
         <StatusMsg msg={msg} />
-        <div className="profile-save-row" style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div className="profile-save-row" style={{ display: "flex", justifyContent: isMobile ? "stretch" : "flex-end" }}>
           <button
             type="button"
             onClick={save}
@@ -578,7 +578,9 @@ export default function ProfileTab({ user, refreshUser, pushNotif }) {
               color: saving ? MUTED : TEXT_ON_STRONG,
               fontSize: 14, fontWeight: 600,
               cursor: saving ? "not-allowed" : "pointer",
-              fontFamily: "inherit", transition: "all 0.15s", minWidth: 120,
+              fontFamily: "inherit", transition: "all 0.15s", 
+              minWidth: 120,
+              width: isMobile ? "100%" : "auto"
             }}
           >
             {saving ? "Saving..." : "Save changes"}

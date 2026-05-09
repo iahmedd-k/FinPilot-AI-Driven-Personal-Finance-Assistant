@@ -736,7 +736,7 @@ html,body { height:100%; background:${C.bg}; }
               )}
 
               {/* PORTFOLIO — already separate */}
-              {activeNav === "portfolio" && <Portfolio key={user?._id} />}
+              {activeNav === "portfolio" && <Portfolio key={user?._id} isMobile={isMobile} />}
               {activeNav === "equity" && (
                 isPro ? (
                   <Equity key={user?._id} />
@@ -3042,134 +3042,147 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
     }}>
 
       {/* ══ LEFT SIDEBAR ══════════════════════════════════ */}
-      {!isMobile && (
+      {/* On mobile, this becomes an overlay that slides in */}
+      <div style={{
+        width: isMobile ? "min(280px, 80vw)" : SIDEBAR_W,
+        minWidth: isMobile ? "min(280px, 80vw)" : SIDEBAR_W,
+        background: BG,
+        display: "flex", flexDirection: "column",
+        height: "100%",
+        borderRight: `1px solid ${BORDER}`,
+        zIndex: isMobile ? 120 : 1,
+        position: isMobile ? "absolute" : "relative",
+        left: 0, top: 0,
+        boxShadow: (isMobile && sidebarOpen) ? "12px 0 40px rgba(0,0,0,0.25)" : "none",
+        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: isMobile ? (sidebarOpen ? "translateX(0)" : "translateX(-100%)") : "none",
+        visibility: isMobile && !sidebarOpen ? "hidden" : "visible",
+      }}>
+        {/* Header */}
         <div style={{
-          width: SIDEBAR_W, minWidth: SIDEBAR_W,
-          background: BG,
-          display: "flex", flexDirection: "column",
-          height: "100%",
-          borderRight: `1px solid ${BORDER}`,
+          padding: "22px 20px 14px",
+          borderBottom: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          {/* Header */}
-          <div style={{
-            padding: "22px 20px 14px",
-            borderBottom: `1px solid ${BORDER}`,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.10em" }}>
-              AI ADVISOR
-            </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.10em" }}>
+            {isMobile ? "CONVERSATIONS" : "AI ADVISOR"}
+          </span>
+          {isMobile ? (
+            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 4, display: "flex" }}>
+              <X size={17} />
+            </button>
+          ) : (
             <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: 4, display: "flex", borderRadius: 6, transition: "background 0.12s" }}
               onMouseEnter={e => e.currentTarget.style.background = BORDER2}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
             >
               <X size={15} strokeWidth={2} />
             </button>
-          </div>
-
-          {/* Session list — scrollable */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "10px 10px 0" }}>
-            {sessionsLoading ? (
-              <div style={{ padding: 20, fontSize: 11, color: MUTED, textAlign: "center" }}>Loading…</div>
-            ) : (
-              Object.entries(groupedSessions).map(([group, list]) =>
-                list.length === 0 ? null : (
-                  <div key={group} style={{ marginBottom: 12 }}>
-                    {/* Group label */}
-                    <div style={{ padding: "4px 8px 6px", fontSize: 12, fontWeight: 700, color: TEXT, letterSpacing: "-0.1px" }}>
-                      {group}
-                    </div>
-                    {list.map(s => (
-                      <div key={s._id}
-                        onClick={() => handleLoadSession(s._id)}
-                        style={{
-                          padding: "8px 10px",
-                          cursor: "pointer",
-                          fontSize: 13,
-                          color: activeSession === s._id ? TEXT : SUB,
-                          background: activeSession === s._id ? BORDER2 : "transparent",
-                          borderRadius: 8, marginBottom: 1,
-                          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
-                          transition: "background 0.12s",
-                          fontWeight: activeSession === s._id ? 500 : 400,
-                        }}
-                        onMouseEnter={e => { if (activeSession !== s._id) e.currentTarget.style.background = BORDER2; }}
-                        onMouseLeave={e => { if (activeSession !== s._id) e.currentTarget.style.background = "transparent"; }}
-                      >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                          {s.title}
-                        </span>
-                        <button
-                          onClick={e => handleDeleteSession(e, s._id)}
-                          style={{ 
-                            width: 24, height: 24, borderRadius: 6, border: "none", 
-                            background: "transparent", cursor: "pointer", color: MUTED, 
-                            display: "flex", alignItems: "center", justifyContent: "center", 
-                            flexShrink: 0, transition: "all 0.15s", opacity: 0.6 
-                          }}
-                          title="Delete conversation"
-                          onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.background = "rgba(239, 68, 68, 0.08)"; e.currentTarget.style.opacity = "1"; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.background = "transparent"; e.currentTarget.style.opacity = "0.6"; }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )
-              )
-            )}
-            {!sessionsLoading && Object.values(groupedSessions).every(l => l.length === 0) && (
-              <div style={{ padding: "32px 12px", textAlign: "center", color: MUTED, fontSize: 12 }}>
-                No conversations yet
-              </div>
-            )}
-          </div>
-
-          {/* Bottom action buttons */}
-          <div style={{ padding: "12px 12px 16px", borderTop: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", gap: 8 }}>
-            {/* New chat */}
-            <button
-              onClick={handleNewChat}
-              style={{
-                width: "100%", padding: "10px 14px",
-                background: STRONG, border: `1px solid ${STRONG}`,
-                borderRadius: 10, cursor: "pointer", color: "var(--text-on-strong)",
-                fontSize: 13, fontWeight: 600,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                fontFamily: "inherit", transition: "opacity 0.15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.86"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              New chat
-              <Plus size={15} strokeWidth={2.5} />
-            </button>
-
-            {/* AI Financial Profile */}
-            <button
-              onClick={() => {
-                onClose?.();
-                navigate("/profile?tab=aiprofile");
-              }}
-              style={{
-                width: "100%", padding: "10px 14px",
-                background: SURFACE, border: `1px solid ${BORDER}`,
-                borderRadius: 10, cursor: "pointer", color: TEXT,
-                fontSize: 13, fontWeight: 500,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                fontFamily: "inherit", transition: "background 0.12s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = BORDER2}
-              onMouseLeave={e => e.currentTarget.style.background = SURFACE}
-            >
-              AI Financial Profile
-              <div style={{ width: 24, height: 24, borderRadius: 7, background: BORDER2, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <SlidersHorizontal size={12} style={{ color: MUTED }} />
-              </div>
-            </button>
-          </div>
+          )}
         </div>
+
+        {/* Session list — scrollable */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 10px 0" }}>
+          {sessionsLoading ? (
+            <div style={{ padding: 20, fontSize: 11, color: MUTED, textAlign: "center" }}>Loading…</div>
+          ) : (
+            Object.entries(groupedSessions).map(([group, list]) =>
+              list.length === 0 ? null : (
+                <div key={group} style={{ marginBottom: 12 }}>
+                  <div style={{ padding: "4px 8px 6px", fontSize: 12, fontWeight: 700, color: TEXT, letterSpacing: "-0.1px" }}>
+                    {group}
+                  </div>
+                  {list.map(s => (
+                    <div key={s._id}
+                      onClick={() => {
+                        handleLoadSession(s._id);
+                        if (isMobile) setSidebarOpen(false);
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        fontSize: 13.5,
+                        color: activeSession === s._id ? TEXT : SUB,
+                        background: activeSession === s._id ? BORDER2 : "transparent",
+                        borderRadius: 8, marginBottom: 1,
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
+                        transition: "background 0.12s",
+                        fontWeight: activeSession === s._id ? 500 : 400,
+                      }}
+                      onMouseEnter={e => { if (activeSession !== s._id) e.currentTarget.style.background = BORDER2; }}
+                      onMouseLeave={e => { if (activeSession !== s._id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                        {s.title}
+                      </span>
+                      <button
+                        onClick={e => handleDeleteSession(e, s._id)}
+                        style={{ 
+                          width: 24, height: 24, borderRadius: 6, border: "none", 
+                          background: "transparent", cursor: "pointer", color: MUTED, 
+                          display: "flex", alignItems: "center", justifyContent: "center", 
+                          flexShrink: 0, transition: "all 0.15s", opacity: 0.6 
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.background = "rgba(239, 68, 68, 0.08)"; e.currentTarget.style.opacity = "1"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.background = "transparent"; e.currentTarget.style.opacity = "0.6"; }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
+            )
+          )}
+          {!sessionsLoading && Object.values(groupedSessions).every(l => l.length === 0) && (
+            <div style={{ padding: "32px 12px", textAlign: "center", color: MUTED, fontSize: 12 }}>
+              No conversations yet
+            </div>
+          )}
+        </div>
+
+        {/* Bottom action buttons */}
+        <div style={{ padding: "12px 12px 16px", borderTop: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", gap: 8 }}>
+          <button
+            onClick={() => { handleNewChat(); if (isMobile) setSidebarOpen(false); }}
+            style={{
+              width: "100%", padding: "10px 14px",
+              background: STRONG, border: `1px solid ${STRONG}`,
+              borderRadius: 10, cursor: "pointer", color: "var(--text-on-strong)",
+              fontSize: 13, fontWeight: 600,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              fontFamily: "inherit", transition: "opacity 0.15s",
+            }}
+          >
+            New chat
+            <Plus size={15} strokeWidth={2.5} />
+          </button>
+          <button
+            onClick={() => {
+              onClose?.();
+              navigate("/profile?tab=aiprofile");
+            }}
+            style={{
+              width: "100%", padding: "10px 14px",
+              background: SURFACE, border: `1px solid ${BORDER}`,
+              borderRadius: 10, cursor: "pointer", color: TEXT,
+              fontSize: 13, fontWeight: 500,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              fontFamily: "inherit", transition: "background 0.12s",
+            }}
+          >
+            Financial Profile
+            <SlidersHorizontal size={13} style={{ color: MUTED }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Sidebar Backdrop */}
+      {isMobile && sidebarOpen && (
+        <div 
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 110, animation: "fadeIn 0.2s ease", backdropFilter: "blur(2px)" }} 
+        />
       )}
 
       {/* ══ RIGHT PANEL ═══════════════════════════════════ */}
@@ -3177,16 +3190,16 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
         flex: 1, display: "flex", flexDirection: "column",
         height: "100%", overflow: "hidden",
         background: BG,
+        position: "relative",
       }}>
 
-        {/* Desktop top bar with close button on right */}
+        {/* Desktop top bar */}
         {!isMobile && (
           <div style={{ padding: "14px 18px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "flex-end", flexShrink: 0 }}>
             <button onClick={onClose}
               style={{ width: 30, height: 30, borderRadius: 8, background: "none", border: `1px solid ${BORDER}`, cursor: "pointer", color: MUTED, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}
               onMouseEnter={e => { e.currentTarget.style.background = BORDER2; e.currentTarget.style.color = TEXT; }}
               onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = MUTED; }}
-              title="Close"
             >
               <X size={15} strokeWidth={2} />
             </button>
@@ -3195,10 +3208,15 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
 
         {/* Mobile header */}
         {isMobile && (
-          <div style={{ padding: "12px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>AI Advisor</span>
-            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, display: "flex" }}>
-              <X size={16} />
+          <div style={{ padding: "12px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0, background: BG }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, display: "flex", padding: 4 }}>
+                <Menu size={20} />
+              </button>
+              <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>AI Advisor</span>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, display: "flex", padding: 4 }}>
+              <X size={20} />
             </button>
           </div>
         )}

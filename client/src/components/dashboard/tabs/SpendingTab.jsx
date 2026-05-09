@@ -1253,6 +1253,7 @@ function SpendingPage({
           txLimitReached={txLimitReached}
           preferredCurrency={preferredCurrency}
           spendingSettings={resolvedSettings}
+          isMobile={isMobileLocal || isMobile}
         />
       )}
 

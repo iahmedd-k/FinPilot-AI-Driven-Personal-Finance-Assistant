@@ -9,7 +9,7 @@ import { formatCurrencyAmount, getUserCurrency } from "../../../utils/currency";
 const EMP_OPTS = ["Employed", "Self-employed", "Freelance", "Business owner", "Student", "Retired", "Unemployed"];
 const RISK_OPTS = ["Conservative", "Moderately Conservative", "Moderate", "Moderately Aggressive", "Aggressive"];
 
-export default function AIProfileTab() {
+export default function AIProfileTab({ isMobile }) {
   const { user, fetchMe } = useAuthContext();
   const currencyCode = getUserCurrency(user);
   const [profile, setProfile] = useState({ age: "", location: "", employment: "Self-employed", annualIncome: "", riskProfile: "Moderately Aggressive", dependents: 0 });
@@ -93,12 +93,12 @@ export default function AIProfileTab() {
         }
       `}</style>
       <Card>
-        <div className="ai-profile-header" style={{ padding: "13px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="ai-profile-header" style={{ padding: isMobile ? "14px 16px" : "13px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: isMobile ? 12 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Brain size={13} style={{ color: MUTED }} />
             <span style={{ fontSize: 10, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.12em" }}>AI Memory</span>
           </div>
-          <button type="button" onClick={openMemorySettings} style={{ border: `1px solid ${BORDER}`, background: SURFACE_MUTED, borderRadius: 8, padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: SUB, fontSize: 11, fontWeight: 600 }}>
+          <button type="button" onClick={openMemorySettings} style={{ border: `1px solid ${BORDER}`, background: SURFACE_MUTED, borderRadius: 8, padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", color: SUB, fontSize: 11, fontWeight: 600, width: isMobile ? "100%" : "auto", justifyContent: "center" }}>
             <Settings size={13} /> Memories Settings
           </button>
         </div>
@@ -134,12 +134,12 @@ export default function AIProfileTab() {
                   <X size={17} />
                 </button>
               </div>
-              <div className="ai-profile-toggle-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderRadius: 14, border: `1px solid ${BORDER}`, background: BG, marginBottom: 20 }}>
+              <div className="ai-profile-toggle-row" style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", padding: "18px 20px", borderRadius: 14, border: `1px solid ${BORDER}`, background: BG, marginBottom: 20, gap: isMobile ? 12 : 0 }}>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: TEXT, marginBottom: 4 }}>Memories enabled</div>
                   <div style={{ fontSize: 13, color: MUTED }}>Allow AI Advisor to save and recall memories when asked.</div>
                 </div>
-                <div onClick={() => !memorySettingsSaving && setMemoryToggleDraft((value) => !value)} style={{ width: 52, height: 30, borderRadius: 100, background: memoryToggleDraft ? "#1a1a1a" : BORDER, position: "relative", cursor: memorySettingsSaving ? "not-allowed" : "pointer", flexShrink: 0, marginLeft: 20, transition: "background 0.2s" }}>
+                <div onClick={() => !memorySettingsSaving && setMemoryToggleDraft((value) => !value)} style={{ width: 52, height: 30, borderRadius: 100, background: memoryToggleDraft ? "#1a1a1a" : BORDER, position: "relative", cursor: memorySettingsSaving ? "not-allowed" : "pointer", flexShrink: 0, marginLeft: isMobile ? 0 : 20, transition: "background 0.2s" }}>
                   <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: memoryToggleDraft ? 25 : 3, transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.25)" }} />
                 </div>
               </div>
@@ -168,7 +168,7 @@ export default function AIProfileTab() {
         )}
 
       <Card>
-        <div className="ai-profile-header" style={{ padding: "13px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="ai-profile-header" style={{ padding: isMobile ? "14px 16px" : "13px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", flexDirection: isMobile && editing ? "column" : "row", alignItems: isMobile && editing ? "stretch" : "center", justifyContent: "space-between", gap: isMobile && editing ? 12 : 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Brain size={13} style={{ color: MUTED }} />
             <span style={{ fontSize: 10, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.12em" }}>About You</span>
@@ -179,10 +179,10 @@ export default function AIProfileTab() {
             </button>
           ) : (
             <div className="ai-profile-edit-actions" style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={() => setEditing(false)} style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${BORDER}`, background: SURFACE_MUTED, fontSize: 12, color: SUB, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={() => setEditing(false)} style={{ flex: isMobile ? 1 : "none", padding: "5px 14px", borderRadius: 8, border: `1px solid ${BORDER}`, background: SURFACE_MUTED, fontSize: 12, color: SUB, cursor: "pointer", fontFamily: "inherit" }}>
                 Cancel
               </button>
-              <button type="button" onClick={save} disabled={saving} style={{ padding: "5px 14px", borderRadius: 8, border: "none", background: SURFACE_STRONG, color: TEXT_ON_STRONG, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              <button type="button" onClick={save} disabled={saving} style={{ flex: isMobile ? 1 : "none", padding: "5px 14px", borderRadius: 8, border: "none", background: SURFACE_STRONG, color: TEXT_ON_STRONG, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 {saving ? "Saving..." : "Save"}
               </button>
             </div>
@@ -198,8 +198,8 @@ export default function AIProfileTab() {
             <InfoRow label="Dependents" value={profile.dependents} last />
           </div>
         ) : (
-          <div className="ai-profile-card-body" style={{ padding: 20 }}>
-            <div className="ai-profile-edit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div className="ai-profile-card-body" style={{ padding: isMobile ? "20px 16px" : 20 }}>
+            <div className="ai-profile-edit-grid" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
               {[{ label: "Age", key: "age", type: "number", ph: "e.g. 27" }, { label: "Location", key: "location", type: "text", ph: "e.g. US" }].map((field) => (
                 <div key={field.key}>
                   <label style={labelSx}>{field.label}</label>

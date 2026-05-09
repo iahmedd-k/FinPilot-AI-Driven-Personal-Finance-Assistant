@@ -272,7 +272,7 @@ function AssetCardMenu({ onDelete }) {
   );
 }
 
-export default function AccountsTab({ pushNotif }) {
+export default function AccountsTab({ pushNotif, isMobile }) {
   const { user } = useAuthContext();
   const navigate = useNavigate();
   const currencyCode = getUserCurrency(user);
@@ -493,12 +493,84 @@ export default function AccountsTab({ pushNotif }) {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, alignItems: "start", width: "100%" }}>
-        {/* LEFT COLUMN */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 2fr", gap: 24, alignItems: "start", width: "100%" }}>
+        {/* LEFT COLUMN — Add Assets panel */}
+        <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
+          <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
+            <div style={{ padding: isMobile ? "14px 16px" : "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.13em" }}>Add Assets</span>
+              <button type="button" onClick={() => { setAssetModalTab("import"); setAssetModalOpen(true); }} style={{ border: `1px solid ${BORDER}`, background: "transparent", borderRadius: 10, padding: isMobile ? "6px 12px" : "8px 14px", fontSize: 12, fontWeight: 700, color: TEXT, cursor: "pointer", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent", transition: "all 0.2s", minHeight: isMobile ? 32 : 38 }} onMouseEnter={e => { if(!isMobile) e.currentTarget.style.background = "var(--surface-muted)"; }} onMouseLeave={e => { if(!isMobile) e.currentTarget.style.background = "transparent"; }}>
+                Import CSV
+              </button>
+            </div>
+
+
+
+            <div style={{ padding: isMobile ? "16px 12px" : "16px 20px", flex: 1, overflowY: "auto" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16 }}>Categories</div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr", gap: isMobile ? 8 : 12 }}>
+                {filteredAssetCards.map((category) => {
+                  const CardIcon = category.icon;
+                  return (
+                    <button
+                      key={category.key}
+                      type="button"
+                      style={{
+                        textAlign: "left",
+                        border: `1px solid ${BORDER}`,
+                        background: WHITE,
+                        borderRadius: 18,
+                        padding: isMobile ? "14px 12px" : "18px 16px",
+                        minHeight: isMobile ? 110 : 128,
+                        minWidth: 0,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        boxShadow: "0 3px 14px rgba(15, 23, 42, 0.06)",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isMobile) return;
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                        e.currentTarget.style.boxShadow = "0 10px 24px rgba(15, 23, 42, 0.12)";
+                        e.currentTarget.style.borderColor = MUTED;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (isMobile) return;
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "0 1px 2px rgba(15, 23, 42, 0.03)";
+                        e.currentTarget.style.borderColor = BORDER;
+                      }}
+                      onClick={() => {
+                        if (category.key === "equity") {
+                          navigate("/dashboard?nav=equity");
+                        } else {
+                          openModal(category.key);
+                        }
+                      }}
+                    >
+                      {/* Icon bubble uses SURFACE_MUTED + MUTED color so it works in dark */}
+                      <div style={{ width: isMobile ? 32 : 38, height: isMobile ? 32 : 38, borderRadius: "50%", background: SURFACE_MUTED, color: MUTED, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <CardIcon size={isMobile ? 15 : 17} strokeWidth={1.8} />
+                      </div>
+                      <div style={{ fontSize: isMobile ? 13 : 14, fontWeight: 500, color: TEXT, lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>{category.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              {!filteredAssetCards.length && <div style={{ paddingTop: 18, fontSize: 13, color: MUTED, textAlign: "center" }}>No asset categories found.</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN — Assets list */}
         <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
           {/* Connected Assets */}
-          <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", height: 300, display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
+          <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", height: isMobile ? "auto" : 300, display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "14px 16px" : "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.13em" }}>Connected Assets</span>
               <button
                 type="button"
@@ -510,7 +582,7 @@ export default function AccountsTab({ pushNotif }) {
                 Refresh
               </button>
             </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px 32px" }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: isMobile ? "40px 20px" : "20px 32px" }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: TEXT, textAlign: "center", marginBottom: 12 }}>No assets connected</div>
               <div style={{ fontSize: 13, color: MUTED, textAlign: "center", marginBottom: 24, maxWidth: 400 }}>Connect assets to start tracking your Net Worth</div>
               <button
@@ -527,7 +599,7 @@ export default function AccountsTab({ pushNotif }) {
 
           {/* Manual Assets */}
           <div style={{ border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", background: WHITE, width: "100%" }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
+            <div style={{ padding: isMobile ? "14px 16px" : "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.13em" }}>Manual Assets</span>
             </div>
 
@@ -557,20 +629,22 @@ export default function AccountsTab({ pushNotif }) {
 
                   return (
                     <div key={asset._id} style={{ 
-                      padding: "16px 20px", 
+                      padding: isMobile ? "14px 16px" : "16px 20px", 
                       borderBottom: index < sortedAssets.length - 1 ? `1px solid ${BORDER}` : "none", 
-                      display: "flex", 
+                      display: "grid", 
+                      gridTemplateColumns: isMobile ? "auto 1fr auto" : "auto 1fr auto auto",
                       alignItems: "center", 
-                      gap: 16,
+                      gap: isMobile ? "8px 12px" : "0 16px",
                       transition: "background 0.15s ease",
                       cursor: "default"
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = SURFACE_MUTED; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                    onMouseEnter={(e) => { if(!isMobile) e.currentTarget.style.background = SURFACE_MUTED; }}
+                    onMouseLeave={(e) => { if(!isMobile) e.currentTarget.style.background = "none"; }}
                     >
                       {/* Icon */}
                       <div style={{ 
-                        width: 42, height: 42, borderRadius: 12, 
+                        gridRow: isMobile ? "1" : "auto",
+                        width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: 12, 
                         background: WHITE, color: MUTED, 
                         display: "flex", alignItems: "center", justifyContent: "center", 
                         flexShrink: 0, border: `1px solid ${BORDER}`,
@@ -579,114 +653,62 @@ export default function AccountsTab({ pushNotif }) {
                         <AssetTypeIcon assetType={asset.assetType} />
                       </div>
 
-                      {/* Label + subtitle — grows */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryName}</span>
+                      {/* Label + subtitle */}
+                      <div style={{ gridRow: isMobile ? "1" : "auto", minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                          <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryName}</span>
                           <span style={{ 
-                            fontSize: 9, fontWeight: 800, color: "#059669", 
+                            fontSize: 8, fontWeight: 800, color: "#059669", 
                             background: "#ecfdf5", border: "1px solid #10b981", 
-                            borderRadius: 6, padding: "2px 6px", letterSpacing: "0.05em", flexShrink: 0 
+                            borderRadius: 6, padding: "1px 5px", letterSpacing: "0.05em", flexShrink: 0 
                           }}>ACTIVE</span>
                         </div>
-                        <div style={{ fontSize: 12, color: MUTED, display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ fontSize: isMobile ? 11 : 12, color: MUTED, display: "flex", alignItems: "center", gap: 4 }}>
                           <span>{display.label}</span>
                           <span style={{ opacity: 0.5 }}>•</span>
-                          <span>{addedLabel}</span>
+                          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{addedLabel}</span>
                         </div>
-                      </div>
-
-                      {/* Value */}
-                      <div style={{ textAlign: "right", flexShrink: 0, paddingRight: 8 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: TEXT }}>
-                          {isHidden ? "••••••" : fmtVal}
-                        </div>
-                        <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>Current Value</div>
                       </div>
 
                       {/* Actions */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <div style={{ 
+                        gridRow: isMobile ? "1" : "auto",
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: 2, 
+                        flexShrink: 0
+                      }}>
                         <button type="button" onClick={() => toggleAssetVisibility(asset._id)} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, display: "flex", padding: 8, borderRadius: 8, transition: "background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = WHITE} onMouseLeave={e => e.currentTarget.style.background = "none"}>
                           {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                         <AssetCardMenu onDelete={() => deleteAsset(asset._id)} />
                       </div>
+
+                      {/* Value */}
+                      <div style={{ 
+                        gridRow: isMobile ? "2" : "auto",
+                        gridColumn: isMobile ? "1 / -1" : "auto",
+                        textAlign: isMobile ? "left" : "right", 
+                        flexShrink: 0, 
+                        paddingRight: isMobile ? 0 : 8,
+                        background: isMobile ? SURFACE_MUTED : "transparent",
+                        padding: isMobile ? "8px 12px" : 0,
+                        borderRadius: isMobile ? 10 : 0,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: isMobile ? 4 : 0
+                      }}>
+                        {isMobile && <div style={{ fontSize: 11, color: MUTED, fontWeight: 500 }}>Current Value</div>}
+                        <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 700, color: TEXT }}>
+                          {isHidden ? "••••••" : fmtVal}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
-
               </>
             )}
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN — Add Assets panel */}
-        <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
-          <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.13em" }}>Add Assets</span>
-              <button type="button" onClick={() => { setAssetModalTab("import"); setAssetModalOpen(true); }} style={{ border: `1px solid ${BORDER}`, background: "transparent", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, color: TEXT, cursor: "pointer", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent", transition: "all 0.2s", minHeight: 38 }} onMouseEnter={e => { e.currentTarget.style.background = "var(--surface-muted)"; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-                Import CSV
-              </button>
-            </div>
-
-
-
-            <div style={{ padding: "16px 20px", flex: 1, overflowY: "auto" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16 }}>Categories</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {filteredAssetCards.map((category) => {
-                  const CardIcon = category.icon;
-                  return (
-                    <button
-                      key={category.key}
-                      type="button"
-                      style={{
-                        textAlign: "left",
-                        border: `1px solid ${BORDER}`,
-                        background: WHITE,
-                        borderRadius: 18,
-                        padding: "18px 16px",
-                        minHeight: 128,
-                        minWidth: 0,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        justifyContent: "space-between",
-                        boxShadow: "0 3px 14px rgba(15, 23, 42, 0.06)",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-1px)";
-                        e.currentTarget.style.boxShadow = "0 10px 24px rgba(15, 23, 42, 0.12)";
-                        e.currentTarget.style.borderColor = MUTED;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 1px 2px rgba(15, 23, 42, 0.03)";
-                        e.currentTarget.style.borderColor = BORDER;
-                      }}
-                      onClick={() => {
-                        if (category.key === "equity") {
-                          navigate("/dashboard?nav=equity");
-                        } else {
-                          openModal(category.key);
-                        }
-                      }}
-                    >
-                      {/* Icon bubble uses SURFACE_MUTED + MUTED color so it works in dark */}
-                      <div style={{ width: 38, height: 38, borderRadius: "50%", background: SURFACE_MUTED, color: MUTED, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <CardIcon size={17} strokeWidth={1.8} />
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: TEXT, lineHeight: 1.25 }}>{category.label}</div>
-                    </button>
-                  );
-                })}
-              </div>
-              {!filteredAssetCards.length && <div style={{ paddingTop: 18, fontSize: 13, color: MUTED, textAlign: "center" }}>No asset categories found.</div>}
-            </div>
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ function PwField({ value, onChange, show, onToggle, placeholder }) {
   );
 }
 
-export default function SecurityTab({ pushNotif }) {
+export default function SecurityTab({ pushNotif, isMobile }) {
   const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [conPw, setConPw] = useState("");
@@ -67,7 +67,7 @@ export default function SecurityTab({ pushNotif }) {
         <span style={{ fontSize: 10, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.12em" }}>Update Your Password</span>
       </div>
       <div style={{ padding: "10px 24px 30px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 22 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 22 }}>
           <PwField value={newPw} onChange={(e) => setNewPw(e.target.value)} show={sNew} onToggle={() => setSNew((value) => !value)} placeholder="New password" />
           <PwField value={conPw} onChange={(e) => setConPw(e.target.value)} show={sCon} onToggle={() => setSCon((value) => !value)} placeholder="Confirm new password" />
         </div>
@@ -88,7 +88,19 @@ export default function SecurityTab({ pushNotif }) {
             type="button"
             onClick={handleSave}
             disabled={!ok || saving}
-            style={{ padding: "13px 64px", borderRadius: 10, border: "none", background: ok && !saving ? SURFACE_STRONG : BORDER, color: ok && !saving ? TEXT_ON_STRONG : MUTED, fontSize: 14, fontWeight: 600, cursor: ok && !saving ? "pointer" : "not-allowed", fontFamily: "inherit", transition: "all 0.15s" }}
+            style={{ 
+              padding: isMobile ? "12px 20px" : "13px 64px", 
+              borderRadius: 10, 
+              border: "none", 
+              background: ok && !saving ? SURFACE_STRONG : BORDER, 
+              color: ok && !saving ? TEXT_ON_STRONG : MUTED, 
+              fontSize: 14, 
+              fontWeight: 600, 
+              cursor: ok && !saving ? "pointer" : "not-allowed", 
+              fontFamily: "inherit", 
+              transition: "all 0.15s",
+              width: isMobile ? "100%" : "auto"
+            }}
           >
             {saving ? "Saving..." : "Save changes"}
           </button>
