@@ -28,10 +28,10 @@ const SIZE_MAP = {
   },
 };
 
-export default function Logo({ size = "md", dark = false, className = "" }) {
+export default function Logo({ size = "md", dark = false, textColor, accentColor, className = "" }) {
   const currentSize = SIZE_MAP[size] || SIZE_MAP.md;
-  const primaryText = dark ? "#0b0914" : "var(--text-primary)";
-  const accentText = dark ? "#475569" : "var(--accent)";
+  const primaryText = textColor ?? (dark ? "#0b0914" : "var(--text-primary)");
+  const accentText = accentColor ?? (dark ? "#475569" : "var(--accent)");
 
   return (
     <Link

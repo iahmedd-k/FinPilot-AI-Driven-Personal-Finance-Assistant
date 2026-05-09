@@ -270,13 +270,13 @@ export default function Login() {
   }[authMode];
 
   return (
-    <div className="min-h-screen px-3 py-3 md:px-5" style={{ background: "#f7f5f1" }}>
+    <div className="min-h-screen px-3 py-3 md:px-5 font-sans" style={{ background: "#f7f5f1", fontFamily: "var(--font-sans)" }}>
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1660px] gap-3 rounded-[28px] border border-black/8 bg-[#fcfbf8] p-3 shadow-[0_10px_40px_rgba(15,23,42,0.06)] grid-cols-[1.08fr_0.92fr]">
         <div className="flex rounded-[24px] border border-black/8 bg-[#fcfbf8] px-6 py-7 md:px-9 lg:px-12" style={{ color: "#0b0914" }}>
           <div className="mx-auto flex w-full max-w-[510px] flex-col justify-center text-[#0b0914]">
             <div className="mb-5 flex flex-col items-center text-center">
               <Logo size="md" dark className="pointer-events-none select-none text-[1.6rem]" />
-              <h1 className="mt-7 font-serif text-[1.75rem] leading-none tracking-[-0.04em] text-[#0b0914] md:text-[2rem]">
+              <h1 className="mt-7 font-sans text-[1.75rem] leading-none tracking-[-0.04em] text-[#0b0914] md:text-[2rem]">
                 {currentTitle}
               </h1>
               {currentSubtitle ? (
@@ -491,6 +491,7 @@ export default function Login() {
                       disabled={isSendingReset}
                       whileTap={{ scale: 0.985 }}
                       className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ color: "#ffffff" }}
                     >
                       {isSendingReset ? (
                         <>

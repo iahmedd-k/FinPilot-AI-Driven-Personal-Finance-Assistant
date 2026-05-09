@@ -47,22 +47,24 @@ async function verifyEmailConnection() {
   return true;
 }
 
-async function sendResetEmail(to, token) {
+async function sendNewPasswordEmail(to, newPassword) {
   await verifyEmailConnection();
-  const resetUrl = `${CLIENT_URL}/reset-password/${token}`;
   const mailOptions = {
     from: EMAIL_FROM,
     to,
-    subject: "Reset your FinPilot password",
-    text: `Reset your password using this link: ${resetUrl}\n\nThis link is valid for 10 minutes. If you did not request this, you can ignore this email.`,
+    subject: "Your new FinPilot password",
+    text: `Your password has been reset. Your new temporary password is: ${newPassword}\n\nPlease log in with this password and change it immediately in your profile settings.\n\nIf you did not request this password reset, please contact support immediately.`,
     html: `
-      <h2>Reset your password</h2>
-      <p>Click the link below to reset your password. This link is valid for 10 minutes.</p>
-      <a href="${resetUrl}" style="color:#10b981;font-weight:bold;">Reset Password</a>
-      <p>If you did not request this, you can ignore this email.</p>
+      <h2>Your password has been reset</h2>
+      <p>Your new temporary password is:</p>
+      <div style="background:#f3f4f6;padding:15px;border-radius:5px;font-family:monospace;font-size:18px;font-weight:bold;margin:10px 0;">
+        ${newPassword}
+      </div>
+      <p>Please log in with this password and change it immediately in your profile settings.</p>
+      <p style="color:#dc2626;">If you did not request this password reset, please contact support immediately.</p>
     `,
   };
   await transporter.sendMail(mailOptions);
 }
 
-module.exports = { sendResetEmail, verifyEmailConnection };
+module.exports = { sendResetEmail, sendNewPasswordEmail, verifyEmailConnection };

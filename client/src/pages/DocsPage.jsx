@@ -41,6 +41,24 @@ const DOCS = {
       },
     ],
   },
+  gdpr: {
+    title: "GDPR Compliance",
+    summary: "Placeholder GDPR guidance for European users and how FinPilot AI handles personal data subject rights.",
+    sections: [
+      {
+        heading: "Data subject rights",
+        body: "European users may have the right to access, correct, and delete their personal data, as well as to object to processing for certain purposes. This page is a placeholder for the full GDPR disclosure.",
+      },
+      {
+        heading: "Lawful basis",
+        body: "FinPilot AI processes personal data to provide dashboard services, improve user experience, and maintain security. Final GDPR wording should specify the lawful basis for each processing activity.",
+      },
+      {
+        heading: "How to contact us",
+        body: "Users should be able to submit requests about their data through support channels or the contact page. Include details on data access, correction, and deletion procedures in the final policy.",
+      },
+    ],
+  },
   disclaimers: {
     title: "Disclaimers",
     summary: "Placeholder disclaimers for AI guidance, forecasts, and educational finance content.",
@@ -276,11 +294,11 @@ export default function DocsPage() {
           <div className="mb-10 flex items-center justify-between">
             <Logo size="md" dark />
             <Link
-              to={ROUTES.PROFILEPAGE}
+              to={ROUTES.HOME}
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 no-underline transition hover:text-gray-800"
             >
               <ArrowLeft size={15} />
-              Back
+              Back to home
             </Link>
           </div>
           <div className="rounded-2xl border border-dashed border-gray-200 px-8 py-14 text-center">
@@ -302,11 +320,11 @@ export default function DocsPage() {
         <div className="mb-12 flex items-center justify-between">
           <Logo size="md" dark />
           <Link
-            to={ROUTES.PROFILEPAGE}
+            to={ROUTES.HOME}
             className="inline-flex items-center gap-1.5 text-sm text-gray-400 no-underline transition hover:text-gray-700"
           >
             <ArrowLeft size={15} />
-            Back to profile
+            Back to home
           </Link>
         </div>
 

@@ -119,9 +119,37 @@ If using automated AI tools for testing, the context is injected into the prompt
    MONGO_URI=your_mongodb_uri
    JWT_SECRET=your_jwt_secret
    GROQ_API_KEY=your_groq_key
+   
+   # Email Configuration (for password reset)
+   EMAIL_HOST=smtp.gmail.com
+   EMAIL_PORT=587
+   EMAIL_USER=your_email@gmail.com
+   EMAIL_PASS=your_app_password
+   EMAIL_FROM=FinPilot AI <your_email@gmail.com>
+   CLIENT_URL=http://localhost:5173
    ```
 
-3. **Run**:
+### Email Configuration for Password Reset
+
+FinPilot uses **Nodemailer** to send password reset emails. When a user requests a password reset:
+
+1. A new temporary password is generated
+2. The user's password is updated in the database
+3. An email containing the new password is sent to the user
+
+**For Development/Testing:**
+- Use Gmail with an App Password (enable 2FA first, then generate an app password)
+- Or use any SMTP service (SendGrid, Mailgun, etc.)
+
+**Environment Variables:**
+- `EMAIL_HOST`: SMTP server hostname
+- `EMAIL_PORT`: SMTP port (587 for TLS, 465 for SSL)
+- `EMAIL_USER`: Your email username
+- `EMAIL_PASS`: Your email password or app password
+- `EMAIL_FROM`: Display name and email for sent emails
+- `CLIENT_URL`: Your frontend URL (for any future reset links)
+
+**Note:** Currently sends a new password directly. For production, consider implementing token-based reset links instead.
    ```bash
    # Server
    npm run dev

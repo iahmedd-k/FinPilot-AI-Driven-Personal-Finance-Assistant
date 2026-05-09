@@ -330,25 +330,25 @@ const forgotPassword = async (req, res, next) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(200).json({ success: true, message: "If that email exists, a reset link was sent" });
+      return res.status(200).json({ success: true, message: "If that email exists, a new password was sent" });
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    user.passwordResetToken = crypto.createHash("sha256").update(resetToken).digest("hex");
-    user.passwordResetExpires = Date.now() + 10 * 60 * 1000;
-    await user.save({ validateBeforeSave: false });
+    // Generate a new dummy password
+    const newPassword = crypto.randomBytes(8).toString("hex");
+    user.passwordHash = newPassword; // This will be hashed by the pre-save hook
+    await user.save();
 
-    const { sendResetEmail } = require("../services/emailService");
+    const { sendNewPasswordEmail } = require("../services/emailService");
 
     try {
-      await sendResetEmail(user.email, resetToken);
-      console.log("✅ Email sent to:", user.email);
+      await sendNewPasswordEmail(user.email, newPassword);
+      console.log("✅ New password email sent to:", user.email);
     } catch (emailErr) {
       console.error("❌ Email send failed:", emailErr.message);
       return res.status(500).json({ success: false, message: emailErr.message });
     }
 
-    res.status(200).json({ success: true, message: "If that email exists, a reset link was sent" });
+    res.status(200).json({ success: true, message: "If that email exists, a new password was sent" });
   } catch (err) {
     next(err);
   }

@@ -112,7 +112,7 @@ export default function ResetPassword() {
         <button
           type="submit"
           disabled={isResettingPassword}
-          className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all border-none cursor-pointer text-white bg-[#111827] disabled:bg-[#e5e7eb] disabled:text-[#6b7280] disabled:cursor-not-allowed hover:bg-[#1f2937] hover:-translate-y-px"
+          className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all border-none cursor-pointer !text-white bg-[#111827] disabled:bg-[#e5e7eb] disabled:!text-[#6b7280] disabled:cursor-not-allowed hover:bg-[#1f2937] hover:-translate-y-px"
         >
           {isResettingPassword ? (
             <><Loader2 size={16} className="animate-spin" /> Resetting...</>

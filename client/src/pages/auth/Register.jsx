@@ -199,7 +199,7 @@ export default function Register() {
           type="submit"
           disabled={isRegistering}
           whileTap={{ scale: 0.97 }}
-          className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all mt-1 border-none cursor-pointer text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all mt-1 border-none cursor-pointer !text-white disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
             boxShadow: "0 0 24px rgba(99,102,241,0.35)",

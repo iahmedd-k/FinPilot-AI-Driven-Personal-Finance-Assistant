@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import { Twitter, Linkedin, Instagram } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import HeroSection from "../components/landing/HeroSection";
+import { ROUTES } from "../constants/routes";
 import SimplifySection from "../components/landing/SimplifySection";
 import TrackSection from "../components/landing/TrackSection";
 import GrowSection from "../components/landing/GrowSection";
@@ -13,7 +14,6 @@ import Testimonials from "../components/landing/Testimonials";
 import ForecastSection from "../components/landing/ForecastSection";
 import InsightsSection from "../components/landing/InsightsSection";
 import FeatureCardsSection from "../components/landing/FeatureCardsSection";
-import { ROUTES } from "../constants/routes";
 import Logo from "../components/common/Logo";
 
 /* ── Final CTA ── */
@@ -270,7 +270,7 @@ function LandingFooter() {
       <div className="max-w-[1100px] mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-12">
         <div className="sm:col-span-2 md:col-span-1">
           <div className="mb-4">
-            <Logo size="sm" />
+            <Logo size="sm" textColor="#fff" accentColor="#fff" />
           </div>
           <p className="text-sm text-zinc-500 leading-relaxed mb-4">
             Your AI-powered personal finance co-pilot. Track everything, ask anything, save more.
@@ -281,19 +281,42 @@ function LandingFooter() {
         </div>
 
         {[
-          { title: "Product", links: ["Features", "Pricing", "How it Works"] },
-          { title: "Company", links: ["About", "Blog", "Careers", "Contact"] },
-          { title: "Legal",   links: ["Privacy Policy", "Terms of Service", "GDPR", "Cookie Policy"] },
+          {
+            title: "Product",
+            links: [
+              { label: "Features", href: "#features" },
+              { label: "Pricing", href: "#pricing" },
+              { label: "How it Works", href: "#how-it-works" },
+            ],
+          },
+          {
+            title: "Company",
+            links: [
+              { label: "About", href: ROUTES.ABOUT },
+              { label: "Blog", href: ROUTES.BLOG },
+              { label: "Careers", href: ROUTES.CAREERS },
+              { label: "Contact", href: ROUTES.CONTACT },
+            ],
+          },
+          {
+            title: "Legal",
+            links: [
+              { label: "Privacy Policy", href: "/docs/privacy" },
+              { label: "Terms of Service", href: "/docs/terms" },
+              { label: "GDPR", href: "/docs/gdpr" },
+              { label: "Cookie Policy", href: "/docs/cookies" },
+            ],
+          },
         ].map(({ title, links }) => (
           <div key={title}>
             <h4 className="text-sm font-semibold text-zinc-300 mb-4">{title}</h4>
             <ul className="flex flex-col gap-3">
               {links.map((item) => (
-                <li key={item}>
-                  <a href={item === "How it Works" ? "#how-it-works" : `#${item.toLowerCase().replace(/ /g, "-")}`}
-                    className="text-sm text-zinc-500 no-underline hover:text-zinc-200 transition-colors">
-                    {item}
-                  </a>
+                <li key={item.label}>
+                  <Link to={item.href}
+                    className="text-sm text-zinc-400 no-underline hover:text-zinc-200 transition-colors">
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -303,7 +326,7 @@ function LandingFooter() {
 
       <div className="max-w-[1100px] mx-auto pt-8 flex flex-col sm:flex-row justify-between items-center gap-5"
         style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-        <p className="text-xs text-zinc-700">
+        <p className="text-xs text-zinc-400">
           © {new Date().getFullYear()} FinPilot AI. All rights reserved.
         </p>
         <div className="flex gap-3">

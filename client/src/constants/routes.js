@@ -5,6 +5,10 @@ export const ROUTES = {
   REGISTER:       "/register",
   FORGOT_PASSWORD:"/forgot-password",
   RESET_PASSWORD: "/reset-password/:token",
+  ABOUT:          "/about",
+  CONTACT:        "/contact",
+  BLOG:           "/blog",
+  CAREERS:        "/careers",
   DOCS:           "/docs/:slug",
 
   // Protected

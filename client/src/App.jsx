@@ -12,6 +12,10 @@ import Landing        from "./pages/Landing";
 import Login          from "./pages/auth/Login";
 import ResetPassword  from "./pages/auth/ResetPassword";
 import Dashboard      from "./pages/Dashboard";
+import About          from "./pages/About";
+import Contact        from "./pages/Contact";
+import Blog           from "./pages/Blog";
+import Careers        from "./pages/Careers";
 
 import Goals          from "./pages/Goals";
 import Subscription   from "./pages/Subscription";
@@ -42,6 +46,10 @@ export default function App() {
               <Route path={ROUTES.REGISTER}        element={<Login />} />
               <Route path={ROUTES.FORGOT_PASSWORD} element={<Login />} />
               <Route path={ROUTES.RESET_PASSWORD}  element={<ResetPassword />} />
+              <Route path={ROUTES.ABOUT}           element={<About />} />
+              <Route path={ROUTES.CONTACT}         element={<Contact />} />
+              <Route path={ROUTES.BLOG}            element={<Blog />} />
+              <Route path={ROUTES.CAREERS}         element={<Careers />} />
               <Route path={ROUTES.DOCS}            element={<DocsPage />} />
 
               <Route element={<ProtectedRoute />}>

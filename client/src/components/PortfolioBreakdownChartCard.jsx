@@ -75,7 +75,7 @@ export default function PortfolioBreakdownChartCard() {
       )}
       <div
         style={{ marginTop: 14, textAlign: "right", fontSize: 13, color: "#10b981", fontWeight: 600, cursor: "pointer" }}
-        onClick={() => window.location.href = "/dashboard?tab=portfolio"}
+        onClick={() => window.location.href = "/dashboard?nav=portfolio"}
       >
         View Portfolio →
       </div>

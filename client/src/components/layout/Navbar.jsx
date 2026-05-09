@@ -32,7 +32,7 @@ export default function Navbar() {
       <div className="div-block-7">
         {/* ── Left: Logo ── */}
         <div className="navbar-left">
-          <Logo size="sm" />
+          <Logo size="sm" textColor="#fff" accentColor="#fff" />
         </div>
 
         {/* ── Center: Navigation Menu ── */}
@@ -108,13 +108,14 @@ export default function Navbar() {
           justify-content: space-between;
           height: 72px;
           padding: 0 48px;
-          background: transparent;
+          background: rgba(10, 10, 26, 0.85);
+          backdrop-filter: blur(16px);
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           z-index: 1000;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
+          border-bottom: 1px solid rgba(255,255,255,0.08);
           overflow-x: hidden;
         }
 

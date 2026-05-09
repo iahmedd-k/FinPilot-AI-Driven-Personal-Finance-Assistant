@@ -20,7 +20,7 @@ const inputFocus = (e, hasError) => !hasError && (e.target.style.borderColor = "
 const inputBlur = (e, hasError) => !hasError && (e.target.style.borderColor = "#e5e7eb");
 
 export default function ForgotPassword() {
-  const { forgotPassword, isSendingReset, forgotSuccess } = useAuth();
+  const { forgotPassword, isSendingReset, forgotSuccess, forgotError } = useAuth();
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
@@ -30,7 +30,7 @@ export default function ForgotPassword() {
 
   if (forgotSuccess) {
     return (
-      <AuthCard title="Check your email" subtitle="We've sent you a password reset link.">
+      <AuthCard title="Check your email" subtitle="We've sent you a new password.">
         <div className="text-center py-4">
           <div
             className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -39,7 +39,7 @@ export default function ForgotPassword() {
             <MailCheck size={26} style={{ color: "#10b981" }} />
           </div>
           <p className="text-sm mb-6 text-[#4b5563]">
-            If that email is registered, a reset link is on its way. Check your inbox and spam folder.
+            If that email is registered, a new password has been sent. Check your inbox and spam folder.
           </p>
           <Link to={ROUTES.LOGIN} className="text-sm font-semibold text-[#10b981] no-underline hover:text-[#059669]">
             Back to Sign In
@@ -52,7 +52,7 @@ export default function ForgotPassword() {
   return (
     <AuthCard
       title="Forgot your password?"
-      subtitle="Enter your email and we'll send you a reset link."
+      subtitle="Enter your email and we'll send you a new password."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div>
@@ -69,15 +69,23 @@ export default function ForgotPassword() {
           {errors.email && <p className="mt-1.5 text-xs text-[#f87171]">{errors.email.message}</p>}
         </div>
 
+        {forgotError && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+            <p className="text-sm text-red-600">
+              {forgotError?.response?.data?.message || "Failed to send reset email. Please try again."}
+            </p>
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={isSendingReset}
-          className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all border-none cursor-pointer text-white bg-[#111827] disabled:bg-[#e5e7eb] disabled:text-[#6b7280] disabled:cursor-not-allowed hover:bg-[#1f2937] hover:-translate-y-px"
+          className="w-full py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all border-none cursor-pointer !text-white bg-gradient-to-r from-[#10b981] to-[#059669] disabled:bg-[#e5e7eb] disabled:!text-[#6b7280] disabled:cursor-not-allowed hover:from-[#059669] hover:to-[#047857] hover:-translate-y-px active:scale-95 shadow-lg hover:shadow-xl"
         >
           {isSendingReset ? (
             <><Loader2 size={16} className="animate-spin" /> Sending...</>
           ) : (
-            "Send Reset Link →"
+            "Send New Password →"
           )}
         </button>
 

@@ -53,9 +53,15 @@ export function useAuth() {
   const forgotMutation = useMutation({
     mutationFn: authService.forgotPassword,
     onSuccess: () => {
-      toast.success("Reset link sent! Check your email.", {
+      toast.success("New password sent! Check your email.", {
         id: "auth-success",
         duration: 1500,
+      });
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to send reset email. Please try again.", {
+        id: "auth-error",
+        duration: 3000,
       });
     },
   });
@@ -101,6 +107,7 @@ export function useAuth() {
     forgotPassword:      forgotMutation.mutateAsync,
     isSendingReset:      forgotMutation.isPending,
     forgotSuccess:       forgotMutation.isSuccess,
+    forgotError:         forgotMutation.error,
     resetPassword:       resetMutation.mutateAsync,
     isResettingPassword: resetMutation.isPending,
     completeExternalLogin,

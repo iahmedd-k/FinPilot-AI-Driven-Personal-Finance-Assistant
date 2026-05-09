@@ -1050,7 +1050,7 @@ export default function Portfolio() {
                       {isEquity ? (
                         <div 
                           style={{ fontSize: 11, color: C.teal, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
-                          onClick={() => navigate("/dashboard?tab=equity")}
+                          onClick={() => navigate("/dashboard?nav=equity")}
                         >
                           Manage in Equity tab
                         </div>
