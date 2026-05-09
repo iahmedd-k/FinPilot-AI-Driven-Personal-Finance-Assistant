@@ -11,7 +11,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // ── Services (../../services/...) ───────────────────────────
 import { dashboardService } from "../../services/dashboardService";
@@ -76,9 +76,18 @@ export function DashboardProvider({ children }) {
     : null;
 
   // ── UI state ────────────────────────────────────────────
-  const [activeNav,      setActiveNav]      = useState("dashboard");
+  const location = useLocation();
+  const [activeNav,      setActiveNav]      = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nav = params.get("nav");
+    const allowed = ["dashboard", "spending", "portfolio", "equity", "planning", "forecast", "benefits"];
+    return (nav && allowed.includes(nav)) ? nav : "dashboard";
+  });
   const [activeTab,      setActiveTab]      = useState("YTD");
-  const [dashSubTab,     setDashSubTab]     = useState("overview");
+  const [dashSubTab,     setDashSubTab]     = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("nav") === "spending" ? "reports" : "overview";
+  });
   const [globalSelectedTxId, setGlobalSelectedTxId] = useState(null);
   const [showForecast,   setShowForecast]   = useState(false);
   const [mobileOpen,     setMobileOpen]     = useState(false);
@@ -548,9 +557,9 @@ export function DashboardProvider({ children }) {
     setMessages(aiInitial);
     setAdvisorMessages([]);
     setChatInput("");
-    setActiveNav("dashboard");
+    // We NO LONGER reset activeNav or dashSubTab here because it destroys URL-based navigation
+    // and causes race conditions when the user loads the page with a specific tab.
     setActiveTab("1M");
-    setDashSubTab("overview");
     setShowForecast(false);
     setNotifications([]);
     setNotifOpen(false);

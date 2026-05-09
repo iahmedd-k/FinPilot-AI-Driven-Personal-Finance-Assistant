@@ -1444,7 +1444,7 @@ export default function Equity() {
                 <div style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 8 }}>Number of shares</div>
                 <div style={{ height: 340, minHeight: 0, minWidth: 0, width: "100%" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 20, right: 12, left: -20, bottom: 24 }}>
+                    <AreaChart data={chartData} margin={{ top: 20, right: 12, left: 0, bottom: 24 }}>
                       <defs>
                         <linearGradient id="equityVestedFill" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#2892ff" stopOpacity={0.4} />

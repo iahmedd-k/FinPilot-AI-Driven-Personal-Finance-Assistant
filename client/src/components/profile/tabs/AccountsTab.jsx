@@ -274,6 +274,7 @@ function AssetCardMenu({ onDelete }) {
 
 export default function AccountsTab({ pushNotif, isMobile }) {
   const { user } = useAuthContext();
+  const isPro = String(user?.subscriptionTier || "").toLowerCase() === "pro";
   const navigate = useNavigate();
   const currencyCode = getUserCurrency(user);
   const queryClient = useQueryClient();
@@ -356,16 +357,16 @@ export default function AccountsTab({ pushNotif, isMobile }) {
 
     const payload = isCrypto
       ? {
-          assetType: "crypto",
-          coin: assetForm.coin.trim().toLowerCase(),
-          symbol: assetForm.symbol.trim().toUpperCase(),
-          quantity: Number(assetForm.quantity),
-          buyPrice: Number(assetForm.buyPrice),
-          buyDate: assetForm.buyDate || undefined,
-          notes: assetForm.notes || undefined,
-        }
+        assetType: "crypto",
+        coin: assetForm.coin.trim().toLowerCase(),
+        symbol: assetForm.symbol.trim().toUpperCase(),
+        quantity: Number(assetForm.quantity),
+        buyPrice: Number(assetForm.buyPrice),
+        buyDate: assetForm.buyDate || undefined,
+        notes: assetForm.notes || undefined,
+      }
       : isEquity
-      ? {
+        ? {
           assetType: "equity",
           name: assetForm.name.trim(),
           ticker: assetForm.ticker.trim().toUpperCase(),
@@ -376,7 +377,7 @@ export default function AccountsTab({ pushNotif, isMobile }) {
           includeInNetWorth: assetForm.includeInNetWorth,
           notes: assetForm.notes || undefined,
         }
-      : {
+        : {
           assetType: assetForm.assetType,
           name: assetForm.name.trim(),
           buyingPrice: Number(assetForm.buyingPrice),
@@ -428,12 +429,12 @@ export default function AccountsTab({ pushNotif, isMobile }) {
       const valueIdx = findIdx('currentvalue', 'current_value', 'value');
       const symbolIdx = findIdx('symbol', 'ticker');
       const qtyIdx = findIdx('quantity', 'qty', 'shares');
-      
+
       if (typeIdx === -1 || nameIdx === -1 || priceIdx === -1) {
         pushNotif?.("error", "CSV must contain assetType, name, and buyingPrice columns.");
         return;
       }
-      
+
       setAssetSaving(true);
       let successCount = 0;
       for (let i = 1; i < lines.length; i++) {
@@ -456,7 +457,7 @@ export default function AccountsTab({ pushNotif, isMobile }) {
           console.error("Failed to add asset from CSV", err);
         }
       }
-      
+
       if (successCount > 0) {
         pushNotif?.("success", `Successfully imported ${successCount} assets`);
         await refetchAssets();
@@ -493,13 +494,13 @@ export default function AccountsTab({ pushNotif, isMobile }) {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 2fr", gap: 24, alignItems: "start", width: "100%" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 24, alignItems: "start", width: "100%" }}>
         {/* LEFT COLUMN — Add Assets panel */}
-        <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", order: 2 }}>
           <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
             <div style={{ padding: isMobile ? "14px 16px" : "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.13em" }}>Add Assets</span>
-              <button type="button" onClick={() => { setAssetModalTab("import"); setAssetModalOpen(true); }} style={{ border: `1px solid ${BORDER}`, background: "transparent", borderRadius: 10, padding: isMobile ? "6px 12px" : "8px 14px", fontSize: 12, fontWeight: 700, color: TEXT, cursor: "pointer", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent", transition: "all 0.2s", minHeight: isMobile ? 32 : 38 }} onMouseEnter={e => { if(!isMobile) e.currentTarget.style.background = "var(--surface-muted)"; }} onMouseLeave={e => { if(!isMobile) e.currentTarget.style.background = "transparent"; }}>
+              <button type="button" onClick={() => { setAssetModalTab("import"); setAssetModalOpen(true); }} style={{ border: `1px solid ${BORDER}`, background: "transparent", borderRadius: 10, padding: isMobile ? "6px 12px" : "8px 14px", fontSize: 12, fontWeight: 700, color: TEXT, cursor: "pointer", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent", transition: "all 0.2s", minHeight: isMobile ? 32 : 38 }} onMouseEnter={e => { if (!isMobile) e.currentTarget.style.background = "var(--surface-muted)"; }} onMouseLeave={e => { if (!isMobile) e.currentTarget.style.background = "transparent"; }}>
                 Import CSV
               </button>
             </div>
@@ -546,6 +547,7 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                       }}
                       onClick={() => {
                         if (category.key === "equity") {
+                          if (!isPro) { navigate("/subscription"); return; }
                           navigate("/dashboard?nav=equity");
                         } else {
                           openModal(category.key);
@@ -567,7 +569,7 @@ export default function AccountsTab({ pushNotif, isMobile }) {
         </div>
 
         {/* RIGHT COLUMN — Assets list */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%", order: 1 }}>
           {/* Connected Assets */}
           <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", height: isMobile ? "auto" : 300, display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "14px 16px" : "16px 20px", borderBottom: `1px solid ${BORDER}` }}>
@@ -628,25 +630,31 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                   const primaryName = asset.assetType === "crypto" ? asset.coin || asset.symbol || "Crypto Asset" : asset.name || display.label;
 
                   return (
-                    <div key={asset._id} style={{ 
-                      padding: isMobile ? "14px 16px" : "16px 20px", 
-                      borderBottom: index < sortedAssets.length - 1 ? `1px solid ${BORDER}` : "none", 
-                      display: "grid", 
+                    <div key={asset._id} style={{
+                      padding: isMobile ? "14px 16px" : "16px 20px",
+                      borderBottom: index < sortedAssets.length - 1 ? `1px solid ${BORDER}` : "none",
+                      display: "grid",
                       gridTemplateColumns: isMobile ? "auto 1fr auto" : "auto 1fr auto auto",
-                      alignItems: "center", 
+                      alignItems: "center",
                       gap: isMobile ? "8px 12px" : "0 16px",
                       transition: "background 0.15s ease",
-                      cursor: "default"
+                      cursor: asset.assetType === "equity" ? "pointer" : "default"
                     }}
-                    onMouseEnter={(e) => { if(!isMobile) e.currentTarget.style.background = SURFACE_MUTED; }}
-                    onMouseLeave={(e) => { if(!isMobile) e.currentTarget.style.background = "none"; }}
+                      onClick={() => {
+                        if (asset.assetType === "equity") {
+                          if (!isPro) { navigate("/subscription"); return; }
+                          navigate("/dashboard?nav=equity");
+                        }
+                      }}
+                      onMouseEnter={(e) => { if (!isMobile) e.currentTarget.style.background = SURFACE_MUTED; }}
+                      onMouseLeave={(e) => { if (!isMobile) e.currentTarget.style.background = "none"; }}
                     >
                       {/* Icon */}
-                      <div style={{ 
+                      <div style={{
                         gridRow: isMobile ? "1" : "auto",
-                        width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: 12, 
-                        background: WHITE, color: MUTED, 
-                        display: "flex", alignItems: "center", justifyContent: "center", 
+                        width: isMobile ? 36 : 42, height: isMobile ? 36 : 42, borderRadius: 12,
+                        background: WHITE, color: MUTED,
+                        display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0, border: `1px solid ${BORDER}`,
                         boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
                       }}>
@@ -657,10 +665,10 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                       <div style={{ gridRow: isMobile ? "1" : "auto", minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                           <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryName}</span>
-                          <span style={{ 
-                            fontSize: 8, fontWeight: 800, color: "#059669", 
-                            background: "#ecfdf5", border: "1px solid #10b981", 
-                            borderRadius: 6, padding: "1px 5px", letterSpacing: "0.05em", flexShrink: 0 
+                          <span style={{
+                            fontSize: 8, fontWeight: 800, color: "#059669",
+                            background: "#ecfdf5", border: "1px solid #10b981",
+                            borderRadius: 6, padding: "1px 5px", letterSpacing: "0.05em", flexShrink: 0
                           }}>ACTIVE</span>
                         </div>
                         <div style={{ fontSize: isMobile ? 11 : 12, color: MUTED, display: "flex", alignItems: "center", gap: 4 }}>
@@ -671,11 +679,11 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                       </div>
 
                       {/* Actions */}
-                      <div style={{ 
+                      <div style={{
                         gridRow: isMobile ? "1" : "auto",
-                        display: "flex", 
-                        alignItems: "center", 
-                        gap: 2, 
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 2,
                         flexShrink: 0
                       }}>
                         <button type="button" onClick={() => toggleAssetVisibility(asset._id)} style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, display: "flex", padding: 8, borderRadius: 8, transition: "background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = WHITE} onMouseLeave={e => e.currentTarget.style.background = "none"}>
@@ -685,11 +693,11 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                       </div>
 
                       {/* Value */}
-                      <div style={{ 
+                      <div style={{
                         gridRow: isMobile ? "2" : "auto",
                         gridColumn: isMobile ? "1 / -1" : "auto",
-                        textAlign: isMobile ? "left" : "right", 
-                        flexShrink: 0, 
+                        textAlign: isMobile ? "left" : "right",
+                        flexShrink: 0,
                         paddingRight: isMobile ? 0 : 8,
                         background: isMobile ? SURFACE_MUTED : "transparent",
                         padding: isMobile ? "8px 12px" : 0,
@@ -852,66 +860,66 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                     </div>
                   </>
                 ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0", flex: 1, overflowY: "auto" }}>
-                <div style={{ textAlign: "center", padding: "0 20px" }}>
-                  <div style={{ fontSize: 14, color: TEXT, marginBottom: 8, fontWeight: 600 }}>Upload CSV file</div>
-                  <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
-                    Import multiple assets at once. Your CSV should match the following format for best results:
-                  </div>
-                </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0", flex: 1, overflowY: "auto" }}>
+                    <div style={{ textAlign: "center", padding: "0 20px" }}>
+                      <div style={{ fontSize: 14, color: TEXT, marginBottom: 8, fontWeight: 600 }}>Upload CSV file</div>
+                      <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
+                        Import multiple assets at once. Your CSV should match the following format for best results:
+                      </div>
+                    </div>
 
-                {/* Sample format preview */}
-                <div style={{ 
-                  background: SURFACE_MUTED, border: `1px solid ${BORDER}`, 
-                  borderRadius: 12, padding: "12px", overflowX: "auto" 
-                }}>
-                  <table style={{ width: "100%", fontSize: 11, color: MUTED, borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                        <th style={{ textAlign: "left", padding: "4px 8px" }}>assetType</th>
-                        <th style={{ textAlign: "left", padding: "4px 8px" }}>name</th>
-                        <th style={{ textAlign: "right", padding: "4px 8px" }}>buyingPrice</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: "4px 8px" }}>property</td>
-                        <td style={{ padding: "4px 8px" }}>Luxury Villa</td>
-                        <td style={{ textAlign: "right", padding: "4px 8px" }}>450000</td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: "4px 8px" }}>vehicle</td>
-                        <td style={{ padding: "4px 8px" }}>Tesla Model S</td>
-                        <td style={{ textAlign: "right", padding: "4px 8px" }}>85000</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                    {/* Sample format preview */}
+                    <div style={{
+                      background: SURFACE_MUTED, border: `1px solid ${BORDER}`,
+                      borderRadius: 12, padding: "12px", overflowX: "auto"
+                    }}>
+                      <table style={{ width: "100%", fontSize: 11, color: MUTED, borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                            <th style={{ textAlign: "left", padding: "4px 8px" }}>assetType</th>
+                            <th style={{ textAlign: "left", padding: "4px 8px" }}>name</th>
+                            <th style={{ textAlign: "right", padding: "4px 8px" }}>buyingPrice</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: "4px 8px" }}>property</td>
+                            <td style={{ padding: "4px 8px" }}>Luxury Villa</td>
+                            <td style={{ textAlign: "right", padding: "4px 8px" }}>450000</td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: "4px 8px" }}>vehicle</td>
+                            <td style={{ padding: "4px 8px" }}>Tesla Model S</td>
+                            <td style={{ textAlign: "right", padding: "4px 8px" }}>85000</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
 
-                <input type="file" accept=".csv" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCsvImport} />
-                <button 
-                  type="button" 
-                  onClick={() => fileInputRef.current?.click()} 
-                  disabled={assetSaving} 
-                  style={{ 
-                    width: "100%", border: `2px dashed ${BORDER}`, background: WHITE, 
-                    borderRadius: 16, padding: "32px 20px", cursor: assetSaving ? "not-allowed" : "pointer", 
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-                    transition: "all 0.2s", opacity: assetSaving ? 0.5 : 1 
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = MUTED; e.currentTarget.style.background = SURFACE_MUTED; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.background = WHITE; }}
-                >
-                  <Upload size={24} style={{ color: MUTED }} />
-                  <div style={{ fontSize: 14, color: TEXT, fontWeight: 600 }}>
-                    {assetSaving ? "Processing..." : "Click to select CSV file"}
+                    <input type="file" accept=".csv" ref={fileInputRef} style={{ display: 'none' }} onChange={handleCsvImport} />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={assetSaving}
+                      style={{
+                        width: "100%", border: `2px dashed ${BORDER}`, background: WHITE,
+                        borderRadius: 16, padding: "32px 20px", cursor: assetSaving ? "not-allowed" : "pointer",
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+                        transition: "all 0.2s", opacity: assetSaving ? 0.5 : 1
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = MUTED; e.currentTarget.style.background = SURFACE_MUTED; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.background = WHITE; }}
+                    >
+                      <Upload size={24} style={{ color: MUTED }} />
+                      <div style={{ fontSize: 14, color: TEXT, fontWeight: 600 }}>
+                        {assetSaving ? "Processing..." : "Click to select CSV file"}
+                      </div>
+                      <div style={{ fontSize: 11, color: MUTED }}>Supports .csv files up to 2MB</div>
+                    </button>
                   </div>
-                  <div style={{ fontSize: 11, color: MUTED }}>Supports .csv files up to 2MB</div>
-                </button>
-              </div>
                 )}
+              </div>
             </div>
-          </div>
           </div>,
           document.body
         )}

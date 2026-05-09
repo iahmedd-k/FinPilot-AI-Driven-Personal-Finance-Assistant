@@ -474,7 +474,24 @@ function AssetCard({ a, onEdit, onDelete, fmt, fmtC }) {
   const cfg     = getTC(a.assetType);
 
   return (
-    <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+    <div 
+      onClick={() => { 
+        if (isEquity) {
+          if (!isPro) { navigate(ROUTES.SUBSCRIPTION); return; }
+          navigate("/dashboard?nav=equity"); 
+        }
+      }}
+      style={{ 
+        background: C.white, 
+        border: `1px solid ${C.border}`, 
+        borderRadius: 12, 
+        padding: "14px 16px", 
+        display: "flex", 
+        flexDirection: "column", 
+        gap: 10,
+        cursor: isEquity ? "pointer" : "default"
+      }}
+    >
       {/* Top row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -838,7 +855,30 @@ export default function Portfolio({ isMobile: isMobileProp }) {
         </div>
 
         {/* Equity Holdings */}
-        <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>
+        <div 
+          onClick={() => {
+            if (!isPro) { navigate(ROUTES.SUBSCRIPTION); return; }
+            navigate("/dashboard?nav=equity");
+          }}
+          style={{ 
+            background: C.white, 
+            border: `1px solid ${C.border}`, 
+            borderRadius: 14, 
+            padding: "14px 16px",
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = C.teal;
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.06)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
           <div className="origin-section-label" style={{ marginBottom: 10, fontSize: C.fSizeXs }}>Equity Holdings</div>
           {agg.equityCount > 0 ? (
             <>
@@ -944,7 +984,13 @@ export default function Portfolio({ isMobile: isMobileProp }) {
                     const cfg      = getTC(a.assetType);
                     return (
                       <tr key={a._id}
-                        style={{ borderBottom: `1px solid ${C.border2}`, transition: "background 0.12s" }}
+                        style={{ borderBottom: `1px solid ${C.border2}`, transition: "background 0.12s", cursor: isEquity ? "pointer" : "default" }}
+                        onClick={() => { 
+                          if (isEquity) {
+                            if (!isPro) { navigate(ROUTES.SUBSCRIPTION); return; }
+                            navigate("/dashboard?nav=equity"); 
+                          }
+                        }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = C.mutedSurface)}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >

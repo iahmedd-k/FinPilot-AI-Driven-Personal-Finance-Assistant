@@ -189,10 +189,10 @@ function DashboardShell() {
   useEffect(() => {
     const nav = new URLSearchParams(location.search).get("nav");
     const allowed = new Set(["dashboard", "spending", "portfolio", "equity", "planning", "forecast", "benefits"]);
-    if (nav && allowed.has(nav)) {
+    if (nav && allowed.has(nav) && nav !== activeNav) {
       setActiveNav(nav);
     }
-  }, [location.search, setActiveNav]);
+  }, [location.search, setActiveNav, activeNav]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

@@ -1319,7 +1319,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <CalendarDays size={16} style={{ color: C.muted }} />
               <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Monthly Breakdown</div>
             </div>
-            <div style={{ maxHeight: 350, overflowY: "auto" }}>
+            <div style={{ maxHeight: 350, overflowY: "auto", overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12 }}>
                 <thead style={{ position: "sticky", top: 0, background: C.bg, zIndex: 1, boxShadow: `0 1px 0 ${C.border}` }}>
                   <tr>
