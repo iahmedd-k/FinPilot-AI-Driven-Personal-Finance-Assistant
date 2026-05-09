@@ -1014,12 +1014,99 @@ export default function Equity() {
   }, [visibleCompanyGrants]);
 
   const chartData = useMemo(() => {
+    if (!visibleCompanyGrants.length) return [];
+    
     const grants = visibleCompanyGrants.slice().sort((a, b) => new Date(a.buyDate) - new Date(b.buyDate));
-    let running = 0;
-    return grants.map((g) => {
-      running += asNumber(g.quantity);
-      return { label: new Date(g.buyDate || Date.now()).toLocaleDateString("en-US", { month: "short", year: "2-digit" }), vested: running, total: running };
+    
+    // Find earliest buy date and today
+    const earliestDate = new Date(grants[0].buyDate || Date.now());
+    const today = new Date();
+    
+    // Create timeline from first grant to today
+    const timelineMap = new Map();
+    
+    // Generate monthly timeline
+    const currentDate = new Date(earliestDate);
+    while (currentDate <= today) {
+      const key = currentDate.toISOString().split('T')[0];
+      const label = currentDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      timelineMap.set(key, { label, date: new Date(currentDate), vested: 0, total: 0 });
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+    
+    // Add today if not already present
+    const todayKey = today.toISOString().split('T')[0];
+    if (!timelineMap.has(todayKey)) {
+      const label = today.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      timelineMap.set(todayKey, { label, date: new Date(today), vested: 0, total: 0 });
+    }
+    
+    // Calculate vested/total for each grant at each timeline point
+    grants.forEach((g) => {
+      const quantity = asNumber(g.quantity);
+      const buyDate = new Date(g.buyDate || Date.now());
+      const vestStartDate = g.vestingStartDate ? new Date(g.vestingStartDate) : buyDate;
+      const hasVesting = g.hasVestingSchedule !== false;
+      
+      // Parse vesting schedule
+      const vestingSchedule = g.vestingSchedule || "monthly_48_12";
+      const scheduleMatch = vestingSchedule.match(/(\w+)_(\d+)_(\d+)/);
+      let monthlyRate = 1/48;
+      let cliffMonths = 12;
+      
+      if (scheduleMatch) {
+        const [, frequency, totalMonths, cliff] = scheduleMatch;
+        if (totalMonths) monthlyRate = 1 / parseInt(totalMonths);
+        if (cliff) cliffMonths = parseInt(cliff);
+      }
+      
+      // For each date in timeline, calculate vesting
+      timelineMap.forEach((entry) => {
+        const entryDate = entry.date;
+        entry.total += quantity;
+        
+        if (!hasVesting) {
+          // No vesting - all shares immediately after buy date
+          if (entryDate >= buyDate) {
+            entry.vested += quantity;
+          }
+        } else {
+          // Calculate vested amount at this date
+          if (entryDate < vestStartDate) {
+            // Before vesting starts - 0 vested
+            entry.vested += 0;
+          } else {
+            // Calculate months since vesting start
+            let monthsSinceStart = 0;
+            const tempDate = new Date(vestStartDate);
+            while (tempDate <= entryDate) {
+              if (tempDate.getMonth() !== vestStartDate.getMonth() || tempDate.getFullYear() !== vestStartDate.getFullYear()) {
+                monthsSinceStart++;
+              }
+              tempDate.setMonth(tempDate.getMonth() + 1);
+            }
+            
+            if (monthsSinceStart < cliffMonths) {
+              // Before cliff - 0 vested
+              entry.vested += 0;
+            } else {
+              // After cliff - calculate progressive vesting
+              const vestedMonths = monthsSinceStart - cliffMonths + 1;
+              let vestedAmount = quantity * monthlyRate * vestedMonths;
+              vestedAmount = Math.min(vestedAmount, quantity);
+              entry.vested += vestedAmount;
+            }
+          }
+        }
+      });
     });
+    
+    // Convert to array, sort by date, remove duplicates by date key
+    const result = Array.from(timelineMap.values())
+      .sort((a, b) => a.date - b.date)
+      .map((entry) => ({ label: entry.label, vested: Math.round(entry.vested * 100) / 100, total: Math.round(entry.total * 100) / 100 }));
+    
+    return result;
   }, [visibleCompanyGrants]);
 
   const insightCards = useMemo(() => {
@@ -1357,19 +1444,71 @@ export default function Equity() {
                 <div style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 8 }}>Number of shares</div>
                 <div style={{ height: 340, minHeight: 0, minWidth: 0, width: "100%" }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
+                    <AreaChart data={chartData} margin={{ top: 20, right: 12, left: -20, bottom: 24 }}>
                       <defs>
                         <linearGradient id="equityVestedFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#2892ff" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#2892ff" stopOpacity={0.12} />
+                          <stop offset="0%" stopColor="#2892ff" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#2892ff" stopOpacity={0.08} />
+                        </linearGradient>
+                        <linearGradient id="equityTotalFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#74b9ff" stopOpacity={0.15} />
+                          <stop offset="100%" stopColor="#74b9ff" stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="var(--border-subtle)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                      <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border-default)", background: "var(--bg-card)", color: "var(--text-primary)" }} />
-                      <Area type="monotone" dataKey="vested" name="Vested" stroke="#2892ff" fill="url(#equityVestedFill)" strokeWidth={2.5} />
-                      <Area type="monotone" dataKey="total" name="Total Shares" stroke="#74b9ff" fill="transparent" strokeDasharray="4 4" strokeWidth={1.6} />
+                      <CartesianGrid 
+                        stroke="var(--border-subtle)" 
+                        vertical={true}
+                        horizontalPoints={[0, 60, 120, 180, 240]}
+                      />
+                      <XAxis 
+                        dataKey="label" 
+                        tick={{ fill: "var(--text-muted)", fontSize: 12 }} 
+                        axisLine={false} 
+                        tickLine={false}
+                        interval={Math.max(0, Math.floor(chartData.length / 6))}
+                      />
+                      <YAxis 
+                        tick={{ fill: "var(--text-muted)", fontSize: 12 }} 
+                        axisLine={false} 
+                        tickLine={false}
+                        allowDecimals={true}
+                        type="number"
+                        width={45}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: 12, 
+                          border: "1px solid var(--border-default)", 
+                          background: "var(--bg-card)", 
+                          color: "var(--text-primary)",
+                          padding: "12px 14px",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+                        }}
+                        formatter={(value) => [value.toFixed(1), '']}
+                        labelStyle={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}
+                      />
+                      <Area 
+                        type="natural" 
+                        dataKey="vested" 
+                        name="Vested" 
+                        stroke="#2892ff" 
+                        fill="url(#equityVestedFill)" 
+                        strokeWidth={3}
+                        isAnimationActive={false}
+                        dot={false}
+                        activeDot={{ r: 6, fill: "#2892ff", stroke: "var(--bg-card)", strokeWidth: 2 }}
+                      />
+                      <Area 
+                        type="natural" 
+                        dataKey="total" 
+                        name="Total Shares" 
+                        stroke="#a8d4ff" 
+                        fill="url(#equityTotalFill)" 
+                        strokeDasharray="5 5"
+                        strokeWidth={2}
+                        isAnimationActive={false}
+                        dot={false}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

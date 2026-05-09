@@ -886,16 +886,16 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
           <div style={{ display: forecastTab === "networth" ? "flex" : "none", flexDirection: "column", gap: 24 }}>
           {/* ════ NET WORTH SECTION ════ */}
           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: isMobile ? "12px 10px 0" : "18px 22px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", padding: isMobile ? "12px 10px 0" : "18px 22px 0", flexWrap: isMobile ? "wrap" : "nowrap", gap: isMobile ? 12 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 {/* [FIX] Icon bg uses C.bg instead of hardcoded #EFF6FF */}
-                <div style={{ ...iconContainerStyle(), borderColor: "transparent" }}>
+                <div style={{ ...iconContainerStyle(), borderColor: "transparent", flexShrink: 0 }}>
                   <TrendingUp size={16} style={{ color: C.indigo }} />
                 </div>
-                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text }}>Net Worth Forecast</div>
+                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>Net Worth Forecast</div>
               </div>
 
-              <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}`, order: isMobile ? 3 : 0, width: isMobile ? "100%" : "auto", gap: isMobile ? 1 : 0, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                 {[
                   { id: "6m", label: "6M" },
                   { id: "12m", label: "1Y" },
@@ -910,9 +910,9 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       setSelectedRange(r.id);
                     }}
                     style={{
-                      padding: isMobile ? "4px 8px" : "6px 12px",
+                      padding: isMobile ? "5px 10px" : "6px 12px",
                       borderRadius: 8,
-                      fontSize: isMobile ? 10 : 11,
+                      fontSize: isMobile ? 11 : 11,
                       fontWeight: 700,
                       border: "none",
                       background: selectedRange === r.id ? C.white : "transparent",
@@ -920,6 +920,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       cursor: "pointer",
                       transition: "all 0.2s",
                       boxShadow: selectedRange === r.id ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
                     {r.label}
@@ -929,7 +931,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <button
                 type="button"
                 onClick={openSettingsModal}
-                style={{ padding: isMobile ? "5px 9px" : "6px 11px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 9, fontSize: isMobile ? 10.5 : 11, color: C.text, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
+                style={{ padding: isMobile ? "5px 9px" : "6px 11px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 9, fontSize: isMobile ? 10.5 : 11, color: C.text, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", order: isMobile ? 2 : 0 }}
               >
                 <PlusCircle size={12} /> {isMobile ? "Customize" : "Add events or customize"}
               </button>
@@ -1134,15 +1136,15 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
           {/* ════ CASH FLOW SECTION ════ */}
           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: isMobile ? "12px 10px 0" : "18px 22px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", padding: isMobile ? "12px 10px 0" : "18px 22px 0", flexWrap: isMobile ? "wrap" : "nowrap", gap: isMobile ? 12 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 {/* [FIX] bg uses C.bg + C.border, not hardcoded #F0FDF4 */}
-                <div style={{ ...iconContainerStyle(), borderColor: "transparent" }}>
+                <div style={{ ...iconContainerStyle(), borderColor: "transparent", flexShrink: 0 }}>
                   <TrendingUp size={16} style={{ color: "#10b981" }} />
                 </div>
-                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text }}>Cash Flow Forecast</div>
+                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>Cash Flow Forecast</div>
               </div>
-              <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}`, order: isMobile ? 1 : 0, width: isMobile ? "100%" : "auto", gap: isMobile ? 1 : 0, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                 {[
                   { id: "6m", label: "6M" },
                   { id: "12m", label: "1Y" },
@@ -1157,16 +1159,18 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       setSelectedRange(r.id);
                     }}
                     style={{
-                      padding: isMobile ? "4px 8px" : "6px 12px",
+                      padding: isMobile ? "5px 10px" : "6px 12px",
                       borderRadius: 8,
-                      fontSize: isMobile ? 10 : 11,
+                      fontSize: isMobile ? 11 : 11,
                       fontWeight: 700,
                       border: "none",
                       background: selectedRange === r.id ? C.white : "transparent",
                       color: selectedRange === r.id ? C.text : C.muted,
                       boxShadow: selectedRange === r.id ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
                       cursor: "pointer",
-                      transition: "all 0.15s"
+                      transition: "all 0.15s",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
                     {r.label}
@@ -1319,21 +1323,21 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12 }}>
                 <thead style={{ position: "sticky", top: 0, background: C.bg, zIndex: 1, boxShadow: `0 1px 0 ${C.border}` }}>
                   <tr>
-                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}` }}>Month</th>
-                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right" }}>Income</th>
-                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right" }}>Expenses</th>
-                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right" }}>Balance</th>
-                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}` }}>Events</th>
+                    <th style={{ padding: isMobile ? "8px 12px" : "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, fontSize: isMobile ? 11 : 12 }}>Month</th>
+                    <th style={{ padding: isMobile ? "8px 12px" : "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right", fontSize: isMobile ? 11 : 12 }}>Income</th>
+                    <th style={{ padding: isMobile ? "8px 12px" : "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right", fontSize: isMobile ? 11 : 12 }}>Expenses</th>
+                    <th style={{ padding: isMobile ? "8px 12px" : "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right", fontSize: isMobile ? 11 : 12 }}>Balance</th>
+                    <th style={{ padding: isMobile ? "8px 12px" : "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, fontSize: isMobile ? 11 : 12 }}>Events</th>
                   </tr>
                 </thead>
                 <tbody>
                   {projectionCFData.slice(0, targetMonthIndex + 1).map((row, i) => (
                     <tr key={i} style={{ borderBottom: `1px solid ${C.border}`, background: row.events?.length > 0 ? "var(--color-blue-tint, rgba(59, 130, 246, 0.04))" : "transparent" }}>
-                      <td style={{ padding: "10px 16px", color: C.text, fontWeight: 500, whiteSpace: "nowrap" }}>{row.label}</td>
-                      <td style={{ padding: "10px 16px", color: "#10b981", textAlign: "right", fontWeight: 500 }}>{fmt(row.income)}</td>
-                      <td style={{ padding: "10px 16px", color: C.red, textAlign: "right", fontWeight: 500 }}>{fmt(row.expense)}</td>
-                      <td style={{ padding: "10px 16px", color: C.text, textAlign: "right", fontWeight: 700 }}>{fmt(row.balance)}</td>
-                      <td style={{ padding: "10px 16px", color: C.sub, fontSize: 11 }}>
+                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.text, fontWeight: 500, whiteSpace: "nowrap", fontSize: isMobile ? 11 : 12 }}>{row.label}</td>
+                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: "#10b981", textAlign: "right", fontWeight: 500, fontSize: isMobile ? 11 : 12 }}>{fmt(row.income)}</td>
+                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.red, textAlign: "right", fontWeight: 500, fontSize: isMobile ? 11 : 12 }}>{fmt(row.expense)}</td>
+                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.text, textAlign: "right", fontWeight: 700, fontSize: isMobile ? 11 : 12 }}>{fmt(row.balance)}</td>
+                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.sub, fontSize: isMobile ? 10 : 11 }}>
                         {row.events?.length > 0 ? row.events.join(", ") : "—"}
                       </td>
                     </tr>
@@ -1542,7 +1546,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             </div>
 
             {/* Modal body */}
-            <div style={{ padding: isMobile ? "14px 16px" : "16px 20px", overflowY: "auto", flex: 1 }}>
+            <div style={{ padding: isMobile ? "14px 12px" : "16px 20px", overflowY: "auto", flex: 1, maxHeight: isMobile ? "calc(90vh - 180px)" : "calc(88vh - 180px)" }}>
               {modalTab === "events" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {/* Info banner */}
@@ -1755,7 +1759,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             </div>
 
             {/* Modal footer */}
-            <div style={{ padding: isMobile ? "12px 16px" : "14px 20px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bg, flexShrink: 0, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+            <div style={{ padding: isMobile ? "12px 12px" : "14px 20px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: isMobile ? "flex-end" : "space-between", alignItems: "center", gap: 8, background: C.bg, flexShrink: 0, flexWrap: isMobile ? "wrap" : "nowrap" }}>
               {showConfirmReset ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, background: C.bg, padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.border}` }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: C.red }}>Reset to defaults?</span>
