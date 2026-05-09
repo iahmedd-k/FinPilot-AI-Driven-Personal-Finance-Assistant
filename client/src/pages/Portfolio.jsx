@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePortfolio } from "../context/PortfolioContext";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { cryptoService } from "../services/cryptoService";
@@ -69,13 +70,13 @@ const ASSET_TYPES = [
   { value: "cash", label: "Cash", icon: DollarSign, color: "#16a34a" },
   { value: "vehicle", label: "Vehicle", icon: Car, color: "#6366f1" },
   { value: "property", label: "Property", icon: Home, color: "#0d9488" },
-  { value: "private_equity", label: "Private Equity", icon: Building2, color: "#3b82f6" },
   { value: "insurance", label: "Insurance", icon: Shield, color: "#ec4899" },
   { value: "valuables", label: "Valuables", icon: Trophy, color: "#d97706" },
   { value: "pension", label: "Pension", icon: Landmark, color: "#8b5cf6" },
   { value: "debt", label: "Unpaid Debt", icon: TrendingDown, color: "#ef4444" },
   { value: "other", label: "Other", icon: Layers, color: "#9ca3af" },
 ];
+const CREATABLE_ASSET_TYPES = ASSET_TYPES.filter((type) => type.value !== "equity");
 const getTC = (type) => ASSET_TYPES.find(t => t.value === type) || ASSET_TYPES[ASSET_TYPES.length - 1];
 const isCryptoAsset = (asset) => asset?.assetType === "crypto";
 const isEquityAsset = (asset) => asset?.assetType === "equity";
@@ -112,7 +113,7 @@ function AssetIcon({ type, size = 32 }) {
 const inputSx = {
   width: "100%", border: `1px solid ${C.border}`, borderRadius: 8,
   padding: "8px 12px", fontSize: 13, color: C.text, background: C.bg,
-  outline: "none", fontFamily: "Inter,system-ui,sans-serif", boxSizing: "border-box"
+  outline: "none", fontFamily: "var(--font-sans)", boxSizing: "border-box"
 };
 const labelSx = {
   fontSize: 10.5, fontWeight: 600, color: C.sub, marginBottom: 4,
@@ -157,7 +158,7 @@ function PortfolioCsvModal({ onClose, onImport, loading, C }) {
 
         <div style={{ padding: 24 }}>
           {/* Sample Box */}
-          <div style={{ background: "var(--surface-muted)", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
+          <div style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Required CSV Columns</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {["assetType", "name", "buyingPrice", "symbol", "quantity"].map(col => (
@@ -179,8 +180,8 @@ function PortfolioCsvModal({ onClose, onImport, loading, C }) {
           {/* File Selector */}
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileSelect} style={{ display: "none" }} />
           <div onClick={() => fileInputRef.current?.click()}
-            style={{ border: `2px dashed ${file ? C.teal : C.border}`, borderRadius: 16, padding: "32px 20px", textAlign: "center", cursor: "pointer", background: file ? `${C.teal}08` : "transparent", transition: "all 0.15s" }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--surface-muted)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", color: file ? C.teal : C.muted }}>
+            style={{ border: `1px dashed ${file ? C.teal : C.border}`, borderRadius: 16, padding: "32px 20px", textAlign: "center", cursor: "pointer", background: "transparent", transition: "all 0.15s" }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", color: file ? C.teal : C.muted }}>
               <Upload size={24} />
             </div>
             {file ? (
@@ -303,7 +304,7 @@ function AssetModal({ initial, onSave, onClose, loading, isEdit, currencyCode })
           {step === "type" ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <p style={{ fontSize: 12, fontWeight: 600, color: C.sub, marginBottom: 4 }}>Common assets</p>
-              {ASSET_TYPES.map(t => {
+              {CREATABLE_ASSET_TYPES.map(t => {
                 const Icon = t.icon;
                 return (
                   <button key={t.value} type="button" onClick={() => handleSelectType(t.value)}
@@ -420,7 +421,6 @@ function AssetModal({ initial, onSave, onClose, loading, isEdit, currencyCode })
                         form.assetType === "vehicle" ? "e.g. Toyota Camry 2022" :
                           form.assetType === "property" ? "e.g. Downtown Apartment" :
                             form.assetType === "cash" ? "e.g. Savings Account" :
-                              form.assetType === "private_equity" ? "e.g. Series A — Acme Inc." :
                                 "Asset name"
                       } style={inputSx} />
                   </div>
@@ -516,24 +516,26 @@ function AssetCard({ a, idx, onEdit, onDelete }) {
           </div>
         </div>
         {/* Actions */}
-        <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" onClick={() => onEdit(a)}
-            style={{
-              width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
-              background: C.bg, color: C.muted, cursor: "pointer", display: "flex",
-              alignItems: "center", justifyContent: "center"
-            }}>
-            <Pencil size={11} strokeWidth={1.8} />
-          </button>
-          <button type="button" onClick={() => onDelete(a._id)}
-            style={{
-              width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
-              background: C.bg, color: C.muted, cursor: "pointer", display: "flex",
-              alignItems: "center", justifyContent: "center"
-            }}>
-            <Trash2 size={11} strokeWidth={1.8} />
-          </button>
-        </div>
+        {!isEquity && (
+          <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" onClick={() => onEdit(a)}
+              style={{
+                width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
+                background: C.bg, color: C.muted, cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center"
+              }}>
+              <Pencil size={11} strokeWidth={1.8} />
+            </button>
+            <button type="button" onClick={() => onDelete(a._id)}
+              style={{
+                width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
+                background: C.bg, color: C.muted, cursor: "pointer", display: "flex",
+                alignItems: "center", justifyContent: "center"
+              }}>
+              <Trash2 size={11} strokeWidth={1.8} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Value row */}
@@ -590,6 +592,7 @@ function AssetCard({ a, idx, onEdit, onDelete }) {
 /* ── Main Portfolio ──────────────────────────────────────── */
 export default function Portfolio() {
   const { user } = useAuthContext();
+  const navigate = useNavigate();
   const currencyCode = getUserCurrency(user);
   activeCurrencyCode = currencyCode;
   const { assets, loading, refreshAssets } = usePortfolio();
@@ -641,6 +644,9 @@ export default function Portfolio() {
 
   /* ── Handlers ── */
   const handleAdd = async (form) => {
+    if (form.assetType === "equity") {
+      return toast.error("Add and edit equity from the Equity tab.");
+    }
     if (form.assetType === "crypto") {
       if (!form.coin || !form.symbol || !form.quantity || !form.buyPrice)
         return toast.error("Fill in all required fields");
@@ -713,6 +719,10 @@ export default function Portfolio() {
   };
 
   const handleEdit = async (form) => {
+    if (editTarget?.assetType === "equity") {
+      setSaving(false);
+      return toast.error("Edit equity from the Equity tab.");
+    }
     setSaving(true);
     try {
       if (typeof cryptoService.update === "function") await cryptoService.update(editTarget._id, form);
@@ -733,6 +743,10 @@ export default function Portfolio() {
   };
 
   const openEdit = (a) => {
+    if (a?.assetType === "equity") {
+      toast.error("Equity details are managed from the Equity tab.");
+      return;
+    }
     setEditTarget(a); setModal("edit");
   };
 
@@ -741,7 +755,7 @@ export default function Portfolio() {
 
   return (
     <div style={{
-      fontFamily: "Inter,system-ui,sans-serif", color: C.text,
+      fontFamily: "var(--font-sans)", color: C.text,
       display: "flex", flexDirection: "column", gap: 14, animation: "fadeUp 0.3s ease"
     }}>
 
@@ -1033,28 +1047,37 @@ export default function Portfolio() {
                     </td>
                     {/* Actions */}
                     <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        <button type="button" onClick={() => openEdit(a)}
-                          style={{
-                            width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
-                            background: C.white, color: C.muted, cursor: "pointer", display: "flex",
-                            alignItems: "center", justifyContent: "center", transition: "all 0.15s"
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = C.bg; e.currentTarget.style.color = C.text; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.muted; }}>
-                          <Pencil size={11} strokeWidth={1.8} />
-                        </button>
-                        <button type="button" onClick={() => setConfirmId(a._id)}
-                          style={{
-                            width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
-                            background: C.white, color: C.muted, cursor: "pointer", display: "flex",
-                            alignItems: "center", justifyContent: "center", transition: "all 0.15s"
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = C.redBg; e.currentTarget.style.color = C.red; e.currentTarget.style.borderColor = `${C.red}30`; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}>
-                          <Trash2 size={11} strokeWidth={1.8} />
-                        </button>
-                      </div>
+                      {isEquity ? (
+                        <div 
+                          style={{ fontSize: 11, color: C.teal, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+                          onClick={() => navigate("/dashboard?tab=equity")}
+                        >
+                          Manage in Equity tab
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <button type="button" onClick={() => openEdit(a)}
+                            style={{
+                              width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
+                              background: C.white, color: C.muted, cursor: "pointer", display: "flex",
+                              alignItems: "center", justifyContent: "center", transition: "all 0.15s"
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = C.bg; e.currentTarget.style.color = C.text; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.muted; }}>
+                            <Pencil size={11} strokeWidth={1.8} />
+                          </button>
+                          <button type="button" onClick={() => setConfirmId(a._id)}
+                            style={{
+                              width: 28, height: 28, borderRadius: 7, border: `1px solid ${C.border}`,
+                              background: C.white, color: C.muted, cursor: "pointer", display: "flex",
+                              alignItems: "center", justifyContent: "center", transition: "all 0.15s"
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = C.redBg; e.currentTarget.style.color = C.red; e.currentTarget.style.borderColor = `${C.red}30`; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}>
+                            <Trash2 size={11} strokeWidth={1.8} />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

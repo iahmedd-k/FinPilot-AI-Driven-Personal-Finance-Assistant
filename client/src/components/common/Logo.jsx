@@ -30,8 +30,8 @@ const SIZE_MAP = {
 
 export default function Logo({ size = "md", dark = false, className = "" }) {
   const currentSize = SIZE_MAP[size] || SIZE_MAP.md;
-  const primaryText = dark ? "#0b0914" : "#e5e7eb";
-  const accentText = dark ? "#475569" : "#a1a1aa";
+  const primaryText = dark ? "#0b0914" : "var(--text-primary)";
+  const accentText = dark ? "#475569" : "var(--accent)";
 
   return (
     <Link

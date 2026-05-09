@@ -33,16 +33,18 @@ import {
 import { DashboardProvider, useDashboard } from "../components/dashboard/DashboardContext";
 import {
   C, dedupToast, ProGate, Card, ChartTip,
-  CAT_COLORS, catToIcon, goalIcons,
+  CAT_COLORS, catToIcon, getSpendingCategoryMeta, goalIcons,
   navSections, navItems, timeTabs, aiInitial,
 } from "../components/dashboard/dashboardShared.jsx";
 import { SpendingPage, CalendarPicker, formatDateInputValue } from "../components/dashboard/tabs/SpendingTab";
 import { ForecastPage } from "../components/dashboard/tabs/ForecastTab";
 import ProfileDropdown from "../components/dashboard/tabs/ProfileDropdown";
 import Logo from "../components/common/Logo";
+import TransactionDetailSidebar from "../components/dashboard/TransactionDetailSidebar";
 
 // ── Other page components ────────────────────────────────────
 import Portfolio from "./Portfolio";
+import Equity from "./Equity";
 
 // ── Services (../services/) ──────────────────────────────────
 import { transactionService } from "../services/transactionService";
@@ -103,6 +105,7 @@ const getAssetCostBasis = (asset) => {
   const quantity = Number(asset.quantity);
   return unitCost * (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
 };
+
 
 // ── Dark mode helpers (no-op — theme is always dark via C tokens) ──
 function injectDarkSheet() { }
@@ -168,12 +171,24 @@ function DashboardShell() {
     advisorActiveSession, setAdvisorActiveSession,
     advisorSidebarOpen, setAdvisorSidebarOpen,
     advisorSessionsLoading,
+    setGlobalSelectedTxId,
   } = useDashboard();
   const isCompactAdvisor = isMobile || isTablet;
 
+  const goToSpending = () => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("spend") === "settings") {
+      params.delete("spend");
+      const nextSearch = params.toString();
+      navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
+    }
+    setActiveNav("spending");
+    if (isMobile) setMobileOpen(false);
+  };
+
   useEffect(() => {
     const nav = new URLSearchParams(location.search).get("nav");
-    const allowed = new Set(["dashboard", "spending", "portfolio", "planning", "forecast", "benefits"]);
+    const allowed = new Set(["dashboard", "spending", "portfolio", "equity", "planning", "forecast", "benefits"]);
     if (nav && allowed.has(nav)) {
       setActiveNav(nav);
     }
@@ -284,7 +299,7 @@ function DashboardShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sideW = isMobile ? 0 : sideCollapsed ? 60 : 200;
+  const sideW = isMobile ? 0 : sideCollapsed ? 60 : 240;
 
   // ── AI Copilot send handler ─────────────────────────────
   const handleSend = async (txt) => {
@@ -363,7 +378,6 @@ html,body { height:100%; background:${C.bg}; }
 }
 
 .tx-row { border-radius:12px; transition:background 0.15s; cursor:pointer; }
-.tx-row:hover { background:var(--border-subtle) !important; }
 .sug-btn { transition:all 0.15s; }
 .sug-btn:hover { background:${C.greenBg} !important; border-color:#6ee7b7 !important; color:${C.greenMid} !important; }
 .tab-pill { transition:all 0.15s; border:none; cursor:pointer; font-family:var(--font-sans); }
@@ -474,7 +488,7 @@ html,body { height:100%; background:${C.bg}; }
         )}
 
         {/* ── SIDEBAR ── */}
-        <aside style={{ width: isMobile ? (mobileOpen ? 240 : 0) : sideW, flexShrink: 0, background: C.sidebar, display: "flex", flexDirection: "column", transition: "width 0.25s cubic-bezier(.4,0,.2,1)", overflow: "hidden", position: isMobile ? "fixed" : "sticky", top: 0, height: "100vh", zIndex: 50, borderRight: "1px solid var(--border-subtle)", boxShadow: isMobile && mobileOpen ? "4px 0 24px rgba(0,0,0,0.12)" : "none", alignSelf: "flex-start" }}>
+        <aside style={{ width: isMobile ? (mobileOpen ? 240 : 0) : sideW, flexShrink: 0, background: C.bg, display: "flex", flexDirection: "column", transition: "width 0.25s cubic-bezier(.4,0,.2,1)", overflow: "hidden", position: isMobile ? "fixed" : "sticky", top: 0, height: "100vh", zIndex: 50, borderRight: "1px solid var(--border-subtle)", boxShadow: isMobile && mobileOpen ? "4px 0 24px rgba(0,0,0,0.12)" : "none", alignSelf: "flex-start" }}>
 
           {/* Logo */}
           <div style={{ padding: "20px 16px 14px", display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
@@ -508,8 +522,9 @@ html,body { height:100%; background:${C.bg}; }
                   return (
                     <div key={id} className={`nav-item tooltip-container ${on ? "active" : ""}`}
                       onClick={() => {
-                        if (id === "forecast" && !isPro) { navigate("/subscription"); return; }
+                        if ((id === "forecast" || id === "equity") && !isPro) { navigate("/subscription"); return; }
                         if (id === "ai_advisor") { setShowAdvisor(v => !v); if (isMobile) setMobileOpen(false); return; }
+                        if (id === "spending") { goToSpending(); return; }
                         setActiveNav(id); if (isMobile) setMobileOpen(false);
                       }}
                       style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 8px", borderRadius: 7, marginBottom: 1, position: "relative", userSelect: "none" }}
@@ -519,7 +534,7 @@ html,body { height:100%; background:${C.bg}; }
                       {(!sideCollapsed || isMobile) && (
                         <span className="nav-lbl" style={{ fontSize: C.fSizeSm, fontWeight: on ? C.fWeightSemi : C.fWeightMed, zIndex: 1, whiteSpace: "nowrap", fontFamily: "var(--font-sans)", letterSpacing: "-0.05px", display: "flex", alignItems: "center", gap: 5, flex: 1 }}>
                           {label}
-                          {id === "forecast" && !isPro && <Lock size={10} style={{ color: "currentColor", flexShrink: 0, marginLeft: 2 }} />}
+                          {(id === "forecast" || id === "equity") && !isPro && <Lock size={10} style={{ color: "currentColor", flexShrink: 0, marginLeft: 2 }} />}
                           {id === "ai_advisor" && !isPro && (
                             <span style={{ fontSize: C.fSizeXs, fontWeight: C.fWeightSemi, color: aiLimitReached ? "var(--accent)" : "var(--text-secondary)", background: aiLimitReached ? "var(--bg-secondary)" : "var(--border-subtle)", padding: "1px 5px", borderRadius: 20, flexShrink: 0 }}>
                               {aiLimitReached ? "0/5" : `${5 - aiRemaining}/5`}
@@ -585,14 +600,14 @@ html,body { height:100%; background:${C.bg}; }
               onMouseEnter={e => { if (!showAdvisor) { e.currentTarget.style.borderColor = "var(--text-secondary)"; e.currentTarget.style.background = "var(--border-subtle)"; } }}
               onMouseLeave={e => { if (!showAdvisor) { e.currentTarget.style.borderColor = "var(--border-subtle)"; e.currentTarget.style.background = "var(--bg-secondary)"; } }}
             >
-              <Wand2 size={13} style={{ color: showAdvisor ? "#ffffff" : "var(--text-primary)", strokeWidth: 1.75, flexShrink: 0 }} />
+              <Star size={13} style={{ color: showAdvisor ? "#ffffff" : "var(--text-primary)", fill: showAdvisor ? "#ffffff" : "var(--text-primary)", flexShrink: 0 }} />
               {!isMobile && <span style={{ fontSize: C.fSizeSm, fontWeight: C.fWeightMed, color: showAdvisor ? "#ffffff" : "var(--text-primary)", whiteSpace: "nowrap", letterSpacing: "-0.1px" }}>AI Advisor</span>}
             </button>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
 
-              
-              
+
+
 
               {/* Initials badge */}
               <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--bg-secondary)", border: "1px solid var(--text-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "var(--text-primary)" }}>
@@ -671,6 +686,8 @@ html,body { height:100%; background:${C.bg}; }
             </div>
           </header>
 
+          <TransactionDetailSidebar />
+
           {/* ── BODY ── */}
           <div style={{ flex: 1, display: "flex", minWidth: 0, minHeight: 0 }}>
             <div className="main-content" style={{ flex: 1, padding: "8px 20px 40px", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
@@ -693,30 +710,49 @@ html,body { height:100%; background:${C.bg}; }
                     aiLimitReached={aiLimitReached} categoryBreakdown={categoryBreakdown}
                     apiGoals={apiGoals} dashCalc={dashCalc} apiBudget={apiBudget}
                     queryClient={queryClient} navigate={navigate}
+                    setGlobalSelectedTxId={setGlobalSelectedTxId}
+                    dashboard={dashboard}
                   />
                 </PortfolioProvider>
               )}
 
               {/* SPENDING — extracted */}
               {activeNav === "spending" && (
-              <SpendingPage
-                key={user?._id}
-                transactionService={transactionService}
-                queryClient={queryClient} C={C} isPro={isPro}
-                txLimitReached={txLimitReached} navigate={navigate}
-                toast={dedupToast} setAddModalOpen={setAddModalOpen}
-                pushNotif={pushNotif} summary={summary}
-                monthlyChart={monthlyChart} apiTransactions={apiTransactions}
-                isMobile={isMobile} refreshUser={refreshUser}
-                budget={apiBudget} categoryBreakdown={categoryBreakdown}
-                onBudgetSaved={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
-                setShowAdvisor={setShowAdvisor}
-                spendingSettings={dashboard?.spendingSettings}
-              />
+                <SpendingPage
+                  key={user?._id}
+                  transactionService={transactionService}
+                  queryClient={queryClient} C={C} isPro={isPro}
+                  txLimitReached={txLimitReached} navigate={navigate}
+                  toast={dedupToast} setAddModalOpen={setAddModalOpen}
+                  pushNotif={pushNotif} summary={summary}
+                  monthlyChart={monthlyChart} apiTransactions={apiTransactions}
+                  isMobile={isMobile} refreshUser={refreshUser}
+                  budget={apiBudget} categoryBreakdown={categoryBreakdown}
+                  onBudgetSaved={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
+                  setShowAdvisor={setShowAdvisor}
+                  spendingSettings={dashboard?.spendingSettings}
+                  setGlobalSelectedTxId={setGlobalSelectedTxId}
+                />
               )}
 
               {/* PORTFOLIO — already separate */}
               {activeNav === "portfolio" && <Portfolio key={user?._id} />}
+              {activeNav === "equity" && (
+                isPro ? (
+                  <Equity key={user?._id} />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 24px", background: "var(--bg-card)", border: "1px solid var(--border-default)", borderRadius: 16, gap: 16, maxWidth: 600, margin: "40px auto" }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 14, background: "#0A0A1A", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(0,0,0,0.18)" }}>
+                      <Lock size={24} color="#FFFFFF" strokeWidth={2.5} />
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)", textAlign: "center" }}>Unlock Equity Tracking</div>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", textAlign: "center", maxWidth: 400, margin: 0 }}>Track and analyze your equity investments with detailed performance metrics and insights. Upgrade to Pro to access this feature.</p>
+                    <button onClick={() => navigate(ROUTES.SUBSCRIPTION)} style={{ marginTop: 8, padding: "11px 24px", borderRadius: 10, background: "var(--accent)", color: "#FFFFFF", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.88"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+                      Upgrade to Pro
+                    </button>
+                  </div>
+                )
+              )}
 
               {/* PLANNING */}
               {activeNav === "planning" && (
@@ -804,7 +840,7 @@ html,body { height:100%; background:${C.bg}; }
 // This wrapper sits inside <PortfolioProvider> and computes the real netWorthData
 // = cumulative cash savings + current portfolio asset value per month.
 function HomeTabWrapper(props) {
-  const { assets = [] } = usePortfolio();
+  const { netWorthAssets: assets = [] } = usePortfolio();
   const { monthlyChart, apiTransactions, activeTab } = props;
 
   const toLocalKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -827,11 +863,11 @@ function HomeTabWrapper(props) {
     const sortedMonthly = [...(monthlyChart || [])].sort((a, b) => (a.month || "").localeCompare(b.month || ""));
     const now = new Date();
 
-    const appendCurrentAssetsToLatest = (points) => {
+    const addAssetsToAllPoints = (points) => {
       if (!points.length) return points;
-      return points.map((point, index) => ({
+      return points.map((point) => ({
         ...point,
-        v: Math.round(point.v + (index === points.length - 1 ? totalAssetsNow : 0)),
+        v: Math.round(point.v + totalAssetsNow),
       }));
     };
 
@@ -886,11 +922,11 @@ function HomeTabWrapper(props) {
       });
     };
 
-    if (activeTab === "1W") return appendCurrentAssetsToLatest(dailyFromTransactions(7));
-    if (activeTab === "1M") return appendCurrentAssetsToLatest(dailyFromTransactions(Math.max(1, now.getDate())));
-    if (activeTab === "3M") return appendCurrentAssetsToLatest(monthlyFromChart("3M"));
-    if (activeTab === "YTD") return appendCurrentAssetsToLatest(monthlyFromChart("YTD"));
-    return appendCurrentAssetsToLatest(monthlyFromChart("ALL"));
+    if (activeTab === "1W") return addAssetsToAllPoints(dailyFromTransactions(7));
+    if (activeTab === "1M") return addAssetsToAllPoints(dailyFromTransactions(Math.max(1, now.getDate())));
+    if (activeTab === "3M") return addAssetsToAllPoints(monthlyFromChart("3M"));
+    if (activeTab === "YTD") return addAssetsToAllPoints(monthlyFromChart("YTD"));
+    return addAssetsToAllPoints(monthlyFromChart("ALL"));
   }, [activeTab, apiTransactions, monthlyChart, totalAssetsNow]);
 
   return (
@@ -904,7 +940,7 @@ function HomeTabWrapper(props) {
 }
 
 /* ─── HomeTab ────────────────────────────────────────────── */
-function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, monthlyChart, setActiveNav, setShowAdvisor, handleExportData, isExporting }) {
+function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, monthlyChart, setActiveNav, setShowAdvisor, handleExportData, isExporting, setGlobalSelectedTxId, dashboard }) {
   return (
     <>
       <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
@@ -929,10 +965,11 @@ function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, set
         <OverviewSubTab
           C={C} isPro={isPro} activeTab={activeTab} setActiveTab={setActiveTab}
           netWorthData={netWorthData} totalAssetsNow={totalAssetsNow} canonicalCurrentNetWorth={canonicalCurrentNetWorth} transactions={transactions}
-          summary={summary} apiTransactions={apiTransactions}
+          summary={summary} apiTransactions={apiTransactions} dashboard={dashboard}
           setActiveNav={setActiveNav} setShowAdvisor={setShowAdvisor}
           handleExportData={handleExportData} isExporting={isExporting}
           setDashSubTab={setDashSubTab}
+          setGlobalSelectedTxId={setGlobalSelectedTxId}
         />
       )}
 
@@ -951,7 +988,7 @@ function BenefitsTab({ isPro, navigate }) {
     "Goal tracking & planning",
     "Cash flow forecasting",
     "Spending calendar",
-    "Basic financial health score",
+    "Basic credit score",
   ];
   const PRO_FEATURES = [
     "Unlimited transactions",
@@ -961,6 +998,7 @@ function BenefitsTab({ isPro, navigate }) {
     "CSV data export anytime",
     "Priority support",
     "Full net worth tracking",
+    "Equity tracking & analysis",
     "Forecast & projection tools",
   ];
   const { data: billingStatus } = useQuery({
@@ -1110,7 +1148,7 @@ function BenefitsTab({ isPro, navigate }) {
 }
 
 /* ─── OverviewSubTab ─────────────────────────────────────── */
-function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, setActiveNav, setShowAdvisor, handleExportData, isExporting, setDashSubTab }) {
+function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, setActiveNav, setShowAdvisor, handleExportData, isExporting, setDashSubTab, setGlobalSelectedTxId, dashboard }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
   const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
@@ -1144,8 +1182,9 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
             const trendLatest = nwArr.length ? nwArr[nwArr.length - 1].v : 0;
             const latest = Number.isFinite(canonicalCurrentNetWorth) ? canonicalCurrentNetWorth : trendLatest;
             const first = nwArr.length > 1 ? nwArr[0].v : 0;
-            const change = trendLatest - first;
-            const changePct = first !== 0 ? ((change / Math.abs(first)) * 100).toFixed(1) : null;
+            const change = latest - first;
+            const changePct = first !== 0 ? ((change / Math.abs(first)) * 100) : 0;
+            const changePctLabel = (Math.abs(changePct) < 0.1 && change !== 0) ? changePct.toFixed(2) : changePct.toFixed(1);
             const fmtNW = (n) => {
               if (n == null) return formatAmount(0, { maximumFractionDigits: 0 });
               return formatSignedAmount(n, { maximumFractionDigits: 0 });
@@ -1153,10 +1192,10 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
             return (
               <>
                 <div>
-                <div className="origin-value" style={{ color: latest < 0 ? C.red : C.text }}>{fmtNW(latest)}</div>
-                  {changePct !== null && (
+                  <div className="origin-value" style={{ color: latest < 0 ? C.red : C.text }}>{fmtNW(latest)}</div>
+                  {change !== 0 && (
                     <div style={{ fontSize: C.fSizeSm, fontWeight: C.fWeightSemi, color: change >= 0 ? C.greenMid : C.red, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
-                      {fmtNW(change)} ({change >= 0 ? "+" : ""}{changePct}%)
+                      {fmtNW(change)} ({change >= 0 ? "+" : ""}{changePctLabel}%)
                     </div>
                   )}
                   {(totalAssetsNow || 0) > 0 && (
@@ -1242,82 +1281,89 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
         </div>
       </Card>
 
-      {/* 2-col bottom row: Calendar left, Transactions right */}
-      <div className="center-grid3 anim-3" style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 10 }}>
-
-        {/* Spending Calendar */}
-        <SpendingCalendar C={C} apiTransactions={apiTransactions} summary={summary} setActiveNav={setActiveNav} />
-
-        {/* Recent Transactions */}
-        <Card style={{ padding: "16px 20px", minWidth: 0, overflow: "hidden", height: 420, display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexShrink: 0 }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="display-serif" style={{ fontSize: 16, fontWeight: 500, color: C.text, marginBottom: 0 }}>Recent transactions</div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={handleExportData}
-                disabled={isExporting || !isPro}
-                title={isPro ? "Export your data as CSV" : "Upgrade to Pro to export data"}
-                style={{
-                  fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", gap: 5,
-                  padding: "4px 10px", borderRadius: 8, flexShrink: 0,
-                  color: isPro ? C.white : "#9ca3af",
-                  background: isPro ? C.greenMid : C.bg,
-                  border: isPro ? "none" : `1px solid ${C.border}`,
-                  cursor: isPro ? "pointer" : "not-allowed",
-                  opacity: isExporting ? 0.75 : 1,
-                  transition: "all 0.15s",
-                }}
-              >
-                {isPro ? <Download size={12} /> : <Lock size={11} />}
-                {isExporting ? "Exporting..." : "Export"}
-              </button>
-
-              <button type="button" onClick={() => setActiveNav("spending")} style={{ fontSize: 11, fontWeight: 600, color: C.greenMid, background: C.greenBg, border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, padding: "4px 8px", borderRadius: 8, flexShrink: 0 }}>
-                View all <ChevronRight size={12} />
-              </button>
-            </div>
-          </div>
-
-          <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-            {transactions.slice(0, 8).map(tx => (
-              <div key={tx.id} className="tx-row" style={{ 
-                display: "flex", alignItems: "center", justifyContent: "space-between", 
-                padding: "12px 14px", borderRadius: 14, background: C.bg, 
-                marginBottom: 0, gap: 12, minWidth: 0, border: `1px solid ${C.border2}`,
-                transition: "all 0.15s ease"
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, overflow: "hidden" }}>
-                  <div style={{ 
-                    width: 36, height: 36, borderRadius: 10, background: C.white, 
-                    display: "flex", alignItems: "center", justifyContent: "center", 
-                    flexShrink: 0, border: `1px solid ${C.border}`,
-                    boxShadow: "var(--shadow-card)"
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: C.sub, letterSpacing: "0.02em" }}>{getMerchantMonogram(tx.merchant, tx.category)}</span>
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.merchant}</div>
-                    <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{tx.category} · {tx.date}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: tx.amount > 0 ? C.greenMid : C.text }}>
-                    {tx.amount > 0 ? "+" : ""}{formatAmount(Math.abs(tx.amount), { maximumFractionDigits: 0 })}
-                  </div>
-                </div>
+      {/* Combined Calendar + Recent Transactions Card */}
+      <Card className="anim-3" style={{ padding: "16px 18px", overflow: "hidden", background: C.white, borderRadius: 18, fontFamily: "Inter, system-ui, sans-serif" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1fr)", gap: 18, minHeight: "auto" }}>
+          
+          {/* LEFT: Calendar Section */}
+          <div style={{ minWidth: 0 }}>
+            {/* Calendar Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} onClick={() => setActiveNav("spending")}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Spent in {new Date().toLocaleString("default", { month: "long" })}</span>
+                <ChevronRight size={10} style={{ color: C.muted }} />
               </div>
-            ))}
-          </div>
-          <button type="button" onClick={() => setActiveNav("spending")} style={{ width: "100%", marginTop: 14, padding: "12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 12, fontWeight: 700, color: C.text, cursor: "pointer", transition: "all 0.15s", textAlign: "center", flexShrink: 0, boxShadow: "var(--shadow-card)" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "var(--surface-muted)"; e.currentTarget.style.borderColor = C.muted; }}
-            onMouseLeave={e => { e.currentTarget.style.background = C.white; e.currentTarget.style.borderColor = C.border; }}
-          >SEE ALL TRANSACTIONS</button>
-        </Card>
+              <button type="button" onClick={() => setShowAdvisor(v => !v)} style={{ width: 22, height: 22, borderRadius: 5, background: C.bg, border: `1px solid ${C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontSize: 13, padding: 0 }}>
+                <Star size={11} style={{ color: "var(--text-secondary)", fill: "var(--text-secondary)" }} />
+              </button>
+            </div>
 
-      </div>{/* end 3-col */}
+            {/* Total Spent */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: "-0.5px" }}>
+                {formatAmount(summary?.totalExpense ?? 0, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+
+            {/* Calendar Grid */}
+            <SpendingCalendarGrid C={C} apiTransactions={apiTransactions} />
+          </div>
+
+          {/* RIGHT: Recent Transactions Section */}
+          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", paddingLeft: 18 }}>
+            {/* Header */}
+            <div style={{ marginBottom: 12, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Recent transactions</div>
+            </div>
+
+            {/* Transactions List */}
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+              {transactions.slice(0, 6).map(tx => {
+                const txMeta = getSpendingCategoryMeta(tx.category);
+                const TxIcon = txMeta?.icon || catToIcon[tx.category] || BadgeDollarSign;
+                const iconColor = txMeta?.color || C.text;
+                return (
+                  <div key={tx.id} 
+                    onClick={() => setGlobalSelectedTxId?.(tx.id)}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      paddingBottom: 8, borderBottom: `1px solid ${C.border2}`,
+                      cursor: "pointer", transition: "all 0.15s ease"
+                    }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 6, background: "var(--surface-muted)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, border: `1px solid ${C.border}`,
+                      }}>
+                        <TxIcon size={14} style={{ color: iconColor, strokeWidth: 2 }} />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 600, color: C.text, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.merchant}</div>
+                        <div style={{ fontSize: 9.5, color: C.muted, marginTop: 1 }}>{tx.date}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: tx.amount > 0 ? C.greenMid : C.text }}>
+                        {tx.amount > 0 ? "+" : ""}{formatAmount(Math.abs(tx.amount), { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* View All Button */}
+            <button type="button" onClick={() => setActiveNav("spending")} 
+              style={{ marginTop: 10, padding: "9px 10px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, fontSize: 11, fontWeight: 600, color: C.text, cursor: "pointer", transition: "all 0.15s", textAlign: "center", fontFamily: "inherit" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--surface-muted)"; e.currentTarget.style.borderColor = C.muted; }}
+              onMouseLeave={e => { e.currentTarget.style.background = C.bg; e.currentTarget.style.borderColor = C.border; }}
+            >
+              View all transactions
+            </button>
+          </div>
+        </div>
+      </Card>
 
       {/* Investments Chart — full width below calendar + transactions */}
       <Card className="anim-4" style={{ padding: 0, overflow: "hidden", background: C.white, borderRadius: 18 }}>
@@ -1794,9 +1840,9 @@ function GoalsPage({ C, aiService, pushNotif }) {
             {/* Header (Premium Overline Style) */}
             <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-card)" }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ 
-                  fontSize: 10, fontWeight: 700, color: "var(--text-muted)", 
-                  textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: "var(--text-muted)",
+                  textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4
                 }}>
                   {editingId ? "Financial Planning" : "New savings goal"}
                 </span>
@@ -1805,10 +1851,10 @@ function GoalsPage({ C, aiService, pushNotif }) {
                 </div>
               </div>
               <button type="button" onClick={resetForm}
-                style={{ 
-                  width: 32, height: 32, borderRadius: 8, border: "none", 
+                style={{
+                  width: 32, height: 32, borderRadius: 8, border: "none",
                   background: "var(--surface-muted)", color: "var(--text-muted)", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" 
+                  display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s"
                 }}>
                 <X size={16} />
               </button>
@@ -1827,15 +1873,15 @@ function GoalsPage({ C, aiService, pushNotif }) {
                       <button key={cat} type="button" onClick={() => setForm(f => ({ ...f, category: cat }))}
                         style={{
                           padding: "12px 16px", borderRadius: 16, border: `1px solid ${C.border}`,
-                          background: C.bg, cursor: "pointer", display: "flex", alignItems: "center", 
+                          background: C.bg, cursor: "pointer", display: "flex", alignItems: "center",
                           gap: 14, transition: "all 0.15s", fontFamily: "inherit", textAlign: "left"
                         }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.background = `${color}08`; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = C.bg; }}
                       >
-                        <div style={{ 
-                          width: 40, height: 40, borderRadius: 12, background: `${color}14`, 
-                          display: "flex", alignItems: "center", justifyContent: "center", color: color 
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 12, background: `${color}14`,
+                          display: "flex", alignItems: "center", justifyContent: "center", color: color
                         }}>
                           <Icon size={20} strokeWidth={1.5} />
                         </div>
@@ -1855,7 +1901,7 @@ function GoalsPage({ C, aiService, pushNotif }) {
                     <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                       placeholder="e.g. Emergency Fund, MacBook" style={inputSx} autoFocus />
                   </div>
-                  
+
                   {/* Category Selection (Inline for edits) */}
                   {editingId && (
                     <div style={{ gridColumn: "1 / -1" }}>
@@ -1866,7 +1912,7 @@ function GoalsPage({ C, aiService, pushNotif }) {
                           const color = catColor(cat);
                           return (
                             <button key={cat} type="button" onClick={() => setForm(f => ({ ...f, category: cat }))}
-                              style={{ 
+                              style={{
                                 padding: "8px 4px", borderRadius: 10, border: `1px solid ${active ? color : C.border}`,
                                 background: active ? `${color}10` : C.bg, color: active ? C.text : C.sub,
                                 fontSize: 11, fontWeight: active ? 600 : 400, cursor: "pointer", transition: "all 0.15s"
@@ -1919,7 +1965,7 @@ function GoalsPage({ C, aiService, pushNotif }) {
                   <button type="button" onClick={() => setForm(f => ({ ...f, category: null }))}
                     style={{
                       padding: "12px 16px", borderRadius: 14, border: `1px solid ${C.border}`,
-                      background: "transparent", color: C.text, fontSize: 13, fontWeight: 600, 
+                      background: "transparent", color: C.text, fontSize: 13, fontWeight: 600,
                       cursor: "pointer", fontFamily: "inherit"
                     }}>
                     Back
@@ -2240,7 +2286,7 @@ function MonthlyBudgetWidget({ C, budget, totalExpense, setActiveNav, onBudgetSa
 function PortfolioGlanceCard({ C, setActiveNav }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
-  const { assets, loading } = usePortfolio();
+  const { netWorthAssets: assets, loading } = usePortfolio();
   const ASSET_COLORS = ["#0d9488", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"];
 
   const totalValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
@@ -2321,7 +2367,7 @@ function PortfolioGlanceCard({ C, setActiveNav }) {
             <div style={{ fontSize: 9, color: C.muted, marginBottom: 1 }}>All time</div>
             <div style={{ fontSize: 11, fontWeight: 700, color: totalGain >= 0 ? C.greenMid : C.red, display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
               {totalGain >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-              {totalGain >= 0 ? "+" : ""}{fmt(totalGain)} ({totalGainPct >= 0 ? "+" : ""}{totalGainPct.toFixed(1)}%)
+              {totalGain >= 0 ? "+" : ""}{fmt(totalGain)} ({totalGain >= 0 ? "+" : ""}{(Math.abs(totalGainPct) < 0.1 && totalGain !== 0 ? totalGainPct.toFixed(2) : totalGainPct.toFixed(1))}%)
             </div>
           </div>
         </div>
@@ -2386,6 +2432,86 @@ function PortfolioGlanceCard({ C, setActiveNav }) {
     </div>
   );
 }
+
+/* ─── Spending Calendar Grid (inline version for combined card) ── */
+function SpendingCalendarGrid({ C, apiTransactions }) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const { user: dashboardUser } = useAuthContext();
+  const preferredCurrency = getUserCurrency(dashboardUser);
+
+  const daySpend = useMemo(() => {
+    const map = {};
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    
+    (apiTransactions || []).forEach(t => {
+      const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
+      if (!isExp) return;
+      const d = new Date(t.date);
+      
+      // Only show transactions that have actually occurred (up to today)
+      if (d <= todayEnd && d.getFullYear() === year && d.getMonth() === month) {
+        const day = d.getDate();
+        map[day] = (map[day] || 0) + Math.abs(t.amount);
+      }
+    });
+    return map;
+  }, [apiTransactions, year, month]);
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = now.getDate();
+
+  const fmt = (n) => {
+    if (!n) return "$0";
+    const formatted = formatCurrencyAmount(Math.round(n), preferredCurrency, { maximumFractionDigits: 0 });
+    return formatted;
+  };
+
+  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  return (
+    <>
+      {/* Day-of-week labels */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 8, flexShrink: 0 }}>
+        {dayLabels.map((d, i) => (
+          <div key={i} style={{ fontSize: 8, fontWeight: 700, color: C.muted, textAlign: "center", textTransform: "uppercase", letterSpacing: "0.02em" }}>{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar cells */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`empty-${i}`} />;
+          const amt = daySpend[day];
+          const isFuture = day > today;
+          return (
+            <div key={day} style={{
+              borderRadius: 6,
+              background: C.bg,
+              border: `1px solid ${C.border2}`,
+              padding: "4px",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              minHeight: 42,
+              opacity: isFuture ? 0.45 : 1,
+              transition: "all 0.15s"
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.text, lineHeight: 1 }}>{day}</div>
+              <div style={{ fontSize: 7.5, fontWeight: 600, color: amt ? C.greenMid : C.muted, lineHeight: 1, marginTop: 2 }}>
+                {amt ? fmt(amt) : "$0"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 
 /* ─── Spending Calendar Component ───────────────────────── */
 
@@ -2697,7 +2823,7 @@ function AIAdvisorCard({
   const [typing, setTyping] = useState(false);
   const msgsEndRef = useRef(null);
   const inputRef = useRef(null);
-  const { assets: portfolioAssets = [] } = usePortfolio();
+  const { netWorthAssets: portfolioAssets = [] } = usePortfolio();
 
   useEffect(() => { msgsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typing]);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 120); }, []);
@@ -2979,11 +3105,18 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
                         </span>
                         <button
                           onClick={e => handleDeleteSession(e, s._id)}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: MUTED, padding: "0 2px", fontSize: 16, lineHeight: 1, flexShrink: 0, borderRadius: 4, fontFamily: "inherit", opacity: 0.7 }}
-                          title="Delete"
-                          onMouseEnter={e => { e.currentTarget.style.color = TEXT; e.currentTarget.style.opacity = "1"; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.opacity = "0.7"; }}
-                        >⋮</button>
+                          style={{ 
+                            width: 24, height: 24, borderRadius: 6, border: "none", 
+                            background: "transparent", cursor: "pointer", color: MUTED, 
+                            display: "flex", alignItems: "center", justifyContent: "center", 
+                            flexShrink: 0, transition: "all 0.15s", opacity: 0.6 
+                          }}
+                          title="Delete conversation"
+                          onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.background = "rgba(239, 68, 68, 0.08)"; e.currentTarget.style.opacity = "1"; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = MUTED; e.currentTarget.style.background = "transparent"; e.currentTarget.style.opacity = "0.6"; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -3255,9 +3388,9 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
               }}
               onMouseEnter={e => { if (!aiLimitReached && input.trim()) e.currentTarget.style.opacity = "0.85"; }}
               onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
-          >
-            <ArrowUpRight size={15} color={(!aiLimitReached && input.trim()) ? TEXT_INVERSE : MUTED} strokeWidth={2.5} />
-          </button>
+            >
+              <ArrowUpRight size={15} color={(!aiLimitReached && input.trim()) ? TEXT_INVERSE : MUTED} strokeWidth={2.5} />
+            </button>
           </div>
           {isMobile && (
             <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -3311,10 +3444,10 @@ function MiniSparkline({ prices, up, width = 80, height = 36 }) {
 
 
 const COIN_MAPPING = {
-  btc: "bitcoin", eth: "ethereum", usdt: "tether", bnb: "binancecoin", sol: "solana", 
-  usdc: "usd-coin", xrp: "ripple", ada: "cardano", avax: "avalanche-2", doge: "dogecoin", 
-  dot: "polkadot", matic: "matic-network", shib: "shiba-inu", ltc: "litecoin", trx: "tron", 
-  link: "chainlink", bch: "bitcoin-cash", ton: "the-open-network", xlm: "stellar", 
+  btc: "bitcoin", eth: "ethereum", usdt: "tether", bnb: "binancecoin", sol: "solana",
+  usdc: "usd-coin", xrp: "ripple", ada: "cardano", avax: "avalanche-2", doge: "dogecoin",
+  dot: "polkadot", matic: "matic-network", shib: "shiba-inu", ltc: "litecoin", trx: "tron",
+  link: "chainlink", bch: "bitcoin-cash", ton: "the-open-network", xlm: "stellar",
   atom: "cosmos", uni: "uniswap", xmr: "monero", etc: "ethereum-classic"
 };
 
@@ -3325,7 +3458,7 @@ const getCoinGeckoId = (coinStr) => {
 };
 
 function CryptoHoldingsWidget({ C, setActiveNav }) {
-  const { assets, loading } = usePortfolio();
+  const { netWorthAssets: assets, loading } = usePortfolio();
   const cryptos = (assets || []).filter(a => a.assetType === "crypto" || (!a.assetType && a.coin));
   const [sparklines, setSparklines] = useState({});
 
@@ -3530,7 +3663,7 @@ function SavingsGoalsWidget({ C, apiGoals, setActiveNav }) {
 function InvestmentsChartCard({ C, setActiveNav }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
-  const { assets = [], loading } = usePortfolio();
+  const { netWorthAssets: assets = [], loading } = usePortfolio();
 
   // ── Totals ────────────────────────────────────────────────
   const totalValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
@@ -3627,39 +3760,37 @@ function InvestmentsChartCard({ C, setActiveNav }) {
 
   return (
     <div>
-      {/* Value row */}
-      {(totalValue > 0 || loading) && (
-        <div style={{ padding: "12px 18px 4px", display: "flex", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: C.text, letterSpacing: "-0.3px" }}>{fmtV(totalValue)}</span>
-          {hasCostData && gainPct !== null && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: totalGain >= 0 ? C.greenMid : C.red }}>
-              {totalGain >= 0 ? "+" : ""}{fmtV(totalGain)} ({totalGain >= 0 ? "+" : ""}{gainPct}%)
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Chart */}
       {loading ? (
-        <div style={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ height: 260, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ fontSize: 11, color: C.muted }}>Loading…</div>
         </div>
       ) : assets.length === 0 ? (
-        <div style={{ height: 160, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <div style={{ height: 260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
           <TrendingUp size={22} style={{ color: C.muted }} />
           <div style={{ fontSize: 11, color: C.muted }}>No assets added yet</div>
         </div>
       ) : chartData.length > 0 ? (
-        <>
-          <ResponsiveContainer width="100%" height={160} minWidth={0} minHeight={160}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 0, bottom: 0, left: 0 }}>
+        <div style={{ width: "100%", height: 260 }}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <AreaChart data={chartData} margin={{ top: 30, right: 35, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="investCostGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.22} />
                   <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="month" hide />
+              <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: C.muted, fontSize: 10 }} tickLine={false} axisLine={false} width={55} allowDecimals={false} tickFormatter={(value) => {
+                const numeric = Number(value || 0);
+                return new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: preferredCurrency || 'USD',
+                  notation: 'compact',
+                  compactDisplay: 'short',
+                  maximumFractionDigits: 1
+                }).format(numeric);
+              }} />
               <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="3 3" />
               <Area
                 type="monotone"
@@ -3670,23 +3801,36 @@ function InvestmentsChartCard({ C, setActiveNav }) {
                 dot={false}
                 activeDot={{ r: 4, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
               />
+              <ReferenceDot
+                x={chartData[chartData.length - 1]?.month}
+                y={chartData[chartData.length - 1]?.currentValue}
+                r={5}
+                fill="#0ea5e9"
+                stroke="#fff"
+                strokeWidth={2}
+                isFront
+                label={{ value: "Current value", position: "top", fill: C.muted, fontSize: 10 }}
+              />
               <Tooltip
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
                   const row = payload[0]?.payload;
+                  const gain = (row?.currentValue || 0) - (row?.costBasis || 0);
                   return (
                     <div style={{ background: C.white, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 12px", boxShadow: "0 4px 12px rgba(0,0,0,0.07)" }}>
                       <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>{row?.month}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{fmtV(row?.costBasis)}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>Invested: {fmtV(row?.costBasis)}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>Current: {fmtV(row?.currentValue)}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: gain >= 0 ? C.greenMid : C.red }}>Gain / loss: {gain >= 0 ? "+" : ""}{fmtV(gain)}</div>
                     </div>
                   );
                 }}
               />
             </AreaChart>
           </ResponsiveContainer>
-        </>
+        </div>
       ) : (
-        <div style={{ height: 160, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <div style={{ height: 260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
           <TrendingUp size={22} style={{ color: C.muted }} />
           <div style={{ fontSize: 11, color: C.muted }}>No investment cost data available</div>
         </div>
@@ -3699,9 +3843,9 @@ function InvestmentsChartCard({ C, setActiveNav }) {
 function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTransactions = [], canonicalCurrentNetWorth }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
-  const { assets = [], loading } = usePortfolio();
+  const { netWorthAssets: assets = [], loading } = usePortfolio();
   const [nwTab, setNwTab] = useState("all");   // "all" | "investments" | "spending"
-  const [nwPeriod, setNwPeriod] = useState("3M");
+  const [nwPeriod, setNwPeriod] = useState("YTD");
   const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
 
   const ASSET_COLORS = ["#16a34a", "#0d9488", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899"];
@@ -4046,6 +4190,22 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
           });
           return (
             <>
+              {/* Summary Metrics */}
+              <div style={{ display: "flex", gap: 32, padding: "0 20px 20px", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Monthly Income</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: C.greenMid, letterSpacing: "-0.5px" }}>
+                    {formatAmount(summary?.totalIncome ?? 0, { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Savings Rate</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: "-0.5px" }}>
+                    {summary?.savingsPercent ?? 0}%
+                  </div>
+                </div>
+              </div>
+
               {/* Legend */}
               <div style={{ display: "flex", gap: 16, padding: "0 20px 4px", justifyContent: "flex-end" }}>
                 {[{ color: "#16a34a", label: "Income" }, { color: "#ef4444", label: "Expenses" }].map(l => (
@@ -4065,7 +4225,7 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
                     tickFormatter={v => fmtNW(v)}
                     tick={{ fontSize: 10, fill: "#b0b8c8", fontFamily: "var(--font-sans)" }}
                   />
-                <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="4 4" />
+                  <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="4 4" />
                   <Tooltip content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const row = payload[0]?.payload;
@@ -4232,8 +4392,8 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
                         const label = (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : m.month;
                         const net = (m.income || 0) - (m.expense || 0);
                         return (
-                          <div key={m.month} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, background: net >= 0 ? C.greenBg : C.redBg, border: `1px solid ${net >= 0 ? `${C.greenMid}40` : `${C.red}40`}` }}>
-                            <span style={{ fontSize: 12, color: C.sub }}>{label}</span>
+                          <div key={m.month} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: 10, background: "transparent", border: `1px solid ${C.border2}` }}>
+                            <span style={{ fontSize: 12, fontWeight: 500, color: C.muted }}>{label}</span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: net >= 0 ? C.greenMid : C.red }}>{net >= 0 ? "+" : ""}{fmtNW(net)}</span>
                           </div>
                         );
@@ -4362,7 +4522,7 @@ function HealthScoreWidget({ C, dashCalc, apiGoals, apiBudget, apiTransactions, 
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <span className="origin-section-label" style={{ fontSize: C.fSizeXs }}>Health Score</span>
+        <span className="origin-section-label" style={{ fontSize: C.fSizeXs }}>Credit Score</span>
         {!noData && (
           <button type="button" onClick={() => setShowBreakdown(v => !v)}
             style={{ fontSize: 9, fontWeight: 700, color: showBreakdown ? C.muted : C.teal, background: "none", border: "none", cursor: "pointer", letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "inherit" }}>
@@ -4373,7 +4533,7 @@ function HealthScoreWidget({ C, dashCalc, apiGoals, apiBudget, apiTransactions, 
 
       {noData ? (
         <div style={{ textAlign: "center", padding: "16px 0", color: C.muted, fontSize: 11 }}>
-          Add transactions to calculate your health score.
+          Add transactions to calculate your credit score.
         </div>
       ) : (
         <>

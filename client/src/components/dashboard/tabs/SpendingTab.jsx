@@ -258,6 +258,7 @@ function SpendingPage({
   onBudgetSaved,
   setShowAdvisor,
   spendingSettings,
+  setGlobalSelectedTxId,
 }) {
   const { user } = useAuthContext();
   const location = useLocation();
@@ -556,10 +557,9 @@ function SpendingPage({
       ? (((thisSpend - prevSpend) / prevSpend) * 100).toFixed(1)
       : null;
 
-  const recentTx = sortTransactionsNewestFirst(analyticsTransactions).slice(
-    0,
-    5
-  );
+  const recentTx = sortTransactionsNewestFirst(
+    analyticsTransactions.filter((t) => new Date(t.date) <= new Date())
+  ).slice(0, 5);
 
   const fmtMoney = (n, options = { maximumFractionDigits: 0 }) => {
     const numeric = Number(n || 0);
@@ -1185,6 +1185,7 @@ function SpendingPage({
           fmtMoney={fmtMoney}
           preferredCurrency={preferredCurrency}
           budget={budget}
+          spendingSettings={spendingSettings}
           // FIX: pass the fully-transformed trendData (labeled, last-6-months)
           // instead of the raw analyticsMonthlyChart. The overview tab's chart
           // expects { label, income, expense, net } objects — not { month, ... }.
@@ -1192,6 +1193,7 @@ function SpendingPage({
           trendData={trendData}
           openAdd={openAdd}
           onBudgetSaved={onBudgetSaved}
+          setGlobalSelectedTxId={setGlobalSelectedTxId}
         />
       )}
 
@@ -1234,6 +1236,7 @@ function SpendingPage({
           preferredCurrency={preferredCurrency}
           setSpendTab={setSpendTab}
           reportPreferences={resolvedSettings.reportPreferences}
+          activeTab={spendTab}
         />
       )}
 

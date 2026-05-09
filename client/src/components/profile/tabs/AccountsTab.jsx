@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Building2, Car, DollarSign, Eye, EyeOff, Gem, Heart, Home, Landmark, Layers, MoreVertical, PiggyBank, Plus, Search, Shield, Trophy, TrendingUp, X, Upload } from "lucide-react";
+import { ArrowUp, Building2, Car, ChevronDown, DollarSign, Eye, EyeOff, Gem, Heart, Home, Landmark, Layers, MoreVertical, PiggyBank, Plus, Shield, Trophy, TrendingUp, X, Upload } from "lucide-react";
 import { useAuthContext } from "../../../hooks/useAuthContext";
 import { cryptoService } from "../../../services/cryptoService";
 import { dashboardService } from "../../../services/dashboardService";
-import { CalendarPicker } from "../../dashboard/tabs/SpendingTab";
-import { BG, BORDER, MUTED, Notice, RED, SUB, SURFACE_MUTED, SURFACE_STRONG, TEXT, TEXT_ON_STRONG, WHITE, fi, fo, inputStyle } from "../shared";
+import { CalendarPicker, formatDateInputValue } from "../../dashboard/tabs/SpendingTab";
+import { BG, BORDER, MUTED, Notice, RED, SUB, SURFACE_MUTED, SURFACE_STRONG, TEXT, TEXT_ON_STRONG, WHITE, fi, fo, inputStyle, FloatingInput, FloatingSelect } from "../shared";
 import { formatCurrencyAmount, getUserCurrency } from "../../../utils/currency";
 
 const ASSET_TYPES = [
@@ -40,7 +41,6 @@ const ACCOUNT_TYPE_DISPLAY = {
 const ADD_ASSET_CARDS = [
   { key: "insurance", label: "Insurance", icon: Heart },
   { key: "valuables", label: "Valuables", icon: Trophy },
-  { key: "private_equity", label: "Private Equity", icon: PiggyBank },
   { key: "equity", label: "Equity", icon: TrendingUp },
   { key: "vehicle", label: "Vehicles", icon: Car },
   { key: "pension", label: "Pensions and annuities", icon: PiggyBank },
@@ -48,6 +48,17 @@ const ADD_ASSET_CARDS = [
   { key: "debt", label: "Unpaid Debt", icon: ArrowUp },
   { key: "other", label: "Other", icon: ArrowUp },
 ];
+
+const ACCOUNT_TYPE_OPTIONS = ["Checking", "Savings", "Cash account", "Brokerage cash"];
+const OTHER_TYPE_OPTIONS = ["Asset", "Liability"];
+const buttonReset = {
+  appearance: "none",
+  background: "transparent",
+  border: "none",
+  padding: 0,
+  margin: 0,
+  font: "inherit",
+};
 
 const CALENDAR_COLORS = {
   border: BORDER,
@@ -177,6 +188,48 @@ function AssetTypeIcon({ assetType }) {
   return <IconComponent />;
 }
 
+function getAssetModalTitle(assetType) {
+  switch (assetType) {
+    case "cash":
+      return "Bank Accounts";
+    case "private_equity":
+      return "Private Equity";
+    case "vehicle":
+      return "Vehicles";
+    case "pension":
+      return "Pensions and annuities";
+    case "debt":
+      return "Unpaid Debt";
+    default:
+      return (ACCOUNT_TYPE_DISPLAY[assetType]?.label || "Other").toUpperCase() === "OTHER"
+        ? "Other"
+        : (ACCOUNT_TYPE_DISPLAY[assetType]?.label || "Asset");
+  }
+}
+
+function getAssetFieldLabels(assetType) {
+  switch (assetType) {
+    case "cash":
+      return { typeLabel: "Account type", nameLabel: "Account name", balanceLabel: "Current balance", dateLabel: "Start date" };
+    case "crypto":
+      return { typeLabel: "Coin / token", nameLabel: "Asset name", balanceLabel: "Current balance", dateLabel: "Start date" };
+    case "equity":
+      return { typeLabel: "Equity type", nameLabel: "Account name", balanceLabel: "Current balance", dateLabel: "Start date" };
+    case "vehicle":
+      return { typeLabel: "Vehicle type", nameLabel: "Vehicle name", balanceLabel: "Current value", dateLabel: "Start date" };
+    case "property":
+      return { typeLabel: "Property type", nameLabel: "Property name", balanceLabel: "Current value", dateLabel: "Start date" };
+    case "insurance":
+      return { typeLabel: "Policy type", nameLabel: "Policy name", balanceLabel: "Current value", dateLabel: "Start date" };
+    case "pension":
+      return { typeLabel: "Pension type", nameLabel: "Account name", balanceLabel: "Current balance", dateLabel: "Start date" };
+    case "debt":
+      return { typeLabel: "Debt type", nameLabel: "Debt name", balanceLabel: "Current balance", dateLabel: "Start date" };
+    default:
+      return { typeLabel: "Select the type", nameLabel: "Account name", balanceLabel: "Current balance", dateLabel: "Start date" };
+  }
+}
+
 function AssetCardMenu({ onDelete }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -221,6 +274,7 @@ function AssetCardMenu({ onDelete }) {
 
 export default function AccountsTab({ pushNotif }) {
   const { user } = useAuthContext();
+  const navigate = useNavigate();
   const currencyCode = getUserCurrency(user);
   const queryClient = useQueryClient();
   const { data: assets = [], isLoading: assetsLoading, refetch: refetchAssets } = useQuery({
@@ -242,10 +296,11 @@ export default function AccountsTab({ pushNotif }) {
   const [assetModalTab, setAssetModalTab] = useState("manual"); // "manual" or "import"
   const [assetSaving, setAssetSaving] = useState(false);
   const [assetMsg, setAssetMsg] = useState(null);
-  const [assetSearch, setAssetSearch] = useState("");
   const [hiddenAssetIds, setHiddenAssetIds] = useState({});
   const [assetForm, setAssetForm] = useState({
     assetType: "cash",
+    accountSubtype: "Checking",
+    otherSubtype: "Asset",
     coin: "",
     symbol: "",
     quantity: "",
@@ -255,13 +310,29 @@ export default function AccountsTab({ pushNotif }) {
     name: "",
     buyingPrice: "",
     currentValue: "",
+    includeInNetWorth: true,
     notes: "",
   });
 
   const openModal = (typeOverride = "cash") => {
     setAssetMsg(null);
     setAssetModalTab("manual");
-    setAssetForm({ assetType: typeOverride, coin: "", symbol: "", quantity: "", buyPrice: "", ticker: "", buyDate: "", name: "", buyingPrice: "", currentValue: "", notes: "" });
+    setAssetForm({
+      assetType: typeOverride,
+      accountSubtype: "Checking",
+      otherSubtype: "Asset",
+      coin: "",
+      symbol: "",
+      quantity: "",
+      buyPrice: "",
+      ticker: "",
+      buyDate: formatDateInputValue(new Date()),
+      name: "",
+      buyingPrice: "",
+      currentValue: "",
+      includeInNetWorth: true,
+      notes: "",
+    });
     setAssetModalOpen(true);
   };
 
@@ -294,23 +365,29 @@ export default function AccountsTab({ pushNotif }) {
           notes: assetForm.notes || undefined,
         }
       : isEquity
-        ? {
-            assetType: "equity",
-            name: assetForm.name.trim(),
-            ticker: assetForm.ticker.trim().toUpperCase(),
-            quantity: Number(assetForm.quantity),
-            buyPrice: Number(assetForm.buyPrice),
-            buyDate: assetForm.buyDate || undefined,
-            currentValue: assetForm.currentValue ? Number(assetForm.currentValue) : undefined,
-            notes: assetForm.notes || undefined,
-          }
+      ? {
+          assetType: "equity",
+          name: assetForm.name.trim(),
+          ticker: assetForm.ticker.trim().toUpperCase(),
+          quantity: Number(assetForm.quantity),
+          buyPrice: Number(assetForm.buyPrice),
+          buyDate: assetForm.buyDate || undefined,
+          currentValue: assetForm.currentValue ? Number(assetForm.currentValue) : undefined,
+          includeInNetWorth: assetForm.includeInNetWorth,
+          notes: assetForm.notes || undefined,
+        }
       : {
           assetType: assetForm.assetType,
           name: assetForm.name.trim(),
           buyingPrice: Number(assetForm.buyingPrice),
           currentValue: assetForm.currentValue ? Number(assetForm.currentValue) : Number(assetForm.buyingPrice),
+          includeInNetWorth: assetForm.includeInNetWorth,
           notes: assetForm.notes || undefined,
         };
+
+    if (isCrypto) {
+      payload.includeInNetWorth = assetForm.includeInNetWorth;
+    }
 
     setAssetSaving(true);
     setAssetMsg(null);
@@ -412,7 +489,7 @@ export default function AccountsTab({ pushNotif }) {
 
   const hasAssets = assets && assets.length > 0;
   const sortedAssets = [...(assets || [])].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  const filteredAssetCards = ADD_ASSET_CARDS.filter((card) => card.label.toLowerCase().includes(assetSearch.trim().toLowerCase()));
+  const filteredAssetCards = ADD_ASSET_CARDS;
 
   return (
     <>
@@ -537,17 +614,7 @@ export default function AccountsTab({ pushNotif }) {
                     </div>
                   );
                 })}
-                <div style={{ padding: "16px 20px", borderTop: `1px solid ${BORDER}` }}>
-                  <button
-                    type="button"
-                    onClick={() => { setAssetModalTab("manual"); openModal("cash"); }}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", gap: 8, background: "transparent", border: `2px dashed ${BORDER}`, borderRadius: 12, cursor: "pointer", padding: "14px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: MUTED, transition: "all 0.2s", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = SUB; e.currentTarget.style.color = TEXT; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.color = MUTED; }}
-                  >
-                    <Plus size={16} /> Add another asset
-                  </button>
-                </div>
+
               </>
             )}
           </div>
@@ -558,25 +625,12 @@ export default function AccountsTab({ pushNotif }) {
           <div style={{ background: WHITE, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%" }}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.13em" }}>Add Assets</span>
-              <button type="button" onClick={() => { setAssetModalTab("import"); setAssetModalOpen(true); }} style={{ border: `1px solid ${BORDER}`, background: "transparent", borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 600, color: TEXT, cursor: "pointer", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background = "var(--surface-muted)"; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+              <button type="button" onClick={() => { setAssetModalTab("import"); setAssetModalOpen(true); }} style={{ border: `1px solid ${BORDER}`, background: "transparent", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, color: TEXT, cursor: "pointer", appearance: "none", outline: "none", WebkitTapHighlightColor: "transparent", transition: "all 0.2s", minHeight: 38 }} onMouseEnter={e => { e.currentTarget.style.background = "var(--surface-muted)"; }} onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
                 Import CSV
               </button>
             </div>
 
-            <div style={{ padding: "12px 14px 8px" }}>
-              <div style={{ position: "relative" }}>
-                <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: MUTED, pointerEvents: "none" }} />
-                <input
-                  type="text"
-                  value={assetSearch}
-                  onChange={(e) => setAssetSearch(e.target.value)}
-                  placeholder="Search asset categories"
-                  style={{ width: "100%", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px 10px 34px", fontSize: 13.5, color: TEXT, background: BG, outline: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s" }}
-                  onFocus={fi}
-                  onBlur={fo}
-                />
-              </div>
-            </div>
+
 
             <div style={{ padding: "16px 20px", flex: 1, overflowY: "auto" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 16 }}>Categories</div>
@@ -592,8 +646,9 @@ export default function AccountsTab({ pushNotif }) {
                         border: `1px solid ${BORDER}`,
                         background: WHITE,
                         borderRadius: 18,
-                        padding: "14px 14px",
-                        minHeight: 104,
+                        padding: "18px 16px",
+                        minHeight: 128,
+                        minWidth: 0,
                         cursor: "pointer",
                         fontFamily: "inherit",
                         transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
@@ -601,7 +656,7 @@ export default function AccountsTab({ pushNotif }) {
                         flexDirection: "column",
                         alignItems: "flex-start",
                         justifyContent: "space-between",
-                        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.03)",
+                        boxShadow: "0 3px 14px rgba(15, 23, 42, 0.06)",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = "translateY(-1px)";
@@ -613,7 +668,13 @@ export default function AccountsTab({ pushNotif }) {
                         e.currentTarget.style.boxShadow = "0 1px 2px rgba(15, 23, 42, 0.03)";
                         e.currentTarget.style.borderColor = BORDER;
                       }}
-                      onClick={() => openModal(category.key)}
+                      onClick={() => {
+                        if (category.key === "equity") {
+                          navigate("/dashboard?nav=equity");
+                        } else {
+                          openModal(category.key);
+                        }
+                      }}
                     >
                       {/* Icon bubble uses SURFACE_MUTED + MUTED color so it works in dark */}
                       <div style={{ width: 38, height: 38, borderRadius: "50%", background: SURFACE_MUTED, color: MUTED, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -634,107 +695,142 @@ export default function AccountsTab({ pushNotif }) {
       {assetModalOpen &&
         createPortal(
           <div
-            style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.55)", padding: 16 }}
+            style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.55)", padding: 24, overflowY: "auto" }}
             onClick={() => !assetSaving && setAssetModalOpen(false)}
           >
             <div
-              style={{ background: WHITE, borderRadius: 16, border: `1px solid ${BORDER}`, boxShadow: "0 20px 60px rgba(0,0,0,0.28)", maxWidth: 520, width: "100%", padding: 20 }}
+              style={{ background: WHITE, borderRadius: 20, border: `1px solid ${BORDER}`, boxShadow: "0 20px 60px rgba(0,0,0,0.28)", maxWidth: 560, width: "100%", overflow: "hidden", maxHeight: "calc(100vh - 48px)", display: "flex", flexDirection: "column", boxSizing: "border-box" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: TEXT }}>Add Asset</div>
-                  <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Choose category and enter asset details</div>
+              <div style={{ padding: "20px 18px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.18em" }}>
+                  {getAssetModalTitle(assetForm.assetType)}
                 </div>
                 <button type="button" onClick={() => setAssetModalOpen(false)} style={{ border: "none", background: "none", color: MUTED, cursor: "pointer" }}>
                   <X size={18} />
                 </button>
               </div>
+              <div style={{ marginTop: 16, borderTop: `1px solid ${BORDER}`, padding: "18px 18px 18px", flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                {assetModalTab === "manual" ? (
+                  <>
+                    <div style={{ fontSize: 15, color: TEXT, fontWeight: 500, marginBottom: 18 }}>Complete your information</div>
+                    <div style={{ display: "grid", gap: 14, minWidth: 0, flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                      {assetForm.assetType === "cash" ? (
+                        <FloatingSelect
+                          label="Account type"
+                          value={assetForm.accountSubtype}
+                          onChange={(e) => setAssetForm((prev) => ({ ...prev, accountSubtype: e.target.value }))}
+                          options={ACCOUNT_TYPE_OPTIONS}
+                        />
+                      ) : assetForm.assetType === "other" ? (
+                        <FloatingSelect
+                          label="Asset type"
+                          value={assetForm.otherSubtype}
+                          onChange={(e) => setAssetForm((prev) => ({ ...prev, otherSubtype: e.target.value }))}
+                          options={OTHER_TYPE_OPTIONS}
+                        />
+                      ) : null}
 
-              {/* Modal tabs */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
-                <button type="button" onClick={() => setAssetModalTab("manual")} style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: assetModalTab === "manual" ? TEXT : MUTED, background: "none", border: "none", cursor: "pointer", borderBottom: assetModalTab === "manual" ? `2px solid ${TEXT}` : "none", transition: "all 0.2s" }}>
-                  Manual Entry
-                </button>
-                <button type="button" onClick={() => setAssetModalTab("import")} style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: assetModalTab === "import" ? TEXT : MUTED, background: "none", border: "none", cursor: "pointer", borderBottom: assetModalTab === "import" ? `2px solid ${TEXT}` : "none", transition: "all 0.2s" }}>
-                  Import CSV
-                </button>
-              </div>
+                      {(() => {
+                        const labels = getAssetFieldLabels(assetForm.assetType);
+                        const useBalanceAsBuying = !["crypto", "equity"].includes(assetForm.assetType);
+                        const totalAmount = Number(assetForm.currentValue || assetForm.buyingPrice || assetForm.buyPrice || 0) || 0;
+                        return (
+                          <>
+                            <FloatingInput
+                              label={labels.nameLabel}
+                              value={assetForm.name}
+                              onChange={handleAssetChange("name")}
+                            />
 
-              {assetModalTab === "manual" ? (
-              <>
-              {/* Asset type selector */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: MUTED, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>Asset Type</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                  {ASSET_TYPES.map((type) => {
-                    const IconComponent = type.icon;
-                    const active = assetForm.assetType === type.value;
-                    return (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() => setAssetForm((prev) => ({ ...prev, assetType: type.value }))}
-                        style={{
-                          border: `1.5px solid ${active ? type.color : BORDER}`,
-                          background: active ? SURFACE_MUTED : "transparent",
-                          borderRadius: 10,
-                          padding: "10px 8px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 6,
-                          color: active ? TEXT : SUB,
-                          fontSize: 12,
-                          fontWeight: active ? 600 : 500,
-                          transition: "all 0.2s",
-                          outline: active ? `2px solid ${type.color}44` : "none",
-                          outlineOffset: -1,
-                        }}
-                      >
-                        <IconComponent size={14} style={{ color: active ? type.color : MUTED }} /> {type.label}
+                            {assetForm.assetType === "crypto" ? (
+                              <>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                  <FloatingInput label="Coin ID" value={assetForm.coin} onChange={handleAssetChange("coin")} />
+                                  <FloatingInput label="Symbol" value={assetForm.symbol} onChange={handleAssetChange("symbol")} />
+                                </div>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                  <FloatingInput label="Quantity" type="number" value={assetForm.quantity} onChange={handleAssetChange("quantity")} />
+                                  <FloatingInput label={`Buy price (${currencyCode})`} type="number" value={assetForm.buyPrice} onChange={handleAssetChange("buyPrice")} />
+                                </div>
+                              </>
+                            ) : assetForm.assetType === "equity" ? (
+                              <>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                  <FloatingInput label="Ticker" value={assetForm.ticker} onChange={(e) => setAssetForm((prev) => ({ ...prev, ticker: e.target.value.toUpperCase() }))} inputStyle={{ textTransform: "uppercase" }} />
+                                  <FloatingInput label="Quantity" type="number" value={assetForm.quantity} onChange={handleAssetChange("quantity")} />
+                                </div>
+                                <FloatingInput label={`${labels.balanceLabel} (${currencyCode})`} type="number" value={assetForm.currentValue} onChange={handleAssetChange("currentValue")} />
+                              </>
+                            ) : (
+                              <FloatingInput
+                                label={labels.balanceLabel}
+                                type="number"
+                                value={useBalanceAsBuying ? (assetForm.currentValue || assetForm.buyingPrice) : assetForm.currentValue}
+                                onChange={(e) => {
+                                  const next = e.target.value;
+                                  setAssetForm((prev) => ({ ...prev, currentValue: next, buyingPrice: useBalanceAsBuying ? next : prev.buyingPrice }));
+                                }}
+                              />
+                            )}
+
+                            <div>
+                              <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>{labels.dateLabel}</div>
+                              <CalendarPicker C={CALENDAR_COLORS} value={assetForm.buyDate} onChange={(value) => setAssetForm((prev) => ({ ...prev, buyDate: value }))} />
+                            </div>
+
+                            <div style={{ background: "rgba(15, 23, 42, 0.03)", borderRadius: 14, padding: "16px 16px 14px", border: `1px solid ${BORDER}` }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                                <div style={{ fontSize: 16, fontWeight: 600, color: TEXT }}>Total amount</div>
+                                <div style={{ fontSize: 16, fontWeight: 500, color: TEXT }}>{formatCurrencyAmount(totalAmount, currencyCode, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                              </div>
+                              <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                                <div>
+                                  <div style={{ fontSize: 14, color: TEXT, fontWeight: 500 }}>Show in Net Worth</div>
+                                  <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>Assets sum up to your net worth</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setAssetForm((prev) => ({ ...prev, includeInNetWorth: !prev.includeInNetWorth }))}
+                                  style={{
+                                    ...buttonReset,
+                                    width: 40,
+                                    height: 22,
+                                    borderRadius: 999,
+                                    background: assetForm.includeInNetWorth ? "#2f2f2f" : "#d4d4d8",
+                                    position: "relative",
+                                    cursor: "pointer",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      position: "absolute",
+                                      top: 2,
+                                      left: assetForm.includeInNetWorth ? 20 : 2,
+                                      width: 18,
+                                      height: 18,
+                                      borderRadius: "50%",
+                                      background: "#fff",
+                                      transition: "left 0.15s ease",
+                                    }}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <Notice msg={assetMsg} />
+                    <div style={{ marginTop: 22, paddingTop: 16, borderTop: `1px solid ${BORDER}`, display: "flex", justifyContent: "flex-end" }}>
+                      <button type="button" onClick={saveAsset} disabled={assetSaving} style={{ minWidth: 98, borderRadius: 10, border: "none", background: SURFACE_STRONG, color: TEXT_ON_STRONG, padding: "12px 18px", cursor: assetSaving ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                        {assetSaving ? "Saving..." : "Save"}
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {assetForm.assetType === "crypto" ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ gridColumn: "1/-1" }}><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Coin ID</div><input style={inputStyle} value={assetForm.coin} onChange={handleAssetChange("coin")} placeholder="e.g. bitcoin" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Symbol</div><input style={inputStyle} value={assetForm.symbol} onChange={handleAssetChange("symbol")} placeholder="BTC" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Quantity</div><input style={inputStyle} type="number" value={assetForm.quantity} onChange={handleAssetChange("quantity")} placeholder="0.00" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Buy Price ({currencyCode})</div><input style={inputStyle} type="number" value={assetForm.buyPrice} onChange={handleAssetChange("buyPrice")} placeholder="0.00" /></div>
-                  <div>
-                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Buy Date</div>
-                    <CalendarPicker C={CALENDAR_COLORS} value={assetForm.buyDate} onChange={(value) => setAssetForm((prev) => ({ ...prev, buyDate: value }))} />
-                  </div>
-                </div>
-              ) : assetForm.assetType === "equity" ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ gridColumn: "1/-1" }}><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Company / Fund Name</div><input style={inputStyle} value={assetForm.name} onChange={handleAssetChange("name")} placeholder="e.g. Apple Inc." /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Ticker</div><input style={inputStyle} value={assetForm.ticker} onChange={(e) => setAssetForm((prev) => ({ ...prev, ticker: e.target.value.toUpperCase() }))} placeholder="AAPL" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Quantity</div><input style={inputStyle} type="number" value={assetForm.quantity} onChange={handleAssetChange("quantity")} placeholder="0" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Average Buy Price ({currencyCode})</div><input style={inputStyle} type="number" value={assetForm.buyPrice} onChange={handleAssetChange("buyPrice")} placeholder="0.00" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Current Value ({currencyCode})</div><input style={inputStyle} type="number" value={assetForm.currentValue} onChange={handleAssetChange("currentValue")} placeholder="Optional" /></div>
-                  <div>
-                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Buy Date</div>
-                    <CalendarPicker C={CALENDAR_COLORS} value={assetForm.buyDate} onChange={(value) => setAssetForm((prev) => ({ ...prev, buyDate: value }))} />
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ gridColumn: "1/-1" }}><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Asset Name</div><input style={inputStyle} value={assetForm.name} onChange={handleAssetChange("name")} placeholder="e.g. Toyota Camry" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Purchase Price ({currencyCode})</div><input style={inputStyle} type="number" value={assetForm.buyingPrice} onChange={handleAssetChange("buyingPrice")} placeholder="0.00" /></div>
-                  <div><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Current Value ({currencyCode})</div><input style={inputStyle} type="number" value={assetForm.currentValue} onChange={handleAssetChange("currentValue")} placeholder="Optional" /></div>
-                </div>
-              )}
-
-              <div style={{ marginTop: 12 }}><div style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>Notes</div><input style={inputStyle} value={assetForm.notes} onChange={handleAssetChange("notes")} placeholder="Optional" /></div>
-              <Notice msg={assetMsg} />
-              </> ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0" }}>
+                    </div>
+                  </>
+                ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "10px 0", flex: 1, overflowY: "auto" }}>
                 <div style={{ textAlign: "center", padding: "0 20px" }}>
                   <div style={{ fontSize: 14, color: TEXT, marginBottom: 8, fontWeight: 600 }}>Upload CSV file</div>
                   <div style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
@@ -791,15 +887,9 @@ export default function AccountsTab({ pushNotif }) {
                   <div style={{ fontSize: 11, color: MUTED }}>Supports .csv files up to 2MB</div>
                 </button>
               </div>
-              )}
-              <Notice msg={assetMsg} />
-              <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-                <button type="button" onClick={() => setAssetModalOpen(false)} style={{ flex: 1, borderRadius: 10, border: `1px solid ${BORDER}`, background: SURFACE_MUTED, color: SUB, padding: "11px 0", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                {assetModalTab === "manual" && (
-                  <button type="button" onClick={saveAsset} disabled={assetSaving} style={{ flex: 1, borderRadius: 10, border: "none", background: SURFACE_STRONG, color: TEXT_ON_STRONG, padding: "11px 0", cursor: assetSaving ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 600 }}>{assetSaving ? "Saving..." : "Add Asset"}</button>
                 )}
-              </div>
             </div>
+          </div>
           </div>,
           document.body
         )}

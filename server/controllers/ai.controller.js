@@ -257,7 +257,15 @@ const aiChat = async (req, res, next) => {
         expense: Math.round(m.expense),
       }));
 
-    // ── Forecast: weighted avg of last 3 months ────────
+    // ── Current Balance (all time) ─────────────────────
+    const allTransactions = await Transaction.find({ userId: user._id }).select("amount type");
+    const currentBalance = allTransactions.reduce((sum, t) => {
+      return (t.type === "income" || t.type === "deposit" || t.type === "credit") 
+        ? sum + (Number(t.amount) || 0) 
+        : sum - (Number(t.amount) || 0);
+    }, 0);
+
+    // ── Forecast: balance + pIncome - pExpense ────────
     let forecast = null;
     const recent3 = monthlyTrend.slice(-3);
     if (recent3.length >= 2) {
@@ -265,9 +273,12 @@ const aiChat = async (req, res, next) => {
       const wTotal   = weights.reduce((s, w) => s + w, 0);
       const pIncome  = Math.round(recent3.reduce((s, m, i) => s + m.income  * weights[i], 0) / wTotal);
       const pExpense = Math.round(recent3.reduce((s, m, i) => s + m.expense * weights[i], 0) / wTotal);
+      
       forecast = {
         predictedIncome:  pIncome,
         predictedExpense: pExpense,
+        projectedBalance: Math.round(currentBalance + pIncome - pExpense),
+        currentBalance:   Math.round(currentBalance),
         confidence: recent3.length >= 3 ? "high" : "medium",
       };
     }
@@ -285,10 +296,12 @@ const aiChat = async (req, res, next) => {
     // Handles both crypto (coin/symbol/quantity/buyPrice)
     // and non-crypto (name/buyingPrice/currentValue)
     let assetsSummary = null;
+    let equitySummary = null;
 
     if (cryptoAssets.length > 0) {
       let totalValue = 0, totalCost = 0;
       const detailLines = [];
+      const equityAssets = cryptoAssets.filter((a) => a.assetType === "equity");
 
       cryptoAssets.forEach((a) => {
         const isCrypto = a.assetType === "crypto" || !!a.coin;
@@ -311,6 +324,42 @@ const aiChat = async (req, res, next) => {
           `P&L $${Math.round(value - cost).toLocaleString()}`
         );
       });
+
+      if (equityAssets.length > 0) {
+        const equityValue = equityAssets.reduce((sum, asset) => sum + (Number(asset.currentValue) || 0), 0);
+        const equityCost = equityAssets.reduce((sum, asset) => sum + (Number(asset.buyingPrice) || 0), 0);
+        const vestedShares = equityAssets.reduce((sum, asset) => {
+          if (asset.hasVestingSchedule === false) return sum + (Number(asset.quantity) || 0);
+          const quantity = Number(asset.quantity) || 0;
+          const vested = Number(asset.vestedQuantity) || quantity;
+          return sum + Math.min(quantity, vested);
+        }, 0);
+        const totalShares = equityAssets.reduce((sum, asset) => sum + (Number(asset.quantity) || 0), 0);
+        const unvestedShares = Math.max(0, totalShares - vestedShares);
+        const exerciseCost = equityAssets.reduce((sum, asset) => sum + ((Number(asset.exercised) || 0) * (Number(asset.buyPrice) || 0)), 0);
+        const equityDetails = equityAssets.slice(0, 6).map((asset) => {
+          const quantity = Number(asset.quantity) || 0;
+          const vestedQuantity = asset.hasVestingSchedule === false ? quantity : Math.min(quantity, Number(asset.vestedQuantity) || quantity);
+          const currentValue = Number(asset.currentValue) || 0;
+          const buyingPrice = Number(asset.buyingPrice) || ((Number(asset.buyPrice) || 0) * quantity);
+          const grantLabel = asset.grantType || "SHARE";
+          const company = asset.ticker ? `${asset.name || "Unknown"} (${asset.ticker})` : (asset.name || "Unknown");
+
+          return `  - ${company}: ${grantLabel}, value $${Math.round(currentValue).toLocaleString()}, cost $${Math.round(buyingPrice).toLocaleString()}, shares ${quantity}, vested ${vestedQuantity}, exercised ${Number(asset.exercised) || 0}`;
+        });
+
+        equitySummary = {
+          count: equityAssets.length,
+          totalValue: Math.round(equityValue),
+          totalCost: Math.round(equityCost),
+          gainLoss: Math.round(equityValue - equityCost),
+          totalShares,
+          vestedShares,
+          unvestedShares,
+          exerciseCost: Math.round(exerciseCost),
+          detailLines: equityDetails,
+        };
+      }
 
       assetsSummary = {
         count:       cryptoAssets.length,
@@ -355,6 +404,7 @@ const aiChat = async (req, res, next) => {
       forecast,
       financialScore,
       assets:        assetsSummary,
+      equity:        equitySummary,
       history: memoryAssistEnabled ? history : [],
       message,
     });

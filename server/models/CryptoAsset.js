@@ -20,6 +20,15 @@ const cryptoAssetSchema = new mongoose.Schema({
   currentValue: { type: Number, min: 0 },
   ticker:      { type: String, trim: true, uppercase: true },
   currentPrice: { type: Number, min: 0 },
+  companyType: { type: String, enum: ["public", "private"], default: "private" },
+  fairMarketValue: { type: Number, min: 0, default: 0 },
+  grantType: { type: String, enum: ["ISO", "RSU", "NSO", "SHARE"], default: "SHARE" },
+  grantId: { type: String, trim: true, default: "" },
+  exercised: { type: Number, min: 0, default: 0 },
+  earlyExercisable: { type: Boolean, default: false },
+  vestingSchedule: { type: String, trim: true, default: "immediate" },
+  hasVestingSchedule: { type: Boolean, default: true },
+  includeInNetWorth: { type: Boolean, default: true },
 
   // ── Crypto-only fields ───────────────────────────────
   coin:     { type: String, trim: true },

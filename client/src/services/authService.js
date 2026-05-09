@@ -8,7 +8,7 @@ export const authService = {
     api.post("/auth/login", data),
 
   getGoogleAuthUrl: () =>
-    `${api.defaults.baseURL || "http://localhost:5005/api"}/auth/google`,
+    `${api.defaults.baseURL || "http://localhost:5000/api"}/auth/google`,
 
   logout: () =>
     api.post("/auth/logout"),

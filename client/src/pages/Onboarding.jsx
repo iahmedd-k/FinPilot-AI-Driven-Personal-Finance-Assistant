@@ -146,7 +146,7 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <div className="mb-2">
-                <h2 className="text-2xl font-bold mb-2" style={{ color: "#f5f0e8", fontFamily: "Playfair Display, serif" }}>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: "#f5f0e8" }}>
                   What's your monthly income?
                 </h2>
                 <p className="text-sm" style={{ color: "#8b90a0" }}>
@@ -178,7 +178,7 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <div className="mb-2">
-                <h2 className="text-2xl font-bold mb-2" style={{ color: "#f5f0e8", fontFamily: "Playfair Display, serif" }}>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: "#f5f0e8" }}>
                   Set your savings goal
                 </h2>
                 <p className="text-sm" style={{ color: "#8b90a0" }}>
@@ -228,7 +228,7 @@ export default function Onboarding() {
           {step === 3 && (
             <>
               <div className="mb-2">
-                <h2 className="text-2xl font-bold mb-2" style={{ color: "#f5f0e8", fontFamily: "Playfair Display, serif" }}>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: "#f5f0e8" }}>
                   Add your first transaction
                 </h2>
                 <p className="text-sm" style={{ color: "#8b90a0" }}>
@@ -293,7 +293,8 @@ export default function Onboarding() {
             style={{
               background: loading ? "#1c2030" : "#2dd4bf",
               color: loading ? "#6b7080" : "#0c0f18",
-              fontWeight: 700,
+              fontWeight: 800,
+              letterSpacing: "-0.03em",
               cursor: loading ? "not-allowed" : "pointer",
               border: "none",
             }}

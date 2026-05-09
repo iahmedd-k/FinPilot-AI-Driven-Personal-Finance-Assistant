@@ -14,11 +14,13 @@ const toNumber = (value) => Number(value);
 const buildEquityPayload = (body, fallback = {}) => {
   const quantity = hasValue(body.quantity) ? toNumber(body.quantity) : (fallback.quantity ?? 0);
   const buyPrice = hasValue(body.buyPrice) ? toNumber(body.buyPrice) : (fallback.buyPrice ?? 0);
+  const fairMarketValue = hasValue(body.fairMarketValue) ? toNumber(body.fairMarketValue) : (fallback.fairMarketValue ?? 0);
   const manualCurrentPrice = hasValue(body.currentPrice) ? toNumber(body.currentPrice) : undefined;
   const manualCurrentValue = hasValue(body.currentValue) ? toNumber(body.currentValue) : undefined;
   const buyingPrice = quantity * buyPrice;
-  const currentValue = manualCurrentValue ?? (manualCurrentPrice !== undefined ? manualCurrentPrice * quantity : (fallback.currentValue ?? buyingPrice));
-  const currentPrice = manualCurrentPrice ?? (quantity > 0 ? currentValue / quantity : 0);
+  const inferredCurrentPrice = manualCurrentPrice !== undefined ? manualCurrentPrice : (fairMarketValue > 0 ? fairMarketValue : undefined);
+  const currentValue = manualCurrentValue ?? (inferredCurrentPrice !== undefined ? inferredCurrentPrice * quantity : (fallback.currentValue ?? buyingPrice));
+  const currentPrice = inferredCurrentPrice ?? (quantity > 0 ? currentValue / quantity : 0);
 
   return {
     assetType: "equity",
@@ -30,6 +32,17 @@ const buildEquityPayload = (body, fallback = {}) => {
     buyingPrice,
     currentPrice,
     currentValue,
+    companyType: hasValue(body.companyType) ? String(body.companyType).trim().toLowerCase() : (fallback.companyType || "private"),
+    fairMarketValue,
+    vestedQuantity: hasValue(body.vestedQuantity) ? toNumber(body.vestedQuantity) : (fallback.vestedQuantity ?? 0),
+    grantType: hasValue(body.grantType) ? String(body.grantType).trim().toUpperCase() : (fallback.grantType || "SHARE"),
+    grantId: body.grantId !== undefined ? String(body.grantId || "").trim() : (fallback.grantId || ""),
+    exercised: hasValue(body.exercised) ? toNumber(body.exercised) : (fallback.exercised ?? 0),
+    earlyExercisable: body.earlyExercisable !== undefined ? Boolean(body.earlyExercisable) : Boolean(fallback.earlyExercisable),
+    vestingSchedule: body.vestingSchedule !== undefined ? String(body.vestingSchedule || "").trim() : (fallback.vestingSchedule || "immediate"),
+    vestingStartDate: body.vestingStartDate || fallback.vestingStartDate || null,
+    hasVestingSchedule: body.hasVestingSchedule !== undefined ? Boolean(body.hasVestingSchedule) : (fallback.hasVestingSchedule ?? true),
+    includeInNetWorth: body.includeInNetWorth !== undefined ? Boolean(body.includeInNetWorth) : (fallback.includeInNetWorth ?? true),
     notes: body.notes !== undefined ? body.notes : (fallback.notes || ""),
   };
 };

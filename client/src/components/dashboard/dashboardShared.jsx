@@ -12,6 +12,7 @@ import {
   Gem, Car, ReceiptText, HousePlus, Sparkles, Plane,
   Target, PiggyBank,
   House, ChartPie, SlidersHorizontal, Gift, Wand2,
+  Wallet, Briefcase, BarChart3, LineChart, Award, CreditCard, Activity,
 } from "lucide-react";
 
 /* ─── Toast dedup helper ─────────────────────────────────
@@ -36,6 +37,7 @@ export const dedupToast = {
       onDismiss:   () => { _activeToasts.delete(id); opts.onDismiss?.(); },
       onAutoClose: () => { _activeToasts.delete(id); opts.onAutoClose?.(); },
     });
+    if (!opts.skipDrawer) window.dispatchEvent(new CustomEvent("fp-notification", { detail: { type: "success", message: msg } }));
   },
   error: (msg, opts = {}) => {
     const id = opts.id ?? msg;
@@ -46,6 +48,7 @@ export const dedupToast = {
       onDismiss:   () => { _activeToasts.delete(id); opts.onDismiss?.(); },
       onAutoClose: () => { _activeToasts.delete(id); opts.onAutoClose?.(); },
     });
+    if (!opts.skipDrawer) window.dispatchEvent(new CustomEvent("fp-notification", { detail: { type: "error", message: msg } }));
   },
   info: (msg, opts = {}) => {
     const id = opts.id ?? msg;
@@ -56,6 +59,7 @@ export const dedupToast = {
       onDismiss:   () => { _activeToasts.delete(id); opts.onDismiss?.(); },
       onAutoClose: () => { _activeToasts.delete(id); opts.onAutoClose?.(); },
     });
+    if (!opts.skipDrawer) window.dispatchEvent(new CustomEvent("fp-notification", { detail: { type: "info", message: msg } }));
   },
   warning: (msg, opts = {}) => {
     const id = opts.id ?? msg;
@@ -66,6 +70,7 @@ export const dedupToast = {
       onDismiss:   () => { _activeToasts.delete(id); opts.onDismiss?.(); },
       onAutoClose: () => { _activeToasts.delete(id); opts.onAutoClose?.(); },
     });
+    if (!opts.skipDrawer) window.dispatchEvent(new CustomEvent("fp-notification", { detail: { type: "warning", message: msg } }));
   },
 };
 
@@ -372,18 +377,19 @@ export const navSections = [
   {
     label: "TRACK",
     items: [
-      { id:"dashboard",  label:"Home",              icon: House            },
-      { id:"spending",   label:"Spending",           icon: ReceiptText      },
-      { id:"portfolio",  label:"Assets",             icon: ChartPie         },
-      { id:"planning",   label:"Financial Planning", icon: SlidersHorizontal},
-      { id:"forecast",   label:"Forecast",           icon: TrendingUp       },
-      { id:"benefits",   label:"Benefits",           icon: Gift             },
+      { id:"dashboard",  label:"Home",              icon: House       },
+      { id:"spending",   label:"Spending",           icon: CreditCard  },
+      { id:"portfolio",  label:"Assets",             icon: Wallet      },
+      { id:"equity",     label:"Equity",             icon: Activity    },
+      { id:"planning",   label:"Financial Planning", icon: Target      },
+      { id:"forecast",   label:"Forecast",           icon: LineChart   },
+      { id:"benefits",   label:"Benefits",           icon: Award       },
     ],
   },
   {
     label: "SERVICES",
     items: [
-      { id:"ai_advisor", label:"AI Advisor", icon: Wand2 },
+      { id:"ai_advisor", label:"AI Advisor", icon: Sparkles },
     ],
   },
 ];

@@ -1,134 +1,135 @@
-# 💰 FinPilot — AI-Driven Personal Finance Assistant
+# 💰 FinPilot AI — Your Advanced Personal Finance Co-Pilot
 
-> Your intelligent co-pilot for smarter financial decisions.
-
-FinPilot is a full-stack, AI-powered personal finance assistant designed to help users take control of their money. It combines a modern web interface with a robust backend to deliver personalized financial insights, expense tracking, and intelligent recommendations — all in one place.
-
-🚀 **Live Demo:** https://fin-pilot-ai-driven-personal-financ-two.vercel.app/
+FinPilot AI is a comprehensive, full-stack financial management platform that leverages AI to provide deep insights into your spending, wealth, and future financial health. It is designed to bridge the gap between simple expense tracking and professional-grade financial planning.
 
 ---
 
-## ✨ Features
+## 🚀 MVP Scope & Functional Requirements
 
-- 🤖 **AI-Powered Insights** — Get smart, personalized financial advice and recommendations driven by AI
-- 📊 **Expense Tracking** — Log and categorize your spending with ease
-- 💡 **Budget Recommendations** — Receive actionable suggestions to optimize your budget
-- 📈 **Financial Analytics** — Visualize your income and spending patterns through interactive charts
-- 🔐 **Secure Authentication** — User accounts with protected routes and session management
-- 📱 **Responsive UI** — Clean, modern interface that works across all devices
+This project fulfills the following core MVP requirements as requested:
+
+### 1. Authentication & Security
+- **Feature**: Secure Register/Login system.
+- **Implementation**: JWT (JSON Web Tokens) with access + refresh token rotation.
+- **Security**: Secure HTTP-only cookies, password hashing, and strict rate limiting on auth endpoints (20 attempts/15 min).
+- **Location**: `server/controllers/auth.controller.js`, `server/app.js`.
+
+### 2. Transaction Module
+- **Feature**: Add, edit, delete transactions.
+- **AI Categorization**: Automatically classifies merchants (e.g., "Starbucks" → "Dining").
+- **Filtering**: Filter by category, date, and search terms.
+- **CSV Import**: Basic import functionality to migrate data.
+- **Location**: `client/src/pages/Transactions.jsx`, `server/services/ai/categorizeTransaction.js`.
+
+### 3. Dashboard Analytics
+- **Visuals**: Income vs. Expense line charts, Category pie charts, and Spending Calendar.
+- **Key Metrics**: Prominent display of Total Monthly Income, Total Expense, and Savings Rate.
+- **Location**: `client/src/pages/Dashboard.jsx`, `client/src/components/dashboard/tabs/spending/OverviewTab.jsx`.
+
+### 4. AI Intelligence (The "Pilot" in FinPilot)
+- **AI Advisor**: A context-aware chatbot that answers questions like "Can I afford a MacBook?" or "Why is my savings low?".
+- **Cash Flow Forecast**: Predicts future balances based on historical trends.
+- **Financial Health Score**: An AI-driven score that evaluates your financial stability.
+- **Location**: `server/services/ai/`, `client/src/components/dashboard/AIAdvisorSidebar.jsx`.
 
 ---
 
-## 🛠️ Tech Stack
+## 📈 Core Financial Formulas
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React.js, JavaScript, CSS |
-| **Backend** | Node.js, Express.js |
-| **AI Integration** | OpenAI / LLM API |
-| **Deployment** | Vercel |
+To ensure transparency and accuracy, FinPilot uses the following logic for its calculations:
+
+### 1. Savings Rate (%)
+Evaluates how much of your monthly income you are retaining after expenses.
+> **Formula**: `((Monthly Income - Monthly Expenses) / Monthly Income) * 100`
+> *Note: Capped at 100%, defaults to 0% if income is 0.*
+
+### 2. AI Financial Score (0–100)
+A weighted composite score based on five key pillars:
+- **30% Savings Rate (p1)**: Reward for higher retention.
+- **20% Spending Consistency (p2)**: Measured via Coefficient of Variation (CV) of monthly expenses. Lower volatility = Higher score.
+- **20% Budget Discipline (p3)**: Adherence to set monthly budgets or discretionary spending limits.
+- **15% Goal Progress (p4)**: Average progress across all active financial goals.
+- **15% Income Stability (p5)**: Percentage of months in the last year with positive income.
+
+### 3. Net Worth
+Calculates your absolute wealth by combining liquid cash savings with asset values.
+> **Formula**: `Cumulative Historical Savings (Income - Expenses) + Current Total Value of Assets (Portfolio)`
+
+### 4. Cash Flow Forecast
+Predicts future net balance by analyzing the growth rate of income and the burn rate of expenses.
+> **Logic**: Uses a moving average of the last 6 months to project the next 12 months, accounting for recurring patterns detected in your transaction history.
 
 ---
 
-## 📁 Project Structure
+## 🤖 AI Engine Configuration
 
-```
-FinPilot-AI-Driven-Personal-Finance-Assistant/
-├── client/          # React frontend
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── ...
-│   └── package.json
-├── server/          # Node.js/Express backend
-│   ├── routes/
-│   ├── controllers/
-│   └── package.json
-├── .gitignore
-└── README.md
-```
+### OpenAI vs. Groq
+The project is architected to be **OpenAI-compatible**. However, by default, it is configured to use the **Groq API** (using Llama-3 models). 
+- **Reasoning**: Groq provides ultra-low latency responses and a free tier suitable for development and MVP testing.
+- **Switching to OpenAI**: Simply change the `BASE_URL` and `MODEL_NAME` in `server/services/ai/chatService.js` and update your `.env` key.
+
+### AI Testing Context
+If using automated AI tools for testing, the context is injected into the prompt via:
+- Monthly income/expense breakdown.
+- Current savings rate.
+- Active goals and their progress.
+- Recent high-value transactions.
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+- **Frontend**: React.js with Vanilla CSS Design Tokens (Sleek, Glassmorphic UI).
+- **Backend**: Node.js & Express.js.
+- **Database**: MongoDB (Mongoose ODM).
+- **State Management**: React Context API & TanStack Query (v5).
+- **Charts**: Recharts.
+- **Icons**: Lucide-React.
+
+---
+
+## 📁 Key File Map for Developers
+
+| Component/Feature | File Path |
+|:--- |:--- |
+| **Global State** | `client/src/context/DashboardContext.jsx` |
+| **API Interceptors** | `client/src/services/api.js` |
+| **Dashboard Shell** | `client/src/pages/Dashboard.jsx` |
+| **AI Score Logic** | `server/services/ai/financialScoreService.js` |
+| **Auto-Categorizer** | `server/services/ai/categorizeTransaction.js` |
+| **Forecast Engine** | `server/services/ai/forecastService.js` |
+| **Rate Limiter** | `server/app.js` (Middleware) |
 
 ---
 
 ## 🚀 Getting Started
 
-### Prerequisites
+1. **Clone & Install**:
+   ```bash
+   # Server
+   cd server && npm install
+   # Client
+   cd client && npm install
+   ```
 
-- Node.js `v18+`
-- npm or yarn
-- An OpenAI API key (or compatible LLM provider)
+2. **Environment Setup**:
+   Create `.env` in the `server/` folder:
+   ```env
+   PORT=5000
+   MONGO_URI=your_mongodb_uri
+   JWT_SECRET=your_jwt_secret
+   GROQ_API_KEY=your_groq_key
+   ```
 
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/iahmedd-k/FinPilot-AI-Driven-Personal-Finance-Assistant.git
-cd FinPilot-AI-Driven-Personal-Finance-Assistant
-```
-
-### 2. Set Up the Server
-
-```bash
-cd server
-npm install
-```
-
-Create a `.env` file in the `server/` directory:
-
-```env
-PORT=5000
-OPENAI_API_KEY=your_openai_api_key
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-```
-
-Start the server:
-
-```bash
-npm run dev
-```
-
-### 3. Set Up the Client
-
-```bash
-cd ../client
-npm install
-```
-
-Create a `.env` file in the `client/` directory:
-
-```env
-REACT_APP_API_URL=http://localhost:5000
-```
-
-Start the frontend:
-
-```bash
-npm start
-```
-
-The app will be available at `http://localhost:3000`.
+3. **Run**:
+   ```bash
+   # Server
+   npm run dev
+   # Client
+   npm run dev
+   ```
 
 ---
 
-## 🌐 Deployment
-
-This project is deployed on **Vercel**. To deploy your own instance:
-
-1. Fork this repository
-2. Connect your fork to(https://fin-pilot-ai-driven-personal-financ-two.vercel.app/)
-3. Set the environment variables in the Vercel dashboard
-4. Deploy!
-
----
-
-
-
-
-## 👤 Author
-
-**iahmedd-k**  
-GitHub: [@iahmedd-k](https://github.com/iahmedd-k)
-
----
-
-> ⭐ If you find this project useful, consider giving it a star on GitHub!
+## 👤 Credits & Author
+*Focus: Security, Performance (<400ms latency), and AI-driven Financial Literacy.*

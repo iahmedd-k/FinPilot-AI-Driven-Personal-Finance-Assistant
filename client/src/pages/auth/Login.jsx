@@ -212,16 +212,16 @@ export default function Login() {
     }
 
     const params = new URLSearchParams();
-    if (nextMode !== AUTH_MODES.SIGN_IN) {
-      params.set("mode", nextMode);
-    }
-
     const nextEmail = getKnownEmail();
     if (nextEmail) {
       params.set("email", nextEmail);
     }
 
-    navigate(`${ROUTES.LOGIN}${params.toString() ? `?${params.toString()}` : ""}`);
+    let nextPath = ROUTES.LOGIN;
+    if (nextMode === AUTH_MODES.SIGN_UP) nextPath = ROUTES.REGISTER;
+    if (nextMode === AUTH_MODES.FORGOT) nextPath = ROUTES.FORGOT_PASSWORD;
+
+    navigate(`${nextPath}${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
   const onLoginSubmit = async (data) => {
@@ -259,8 +259,8 @@ export default function Login() {
 
   const currentTitle = {
     [AUTH_MODES.SIGN_IN]: "Welcome back",
-    [AUTH_MODES.SIGN_UP]: "Welcome back",
-    [AUTH_MODES.FORGOT]: "Welcome back",
+    [AUTH_MODES.SIGN_UP]: "Create your account",
+    [AUTH_MODES.FORGOT]: "Reset your password",
   }[authMode];
 
   const currentSubtitle = {
@@ -271,12 +271,12 @@ export default function Login() {
 
   return (
     <div className="min-h-screen px-3 py-3 md:px-5" style={{ background: "#f7f5f1" }}>
-      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1660px] gap-3 rounded-[28px] border border-black/8 bg-[#fcfbf8] p-3 shadow-[0_10px_40px_rgba(15,23,42,0.06)] lg:grid-cols-[1.08fr_0.92fr]">
+      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1660px] gap-3 rounded-[28px] border border-black/8 bg-[#fcfbf8] p-3 shadow-[0_10px_40px_rgba(15,23,42,0.06)] grid-cols-[1.08fr_0.92fr]">
         <div className="flex rounded-[24px] border border-black/8 bg-[#fcfbf8] px-6 py-7 md:px-9 lg:px-12" style={{ color: "#0b0914" }}>
           <div className="mx-auto flex w-full max-w-[510px] flex-col justify-center text-[#0b0914]">
             <div className="mb-5 flex flex-col items-center text-center">
               <Logo size="md" dark className="pointer-events-none select-none text-[1.6rem]" />
-              <h1 className="mt-7 text-[1.75rem] leading-none tracking-[-0.04em] text-[#0b0914] md:text-[2rem]" style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}>
+              <h1 className="mt-7 font-serif text-[1.75rem] leading-none tracking-[-0.04em] text-[#0b0914] md:text-[2rem]">
                 {currentTitle}
               </h1>
               {currentSubtitle ? (
@@ -335,7 +335,7 @@ export default function Login() {
                 )}
 
                 {authMode === AUTH_MODES.SIGN_IN && (
-                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="mx-auto flex w-full max-w-[452px] flex-col gap-4.5">
+                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="mx-auto flex w-full max-w-[452px] flex-col gap-5">
                     <Field label="Email" error={loginForm.formState.errors.email?.message}>
                       <input
                         {...loginForm.register("email")}
@@ -377,7 +377,7 @@ export default function Login() {
                       type="submit"
                       disabled={isLoggingIn}
                       whileTap={{ scale: 0.985 }}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3.25 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
                       style={{ color: "white" }}
                     >
                       {isLoggingIn ? (
@@ -404,7 +404,7 @@ export default function Login() {
                 )}
 
                 {authMode === AUTH_MODES.SIGN_UP && (
-                  <form onSubmit={signUpForm.handleSubmit(onSignUpSubmit)} className="mx-auto flex w-full max-w-[452px] flex-col gap-4.5">
+                  <form onSubmit={signUpForm.handleSubmit(onSignUpSubmit)} className="mx-auto flex w-full max-w-[452px] flex-col gap-5">
                     <Field label="Full name" error={signUpForm.formState.errors.name?.message}>
                       <input
                         {...signUpForm.register("name")}
@@ -448,7 +448,7 @@ export default function Login() {
                       type="submit"
                       disabled={isRegistering}
                       whileTap={{ scale: 0.985 }}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3.25 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
                       style={{ color: "white" }}
                     >
                       {isRegistering ? (
@@ -475,7 +475,7 @@ export default function Login() {
                 )}
 
                 {authMode === AUTH_MODES.FORGOT && (
-                  <form onSubmit={forgotForm.handleSubmit(onForgotSubmit)} className="mx-auto flex w-full max-w-[452px] flex-col gap-4.5">
+                  <form onSubmit={forgotForm.handleSubmit(onForgotSubmit)} className="mx-auto flex w-full max-w-[452px] flex-col gap-5">
                     <Field label="Email" error={forgotForm.formState.errors.email?.message}>
                       <input
                         {...forgotForm.register("email")}
@@ -490,7 +490,7 @@ export default function Login() {
                       type="submit"
                       disabled={isSendingReset}
                       whileTap={{ scale: 0.985 }}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3.25 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border-none bg-[#04030d] px-4 py-3 text-[1rem] font-semibold text-white transition hover:bg-[#0c0b18] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isSendingReset ? (
                         <>
@@ -519,7 +519,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="relative hidden overflow-hidden rounded-[24px] bg-[#09111d] p-7 lg:flex lg:min-h-[740px]">
+        <div className="relative overflow-hidden rounded-[24px] bg-[#09111d] p-7 flex flex-col items-center justify-center min-h-[740px]">
           <div
             style={{
               position: "absolute",
@@ -540,7 +540,7 @@ export default function Login() {
           <div style={{ position: "absolute", top: 165, left: "49.5%", width: 108, height: 1.5, background: "linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.08))", transform: "rotate(28deg)", transformOrigin: "left center", boxShadow: "0 0 12px rgba(255,255,255,0.38)" }} />
 
           <div className="relative z-10 flex w-full flex-col items-center justify-center text-center text-white">
-            <h2 className="max-w-[405px] text-[2.1rem] leading-[1.16] tracking-[-0.042em] xl:text-[2.3rem]" style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}>
+            <h2 className="max-w-[405px] font-serif text-[2.1rem] leading-[1.16] tracking-[-0.042em] xl:text-[2.3rem]">
               Track spend, ask anything.
               <br />
               Own your wealth.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   BadgeDollarSign,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuthContext } from "../../../../hooks/useAuthContext";
 import { CAT_COLORS, catToIcon, dedupToast, getSpendingCategoryLabel, getSpendingCategoryMeta } from "../../dashboardShared.jsx";
+import { useDashboard } from "../../DashboardContext";
 import { transactionCategoryService } from "../../../../services/transactionCategoryService";
 import { formatCurrencyAmount, getUserCurrency } from "../../../../utils/currency";
 
@@ -143,7 +145,9 @@ const isAmountMatch = (amountValue, filter) => {
 };
 
 export default function TransactionsPage({ transactionService, queryClient, C, apiTransactions = [], txLimitReached, setAddModalOpen, pushNotif, spendingSettings }) {
+  const navigate = useNavigate();
   const { user } = useAuthContext();
+  const { globalSelectedTxId: selectedId, setGlobalSelectedTxId: setSelectedId } = useDashboard();
   const preferredCurrency = getUserCurrency(user);
   const formatAmount = (value, options = {}) => formatCurrencyAmount(Math.abs(value || 0), preferredCurrency, options);
   const { data: categoryData } = useQuery({
@@ -161,7 +165,6 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
   const [sortDir, setSortDir] = useState(spendingSettings?.transactionPreferences?.defaultSortDirection || "desc");
   const [detailDraft, setDetailDraft] = useState(null);
@@ -171,7 +174,7 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 640 : false));
   const [isWideScreen, setIsWideScreen] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 1280 : true));
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [openPickerTxId, setOpenPickerTxId] = useState(null);
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -198,8 +201,8 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   }, [filterOpen, filters]);
 
   useEffect(() => {
-    if (!showCategoryPicker) { setCategorySearch(""); setCategoryFormOpen(false); setNewCategoryName(""); setEditingCategoryId(null); setEditingCategoryName(""); }
-  }, [showCategoryPicker]);
+    if (!openPickerTxId) { setCategorySearch(""); setCategoryFormOpen(false); setNewCategoryName(""); setEditingCategoryId(null); setEditingCategoryName(""); }
+  }, [openPickerTxId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -621,11 +624,179 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
           </div>
           <div style={{ fontSize: C.fSizeSm, fontWeight: C.fWeightMed, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.merchant || "Transaction"}</div>
         </div>
-        <div>
-          <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedId(tx._id); setShowCategoryPicker(true); }} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--bg-card)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", maxWidth: "100%", cursor: "pointer", fontFamily: "inherit", boxShadow: "var(--shadow-card)" }}>
+        <div style={{ position: "relative" }}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setOpenPickerTxId(openPickerTxId === tx._id ? null : tx._id); }} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--bg-card)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", maxWidth: "100%", cursor: "pointer", fontFamily: "inherit", boxShadow: "var(--shadow-card)", transition: "all 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.borderColor = C.text} onMouseLeave={(e) => e.currentTarget.style.borderColor = C.border}>
             <span style={{ fontSize: C.fSizeXs, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: C.fWeightMed }}>{displayCategory}</span>
             <ChevronDown size={12} color={C.muted} />
           </button>
+
+          {openPickerTxId === tx._id && (
+            <>
+              {/* Invisible overlay to close */}
+              <div onClick={(e) => { e.stopPropagation(); setOpenPickerTxId(null); }} style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(0,0,0,0.2)", backdropFilter: "blur(2px)" }} />
+              
+              {/* Modal (Centered Popover) */}
+              <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 340, background: C.white, border: `1px solid ${C.border}`, borderRadius: 20, boxShadow: "0 20px 40px rgba(0,0,0,0.15)", zIndex: 91, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <div style={{ padding: "16px 16px 12px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Select Category</div>
+                  <button type="button" onClick={() => setOpenPickerTxId(null)} style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", padding: 4, borderRadius: 8 }} onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-muted)"} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                    <X size={18} color={C.muted} />
+                  </button>
+                </div>
+
+                {!categoryFormOpen && (
+                  <div style={{ padding: "12px 16px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface-muted)", padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}` }}>
+                      <Search size={16} color={C.muted} />
+                      <input 
+                        autoFocus
+                        placeholder="Search categories..." 
+                        value={categorySearch} 
+                        onChange={(e) => setCategorySearch(e.target.value)} 
+                        style={{ border: "none", outline: "none", background: "transparent", width: "100%", fontSize: 13, color: C.text, fontFamily: "inherit" }} 
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <div style={{ flex: 1, maxHeight: 320, overflowY: "auto", padding: 16 }}>
+                  {categoryFormOpen ? (
+                    <div style={{ padding: "8px 0" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>New Category Name</div>
+                      <input 
+                        autoFocus
+                        placeholder="e.g. Subscriptions"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter') {
+                            const name = newCategoryName.trim();
+                            if (!name) return;
+                            try {
+                              setCategorySaving(true);
+                              const response = await transactionCategoryService.create({ name, type: tx.type });
+                              queryClient.setQueryData(["transaction-categories", user?._id], (current) => ({ ...(current || {}), categories: [...(current?.categories || []), response.data.category] }));
+                              await transactionService.update(tx._id, { category: name });
+                              queryClient.invalidateQueries({ queryKey: ["transactions"] });
+                              queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                              pushNotif?.("success", "Category created & applied");
+                              setNewCategoryName(""); 
+                              setCategoryFormOpen(false);
+                              setOpenPickerTxId(null);
+                            } catch (err) {
+                              dedupToast.error(err?.response?.data?.message || err?.message || "Failed to create");
+                            } finally {
+                              setCategorySaving(false);
+                            }
+                          }
+                        }}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, outline: "none", color: C.text, fontFamily: "inherit", background: "var(--surface-muted)" }}
+                      />
+                      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                        <button type="button" onClick={() => setCategoryFormOpen(false)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.text }}>Cancel</button>
+                        <button type="button" disabled={!newCategoryName.trim() || categorySaving} onClick={async () => {
+                          const name = newCategoryName.trim();
+                          if (!name) return;
+                          try {
+                            setCategorySaving(true);
+                            const response = await transactionCategoryService.create({ name, type: tx.type });
+                            queryClient.setQueryData(["transaction-categories", user?._id], (current) => ({ ...(current || {}), categories: [...(current?.categories || []), response.data.category] }));
+                            await transactionService.update(tx._id, { category: name });
+                            queryClient.invalidateQueries({ queryKey: ["transactions"] });
+                            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                            pushNotif?.("success", "Category created & applied");
+                            setNewCategoryName(""); 
+                            setCategoryFormOpen(false);
+                            setOpenPickerTxId(null);
+                          } catch (err) {
+                            dedupToast.error(err?.response?.data?.message || err?.message || "Failed to create");
+                          } finally {
+                            setCategorySaving(false);
+                          }
+                        }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", background: C.text, color: C.white, cursor: newCategoryName.trim() ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600, opacity: newCategoryName.trim() ? 1 : 0.6 }}>{categorySaving ? "Saving..." : "Create"}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10, paddingLeft: 4 }}>
+                        {tx.type === "expense" ? "All Expenses" : "All Income"}
+                      </div>
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+                        <div style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border2}`, fontSize: 14, color: C.text, fontWeight: 600, background: "var(--bg-subtle)" }}>
+                          {tx.type === "expense" ? "Expense" : "Income"}
+                        </div>
+                        {allCategoryRecords
+                          .filter(c => c.type === tx.type && (getSpendingCategoryLabel(c.name).toLowerCase().includes(categorySearch.toLowerCase()) || c.name.toLowerCase().includes(categorySearch.toLowerCase())))
+                          .map((cat, idx, arr) => {
+                            const isSelected = tx.category === cat.name;
+                            const cMeta = getSpendingCategoryMeta(cat.name);
+                            const CIcon = cMeta?.icon || BadgeDollarSign;
+                            const cColor = cMeta?.color || "#8b80ff";
+                            return (
+                              <div 
+                                key={cat.id} 
+                                onClick={async () => {
+                                  try {
+                                    await transactionService.update(tx._id, { category: cat.name });
+                                    queryClient.invalidateQueries({ queryKey: ["transactions"] });
+                                    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                                    pushNotif?.("success", "Category updated");
+                                    setOpenPickerTxId(null);
+                                  } catch (e) {
+                                    dedupToast.error("Failed to update category");
+                                  }
+                                }}
+                                style={{ 
+                                  padding: "10px 14px", 
+                                  display: "flex", 
+                                  alignItems: "center", 
+                                  justifyContent: "space-between", 
+                                  cursor: "pointer", 
+                                  background: isSelected ? "var(--surface-muted)" : C.white,
+                                  borderBottom: idx < arr.length - 1 ? `1px solid ${C.border2}` : "none",
+                                  transition: "background 0.2s"
+                                }}
+                                onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "var(--bg-subtle)" }}
+                                onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = C.white }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: cColor, color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <CIcon size={18} />
+                                  </div>
+                                  <span style={{ fontSize: 13.5, color: C.text, fontWeight: isSelected ? 600 : 400 }}>{getSpendingCategoryLabel(cat.name)}</span>
+                                </div>
+                                <div style={{ 
+                                  width: 20, 
+                                  height: 20, 
+                                  borderRadius: "50%", 
+                                  border: `2px solid ${isSelected ? C.text : C.muted}`, 
+                                  display: "flex", 
+                                  alignItems: "center", 
+                                  justifyContent: "center" 
+                                }}>
+                                  {isSelected && <div style={{ width: 10, height: 10, borderRadius: "50%", background: C.text }} />}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {!categoryFormOpen && (
+                  <div style={{ padding: "16px", borderTop: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--bg-subtle)" }}>
+                    <button type="button" onClick={() => setCategoryFormOpen(true)} style={{ padding: "10px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, color: C.text, fontSize: 13, fontWeight: 600, cursor: "pointer", flex: 1, transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-muted)"} onMouseLeave={(e) => e.currentTarget.style.background = C.white}>
+                      Create new category
+                    </button>
+                    <button type="button" onClick={() => { navigate("/profile?tab=categories"); setOpenPickerTxId(null); }} style={{ padding: "10px 24px", borderRadius: 8, border: "none", background: C.text, color: C.white, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.opacity = 0.8} onMouseLeave={(e) => e.currentTarget.style.opacity = 1}>
+                      Manage
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.muted, fontSize: C.fSizeXs, fontWeight: C.fWeightReg }}>
           <div style={{ width: 22, height: 22, borderRadius: 6, background: "var(--bg-subtle)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>P</div>
@@ -655,15 +826,25 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
               {/* Label — hide on very small screens */}
               {!isMobile && <div className="origin-section-label" style={{ marginRight: 4, fontSize: C.fSizeXs }}>TRANSACTIONS</div>}
 
-              {/* Search — full width on mobile */}
-              <div style={{ flex: isMobile ? "1 1 100%" : "1 1 240px", maxWidth: isMobile ? "100%" : 352, height: 40, borderRadius: 12, border: `1px solid ${C.border}`, background: "var(--bg-card)", display: "flex", alignItems: "center", gap: 8, padding: "0 12px", boxShadow: "var(--shadow-card)" }}>
-                <Search size={17} color={C.muted} />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search transactions…" style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13.5, color: C.text, fontFamily: "inherit" }} />
-                {search ? <button type="button" onClick={() => setSearch("")} style={{ border: "none", background: "transparent", padding: 0, display: "flex", cursor: "pointer" }}><X size={16} color={C.text} /></button> : null}
-              </div>
+              {/* Search — full width on mobile; on desktop the search sits beside the filter buttons */}
+              {isMobile && (
+                <div style={{ flex: "1 1 100%", maxWidth: "100%", height: 40, borderRadius: 12, border: `1px solid ${C.border}`, background: "var(--bg-card)", display: "flex", alignItems: "center", gap: 8, padding: "0 12px", boxShadow: "var(--shadow-card)" }}>
+                  <Search size={17} color={C.muted} />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search transactions…" style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13.5, color: C.text, fontFamily: "inherit" }} />
+                  {search ? <button type="button" onClick={() => setSearch("")} style={{ border: "none", background: "transparent", padding: 0, display: "flex", cursor: "pointer" }}><X size={16} color={C.text} /></button> : null}
+                </div>
+              )}
 
               {/* Icon buttons row */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: isMobile ? 0 : "auto" }}>
+                {/* Desktop search placed here so it sits next to filter and other action buttons */}
+                {!isMobile && (
+                  <div style={{ width: 260, height: 36, borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--bg-card)", display: "flex", alignItems: "center", gap: 8, padding: "0 10px", boxShadow: "var(--shadow-card)", flexShrink: 0 }}>
+                    <Search size={16} color={C.muted} />
+                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search transactions…" style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13, color: C.text, fontFamily: "inherit" }} />
+                    {search ? <button type="button" onClick={() => setSearch("")} style={{ border: "none", background: "transparent", padding: 0, display: "flex", cursor: "pointer" }}><X size={14} color={C.text} /></button> : null}
+                  </div>
+                )}
                 <button type="button" onClick={() => setFilterOpen(true)} style={{ width: 40, height: 40, borderRadius: 12, border: `1px solid ${C.border}`, background: "var(--bg-card)", cursor: "pointer", position: "relative", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow-card)" }}>
                   <Filter size={16} color={C.sub} />
                   {selectedFilterCount ? <span style={{ position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: "50%", background: C.text }} /> : null}
@@ -773,226 +954,7 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
         </div>
       </div>
 
-      {/* ── Detail panel ── */}
-      {selectedTransaction && detailDraft && (
-        <>
-          <div onClick={() => { setSelectedId(null); setShowCategoryPicker(false); }} style={{ position: "fixed", inset: 0, background: "var(--bg-overlay)", zIndex: 80 }} />
-          <div style={{
-            position: "fixed",
-            /* Mobile: bottom sheet; desktop: right panel */
-            ...(isMobile
-              ? { bottom: 0, left: 0, right: 0, height: "78vh", borderRadius: "20px 20px 0 0" }
-              : { top: 12, right: 12, height: "calc(100vh - 24px)", width: isWideScreen ? 440 : "min(420px, calc(100vw - 24px))", borderRadius: 16 }),
-            background: "var(--bg-secondary)",
-            border: `1px solid ${C.border}`,
-            boxShadow: "var(--shadow-elevated)",
-            zIndex: 81,
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-          }}>
-            {/* Handle (mobile) */}
-            {isMobile && <div style={{ width: 40, height: 4, borderRadius: 2, background: C.border, margin: "10px auto 0" }} />}
-
-            <div style={{ padding: isMobile ? "12px 16px 10px" : "16px 18px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                {!isMobile && <button type="button" onClick={() => setSelectedId(null)} style={{ width: 30, height: 30, borderRadius: 9, border: "none", background: "var(--bg-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronLeft size={16} color={C.sub} /></button>}
-                <div className="origin-section-label" style={{ fontSize: C.fSizeXs }}>{(selectedTransaction.merchant || "Transaction").slice(0, 40)}</div>
-              </div>
-              {isMobile && <button type="button" onClick={() => setSelectedId(null)} style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0 }}><X size={20} color={C.muted} /></button>}
-            </div>
-
-            <div style={{ flex: 1, overflowY: "auto", minHeight: 0, scrollbarGutter: "stable" }}>
-              <div style={{ padding: isMobile ? "14px 16px 12px" : "18px 18px 14px", textAlign: "center" }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2f9cff", marginBottom: 8 }}>{REVIEW[detailDraft.reviewStatus || "needs_review"]}</div>
-                <div style={{ fontSize: isMobile ? 28 : 32, lineHeight: 1, letterSpacing: "-0.04em", color: C.text, marginBottom: 12, fontWeight: 500 }}>{formatAmount(selectedTransaction.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <button type="button" onClick={() => setShowCategoryPicker((prev) => !prev)} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--surface-muted)", borderRadius: 999, padding: "9px 14px", border: `1px solid ${C.border}`, cursor: "pointer", fontFamily: "inherit", color: C.text }}>
-                  <Tag size={15} color="#f59e0b" />
-                  <span style={{ fontSize: 12.5 }}>{selectedTransaction.type === "expense" ? getSpendingCategoryLabel(detailDraft.category) : detailDraft.category}</span>
-                  <ChevronDown size={14} color={C.muted} style={{ transform: showCategoryPicker ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 160ms ease" }} />
-                </button>
-              </div>
-
-              <div style={{ padding: `0 ${isMobile ? 12 : 16}px 12px` }}>
-                {showCategoryPicker && (
-                  <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 16, background: "var(--bg-secondary)", overflow: "hidden" }}>
-                    <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border2}` }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: C.muted, marginBottom: 12 }}>Choose category</div>
-                      <div style={{ height: 42, border: `1px solid ${C.border}`, borderRadius: 12, display: "flex", alignItems: "center", gap: 8, padding: "0 12px", boxSizing: "border-box" }}>
-                        <Search size={17} color="#b0b8c7" />
-                        <input value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} placeholder="Search categories" style={{ width: "100%", border: "none", outline: "none", background: "transparent", fontSize: 13.5, fontFamily: "inherit", color: C.text }} />
-                      </div>
-                    </div>
-                    <div style={{ padding: "14px 16px 16px" }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 10 }}>{selectedTransaction.type === "income" ? "Income" : "Expense"} categories</div>
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", background: "var(--surface-muted)" }}>
-                        <div style={{ maxHeight: isMobile ? "32vh" : 280, overflowY: "auto" }}>
-                          {categoryOptions.map((category, index) => {
-                            const meta = getSpendingCategoryMeta(category.name);
-                            const Icon = meta.icon || BadgeDollarSign;
-                            const active = detailDraft.category === category.name;
-                            const isEditing = editingCategoryId === category.id;
-                            return (
-                              <div key={category.id} style={{ borderTop: index ? `1px solid ${C.border2}` : "none", padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: active ? "rgba(47, 156, 255, 0.08)" : "transparent" }}>
-                                <button type="button" onClick={async () => { setDetailDraft((prev) => ({ ...prev, category: category.name })); await patchTx({ category: category.name }, "Category updated"); setShowCategoryPicker(false); }} style={{ flex: 1, minWidth: 0, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left" }}>
-                                  <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                                    <span style={{ width: 28, height: 28, borderRadius: 10, background: `${meta.color}22`, color: meta.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={14} /></span>
-                                    {isEditing ? (
-                                      <input value={editingCategoryName} onChange={(e) => setEditingCategoryName(e.target.value)} onClick={(e) => e.stopPropagation()} style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 10px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-                                    ) : (
-                                      <span style={{ fontSize: 13.5, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{getSpendingCategoryLabel(category.name)}</span>
-                                    )}
-                                  </span>
-                                  {active ? <CircleDot size={18} color={C.text} /> : <Circle size={18} color={C.muted} />}
-                                </button>
-                                {category.isCustom && (
-                                  isEditing
-                                    ? <button type="button" onClick={renameCategory} disabled={categorySaving || !editingCategoryName.trim()} style={{ height: 32, padding: "0 11px", borderRadius: 9, border: "none", background: C.strong, color: C.onStrong, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Save</button>
-                                    : <button type="button" onClick={() => { setEditingCategoryId(category.id); setEditingCategoryName(category.name); }} style={{ width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.border}`, background: "var(--bg-secondary)", color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><PenLine size={14} /></button>
-                                )}
-                              </div>
-                            );
-                          })}
-                          {!categoryOptions.length && <div style={{ padding: "16px 14px", fontSize: 12.5, color: C.muted, textAlign: "center" }}>No categories found.</div>}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: 12, border: `1px solid ${C.border}`, borderRadius: 14, padding: 12 }}>
-                        {categoryFormOpen ? (
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="New category name" style={{ flex: 1, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box", background: "var(--bg-card)", color: C.text }} />
-                            <button type="button" onClick={createCategory} disabled={categorySaving || !newCategoryName.trim()} style={{ height: 40, padding: "0 14px", borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Add</button>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => setCategoryFormOpen(true)} style={{ width: "100%", height: 40, borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--bg-secondary)", color: C.text, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Create new category</button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
-                  {inlineField === "merchant" ? (
-                    <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 14, color: C.muted }}>Merchant</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input value={detailDraft.merchant} onChange={(e) => setDetailDraft((p) => ({ ...p, merchant: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 10px", fontSize: 13, background: "var(--bg-card)", color: C.text }} />
-                        <button type="button" onClick={() => saveInlineField("merchant")} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={15} /></button>
-                      </div>
-                    </div>
-                  ) : <div style={{ borderBottom: `1px solid ${C.border2}` }}><RowButton label="Merchant" value={detailDraft.merchant} action={() => setInlineField("merchant")} trailing={<ChevronRight size={18} color="#9ca3af" />} /></div>}
-                  
-                  {inlineField === "amount" ? (
-                    <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 14, color: C.muted }}>Amount</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input type="number" step="0.01" value={detailDraft.amount} onChange={(e) => setDetailDraft((p) => ({ ...p, amount: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 10px", fontSize: 13, background: "var(--bg-card)", color: C.text, width: 100 }} />
-                        <button type="button" onClick={() => saveInlineField("amount")} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={15} /></button>
-                      </div>
-                    </div>
-                  ) : <div style={{ borderBottom: `1px solid ${C.border2}` }}><RowButton label="Amount" value={formatAmount(detailDraft.amount)} action={() => setInlineField("amount")} trailing={<ChevronRight size={18} color="#9ca3af" />} /></div>}
-
-                  {inlineField === "date" ? (
-                    <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 14, color: C.muted }}>Date</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input type="date" value={detailDraft.date} onChange={(e) => setDetailDraft((p) => ({ ...p, date: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 10px", fontSize: 13, background: "var(--bg-card)", color: C.text }} />
-                        <button type="button" onClick={() => saveInlineField("date")} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={15} /></button>
-                      </div>
-                    </div>
-                  ) : <div style={{ borderBottom: `1px solid ${C.border2}` }}><RowButton label="Date" value={new Date(selectedTransaction.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })} action={() => setInlineField("date")} trailing={<ChevronRight size={18} color="#9ca3af" />} /></div>}
-                  {inlineField === "tag" ? (
-                    <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <span style={{ fontSize: 14, color: C.muted }}>Tag</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <input value={detailDraft.tag} onChange={(e) => setDetailDraft((p) => ({ ...p, tag: e.target.value }))} placeholder="Add tag" style={{ border: `1px solid ${C.border}`, borderRadius: 999, padding: "8px 12px", fontSize: 13, background: "var(--bg-card)", color: C.text }} />
-                        <button type="button" onClick={() => saveInlineField("tag")} style={{ width: 34, height: 34, borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={15} /></button>
-                      </div>
-                    </div>
-                  ) : <div style={{ borderBottom: `1px solid ${C.border2}` }}><RowButton label="Tag" value={detailDraft.tag} action={() => setInlineField("tag")} trailing={<ChevronRight size={18} color="#9ca3af" />} /></div>}
-                  <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ fontSize: 15, color: C.muted }}>Hide transaction</span>
-                    <Toggle checked={!!detailDraft.isHidden} onClick={async () => { const next = !detailDraft.isHidden; setDetailDraft((p) => ({ ...p, isHidden: next })); await patchTx({ isHidden: next }, next ? "Transaction hidden" : "Transaction shown"); }} />
-                  </div>
-                  
-                  {inlineField === "splitting" ? (
-                    <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, background: "rgba(59, 130, 246, 0.03)" }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", marginBottom: 12 }}>Split Transaction</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: 13, color: C.text }}>First Part:</span>
-                          <input 
-                            type="number" 
-                            step="0.01" 
-                            value={splitAmount} 
-                            onChange={(e) => setSplitAmount(e.target.value)} 
-                            placeholder="Amount" 
-                            style={{ width: 110, border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", background: "var(--bg-card)", color: C.text }} 
-                          />
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.7 }}>
-                          <span style={{ fontSize: 13, color: C.text }}>Second Part:</span>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{formatAmount(Math.max(0, Math.abs(selectedTransaction.amount) - (Number(splitAmount) || 0)))}</span>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                          <button type="button" onClick={() => setInlineField(null)} style={{ flex: 1, height: 36, borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--bg-card)", color: C.text, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
-                          <button type="button" onClick={splitTransaction} disabled={saving || !splitAmount || Number(splitAmount) <= 0 || Number(splitAmount) >= Math.abs(selectedTransaction.amount)} style={{ flex: 1, height: 36, borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: (!splitAmount || Number(splitAmount) <= 0 || Number(splitAmount) >= Math.abs(selectedTransaction.amount)) ? 0.6 : 1 }}>Confirm Split</button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ borderBottom: `1px solid ${C.border2}` }}>
-                      <RowButton label="Split transaction" value="" action={() => { setInlineField("splitting"); setSplitAmount((Math.abs(selectedTransaction.amount) / 2).toFixed(2)); }} trailing={<ChevronRight size={18} color="#9ca3af" />} />
-                    </div>
-                  )}
-                  {inlineField === "notes" ? (
-                    <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}` }}>
-                      <div style={{ fontSize: 14, color: C.muted, marginBottom: 10 }}>Add note</div>
-                      <textarea value={detailDraft.notes} onChange={(e) => setDetailDraft((p) => ({ ...p, notes: e.target.value }))} rows={3} style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", fontSize: 13, resize: "none", boxSizing: "border-box" }} />
-                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-                        <button type="button" onClick={() => saveInlineField("notes")} style={{ height: 34, padding: "0 14px", borderRadius: 10, border: "none", background: C.strong, color: C.onStrong, cursor: "pointer", fontSize: 12.5, fontWeight: 700 }}>Save</button>
-                      </div>
-                    </div>
-                  ) : <div style={{ borderBottom: `1px solid ${C.border2}` }}><RowButton label="Add note" value={detailDraft.notes} action={() => setInlineField("notes")} trailing={<ChevronRight size={18} color="#9ca3af" />} /></div>}
-                  <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ fontSize: 14, color: C.muted }}>Recurring</span>
-                    <Toggle checked={!!detailDraft.isRecurring} onClick={async () => { const next = !detailDraft.isRecurring; setDetailDraft((p) => ({ ...p, isRecurring: next })); await patchTx({ isRecurring: next }, next ? "Marked as recurring" : "Recurring removed"); }} />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: `0 ${isMobile ? 12 : 16}px 14px` }}>
-                <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: detailDraft.reviewStatus === "reviewed" ? "rgba(34, 197, 94, 0.04)" : "rgba(59, 130, 246, 0.04)" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>Review Status</div>
-                    <div style={{ fontSize: 11, color: C.muted }}>{detailDraft.reviewStatus === "reviewed" ? "Verified and checked" : "Requires your confirmation"}</div>
-                  </div>
-                  <button type="button" onClick={async () => { const next = detailDraft.reviewStatus === "reviewed" ? "needs_review" : "reviewed"; setDetailDraft((p) => ({ ...p, reviewStatus: next })); await patchTx({ reviewStatus: next }, next === "reviewed" ? "Marked as reviewed" : "Marked as needs review"); }} style={{ padding: "9px 16px", borderRadius: 12, border: "none", background: detailDraft.reviewStatus === "reviewed" ? "var(--surface-muted)" : C.strong, color: detailDraft.reviewStatus === "reviewed" ? C.text : C.onStrong, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-                    {detailDraft.reviewStatus === "reviewed" ? "Mark unreviewed" : "Mark as reviewed"}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ padding: `0 ${isMobile ? 12 : 16}px 16px` }}>
-                <button type="button" onClick={() => handleDeleteTransaction(selectedTransaction._id)} disabled={saving} 
-                  style={{ 
-                    width: "100%", height: 42, borderRadius: 14, 
-                    border: confirmingId === selectedTransaction._id ? `1px solid ${C.red}` : `1px solid ${C.red}33`, 
-                    background: confirmingId === selectedTransaction._id ? C.red : C.redBg, 
-                    color: confirmingId === selectedTransaction._id ? "#fff" : C.red, 
-                    cursor: saving ? "not-allowed" : "pointer", 
-                    fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, 
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8, 
-                    opacity: saving ? 0.6 : 1,
-                    transition: "all 0.2s ease"
-                  }}>
-                  <Trash2 size={15} />
-                  {confirmingId === selectedTransaction._id ? "Confirm Delete?" : "Delete transaction"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Sidebar is now handled globally */}
 
       {/* ── Filter panel ── */}
       {filterOpen && (

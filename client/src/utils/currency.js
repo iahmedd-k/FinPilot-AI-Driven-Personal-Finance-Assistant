@@ -9,9 +9,10 @@ export const formatCurrencyAmount = (
   { minimumFractionDigits = 0, maximumFractionDigits = 0, locale } = {}
 ) => {
   const amount = Number(value ?? 0);
-  return new Intl.NumberFormat(locale || undefined, {
+  return new Intl.NumberFormat(locale || "en-US", {
     style: "currency",
     currency,
+    currencyDisplay: "narrowSymbol",
     minimumFractionDigits,
     maximumFractionDigits,
   }).format(Number.isFinite(amount) ? amount : 0);

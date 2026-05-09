@@ -2,11 +2,11 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 
 export const BG = "var(--bg-primary)";
-export const WHITE = "var(--bg-secondary)";
-export const BORDER = "var(--border-subtle)";
+export const WHITE = "var(--bg-card)";
+export const BORDER = "var(--border-default)";
 export const TEXT = "var(--text-primary)";
 export const SUB = "var(--text-secondary)";
-export const MUTED = "var(--text-secondary)";
+export const MUTED = "var(--text-muted)";
 export const GREEN = "var(--accent)";
 export const RED = "var(--error, #ef4444)";
 export const SURFACE_MUTED = "var(--surface-muted)";

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid, Bar, PieChart, Pie, Cell, Line, BarChart } from "recharts";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, GitBranch, PenLine, Plus, Sparkles, Tag, X, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { catToIcon, getSpendingCategoryLabel, getSpendingCategoryMeta, ProGate, SPENDING_CATEGORY_META, getOccurrencesInMonth } from "../../dashboardShared.jsx";
+import { catToIcon, getSpendingCategoryLabel, getSpendingCategoryMeta, ProGate, SPENDING_CATEGORY_META, getOccurrencesInMonth, getRecurringFrequency } from "../../dashboardShared.jsx";
 import api from "../../../../services/api";
 import { formatCurrencyAmount } from "../../../../utils/currency";
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function panelStyle(C) {
-  return { background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" };
+  return { background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", fontFamily: "Inter, system-ui, sans-serif" };
 }
 
 function sectionLabel(text) {
@@ -87,8 +87,10 @@ export default function OverviewTab({
   fmtMoney,
   preferredCurrency,
   budget,
+  spendingSettings,
   monthlyChart = [],
   onBudgetSaved,
+  setGlobalSelectedTxId,
 }) {
   const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
 
@@ -98,11 +100,6 @@ export default function OverviewTab({
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const [selectedSpendMonthKey, setSelectedSpendMonthKey] = useState(null);
   const [upcomingMonthOffset, setUpcomingMonthOffset] = useState(0);
-  const [selectedTxId, setSelectedTxId] = useState(null);
-  const [txDraft, setTxDraft] = useState(null);
-  const [txEdit, setTxEdit] = useState(false);
-  const [txSaving, setTxSaving] = useState(false);
-  const [hoveredTxId, setHoveredTxId] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [categoryBudget, setCategoryBudget] = useState("");
   const [categorySaving, setCategorySaving] = useState(false);
@@ -263,7 +260,6 @@ export default function OverviewTab({
 
   // ─── Transactions ─────────────────────────────────────────────────────────
   const latestTransactions = recentTx.slice(0, 8);
-  const selectedTransaction = apiTransactions.find((tx) => tx._id === selectedTxId) || null;
 
   // ─── Upcoming calendar ────────────────────────────────────────────────────
   const upcomingCalendarDate = useMemo(
@@ -275,18 +271,57 @@ export default function OverviewTab({
   const upcomingCalendarDaysInMonth = new Date(upcomingCalendarYear, upcomingCalendarMonth + 1, 0).getDate();
 
   const upcomingTransactions = useMemo(() => {
-    const recurringTemplates = (apiTransactions || []).filter((tx) => tx.isRecurring);
+    const recurringSettings = spendingSettings?.recurringSettings || {};
+    const showInferred = recurringSettings?.showInferredRecurring ?? true;
+
+    const explicit = (apiTransactions || []).filter((tx) => tx.isRecurring);
+    let inferred = [];
+    
+    if (showInferred) {
+      const candidates = new Map();
+      apiTransactions.forEach(tx => {
+        if (tx.isRecurring || !tx.merchant) return;
+        const amountRound = Math.round(Math.abs(tx.amount));
+        const key = `${tx.type}:${tx.merchant}:${amountRound}`;
+        if (!candidates.has(key)) candidates.set(key, []);
+        candidates.get(key).push(tx);
+      });
+      candidates.forEach(txs => {
+        if (txs.length >= 3) {
+          const recent = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+          inferred.push({ ...recent, isInferred: true });
+        }
+      });
+    }
+
+    const allRecurring = [...explicit, ...inferred];
+    const merged = new Map();
+    allRecurring.forEach(tx => {
+      const merchant = tx.merchant || tx.category || "Transaction";
+      const key = `${tx.type}:${merchant}:${tx.category || "Other"}:${Math.abs(tx.amount).toFixed(2)}`;
+      if (!merged.has(key) || new Date(tx.date) > new Date(merged.get(key).date)) {
+        merged.set(key, tx);
+      }
+    });
+
     const occurrences = [];
-    recurringTemplates.forEach((tx) => {
+    const now = new Date();
+    // Use the actual "today" for projection start
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    [...merged.values()].forEach((tx) => {
       const dates = getOccurrencesInMonth(tx, upcomingCalendarDate);
       dates.forEach((date) => {
-        if (date > latestTransactionDate) {
+        // Bug Fix 2: Only show projected occurrences that are in the future
+        // and not already represented by a "real" manual future transaction in apiTransactions
+        if (date >= today) {
           occurrences.push({ ...tx, date: date.toISOString() });
         }
       });
     });
+
     return occurrences.sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [apiTransactions, latestTransactionDate, upcomingCalendarDate]);
+  }, [apiTransactions, upcomingCalendarDate, spendingSettings]);
 
   const calendarCells = useMemo(() => {
     const firstDay = (new Date(upcomingCalendarYear, upcomingCalendarMonth, 1).getDay() + 6) % 7;
@@ -387,20 +422,6 @@ export default function OverviewTab({
   }, [apiTransactions, currentMonthKey, selectedCategoryId]);
 
   // ─── Effects ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!selectedTransaction) return;
-    setTxDraft({
-      merchant: selectedTransaction.merchant || "",
-      category: selectedTransaction.category || transactionService?.CATEGORIES?.[0] || "",
-      date: selectedTransaction.date ? new Date(selectedTransaction.date).toISOString().slice(0, 10) : "",
-      notes: selectedTransaction.notes || "",
-      tag: selectedTransaction.tag || "",
-      isRecurring: !!selectedTransaction.isRecurring,
-      isHidden: !!selectedTransaction.isHidden,
-      reviewStatus: selectedTransaction.reviewStatus || "needs_review",
-    });
-    setTxEdit(false);
-  }, [selectedTransaction, transactionService]);
 
   useEffect(() => {
     if (!selectedCategoryId) return;
@@ -409,48 +430,6 @@ export default function OverviewTab({
   }, [budget?.amount, selectedCategoryId]);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-  const refreshQueries = () => {
-    queryClient?.invalidateQueries?.({ queryKey: ["transactions"] });
-    queryClient?.invalidateQueries?.({ queryKey: ["transactions-page"] });
-    queryClient?.invalidateQueries?.({ queryKey: ["dashboard"] });
-  };
-
-  const patchTx = async (patch, successMessage) => {
-    if (!selectedTransaction) return;
-    try {
-      setTxSaving(true);
-      await transactionService.update(selectedTransaction._id, patch);
-      refreshQueries();
-      if (successMessage) pushNotif?.("success", successMessage);
-    } catch (e) {
-      pushNotif?.("error", e?.response?.data?.message || e?.message || "Failed to update transaction");
-    } finally {
-      setTxSaving(false);
-    }
-  };
-
-  const saveTxEdits = async () => { await patchTx(txDraft, "Transaction updated"); setTxEdit(false); };
-
-  const splitTransaction = async () => {
-    if (!selectedTransaction) return;
-    const total = Math.abs(selectedTransaction.amount || 0);
-    const first = Number((total / 2).toFixed(2));
-    const second = Number((total - first).toFixed(2));
-    try {
-      setTxSaving(true);
-      const base = { category: selectedTransaction.category, type: selectedTransaction.type, date: selectedTransaction.date, notes: selectedTransaction.notes, tag: selectedTransaction.tag, isRecurring: selectedTransaction.isRecurring, isHidden: selectedTransaction.isHidden, reviewStatus: "needs_review" };
-      await transactionService.create({ ...base, merchant: selectedTransaction.merchant, amount: first });
-      await transactionService.create({ ...base, merchant: `${selectedTransaction.merchant || "Split"} (Part 2)`, amount: second });
-      await transactionService.delete(selectedTransaction._id);
-      refreshQueries();
-      setSelectedTxId(null);
-      pushNotif?.("success", "Transaction split into two entries");
-    } catch (e) {
-      pushNotif?.("error", e?.response?.data?.message || e?.message || "Failed to split transaction");
-    } finally {
-      setTxSaving(false);
-    }
-  };
 
   const saveCategoryBudget = async () => {
     const amount = Number(categoryBudget);
@@ -511,6 +490,7 @@ export default function OverviewTab({
       <style>{`
         .spending-category-row:hover, .spending-category-row:focus { background: var(--surface-muted) !important; }
         .performance-row:hover { background: var(--surface-muted) !important; }
+        .hover-bg-muted:hover { background: var(--surface-muted) !important; }
       `}</style>
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) 308px", gap: 16, alignItems: "start" }}>
@@ -559,34 +539,52 @@ export default function OverviewTab({
               </div>
 
               {/* ── Spend summary bar (spend vs budget) ── */}
-              {spendViewMode === "chart" && (
-                <div style={{ padding: "16px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                  <div>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: C.text, letterSpacing: "-0.03em", lineHeight: 1 }}>
-                      {formatAmount(spendChartData.totalSpend || 0, { maximumFractionDigits: 0 })}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>spent in {selectedSpendMonthOption?.label || ""}</div>
-                  </div>
-                  {effectiveBudget > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#16a34a" }}>
-                        {formatAmount(Math.max(0, effectiveBudget - (spendChartData.totalSpend || 0)), { maximumFractionDigits: 0 })} left
+                {spendViewMode === "chart" && (
+                  <>
+                    <div style={{ padding: "16px 20px 8px", display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", fontFamily: "var(--font-sans)" }}>
+                      <div style={{ textAlign: "left" }}>
+                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Expenses</div>
+                        <div style={{ fontSize: 18, fontWeight: 500, color: C.text, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                          {formatAmount(spendChartData.totalSpend || 0, { maximumFractionDigits: 0 })}
+                        </div>
+                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>spent in {selectedSpendMonthOption?.label || ""}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: C.muted }}>of {formatAmount(effectiveBudget, { maximumFractionDigits: 0 })} budget</div>
-                      {/* Budget progress bar */}
-                      <div style={{ width: 120, height: 4, borderRadius: 99, background: "var(--border-subtle)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 99, background: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#ffb95a", width: `${Math.min(100, ((spendChartData.totalSpend || 0) / effectiveBudget) * 100)}%` }} />
+                      <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, textAlign: "left" }}>
+                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Income</div>
+                        <div style={{ fontSize: 18, fontWeight: 500, color: C.greenMid, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                          {formatAmount(thisIncome, { maximumFractionDigits: 0 })}
+                        </div>
+                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>earned in {selectedSpendMonthOption?.label || ""}</div>
                       </div>
+                      <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, textAlign: "left" }}>
+                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Savings Rate</div>
+                        <div style={{ fontSize: 18, fontWeight: 500, color: (thisIncome - thisSpend) >= 0 ? C.text : C.red, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                          {thisIncome > 0 ? Math.round(((thisIncome - thisSpend) / thisIncome) * 100) : 0}%
+                        </div>
+                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>of total income</div>
+                      </div>
+                      {effectiveBudget > 0 && (
+                        <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+                          <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>Budget</div>
+                          <div style={{ fontSize: 15, fontWeight: 500, color: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#16a34a", lineHeight: 1, marginTop: 1 }}>
+                            {formatAmount(Math.max(0, effectiveBudget - (spendChartData.totalSpend || 0)), { maximumFractionDigits: 0 })} left
+                          </div>
+                          <div style={{ fontSize: 10, color: C.muted }}>of {formatAmount(effectiveBudget, { maximumFractionDigits: 0 })}</div>
+                          {/* Budget progress bar */}
+                          <div style={{ width: 100, height: 4, borderRadius: 99, background: "var(--border-subtle)", overflow: "hidden", marginTop: 2 }}>
+                            <div style={{ height: "100%", borderRadius: 99, background: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#ffb95a", width: `${Math.min(100, ((spendChartData.totalSpend || 0) / effectiveBudget) * 100)}%` }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </>
+                )}
 
               {/* ── Chart view ── */}
               {spendViewMode === "chart" ? (
                 spendChartData.points.length > 0 && spendChartData.totalSpend > 0 ? (
-                  <div style={{ width: "100%", padding: "10px 0 0" }}>
-                    <ResponsiveContainer width="100%" height={248}>
+                  <div style={{ width: "100%", padding: "0" }}>
+                    <ResponsiveContainer width="100%" height={248} minHeight={0}>
                       <AreaChart
                         data={spendChartData.points}
                         margin={{ top: 16, right: 52, left: 0, bottom: 20 }}
@@ -684,16 +682,19 @@ export default function OverviewTab({
               <div style={{ padding: "12px 0", flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
                 {latestTransactions.length === 0 ? (
                   <div style={{ textAlign: "center", color: C.muted, fontSize: 13, padding: "40px 20px" }}>No transactions yet</div>
-                ) : latestTransactions.map((tx) => {
-                  const Icon = catToIcon[tx.category] || Plus;
+                ) : latestTransactions.map((tx, idx) => {
+                  const txMeta = getSpendingCategoryMeta(tx.category);
+                  const TxIcon = txMeta?.icon || catToIcon[tx.category] || Sparkles;
                   const isInc = isIncomeTx(tx);
                   return (
-                    <button key={tx._id} type="button" onClick={() => setSelectedTxId(tx._id)}
-                      onMouseEnter={() => setHoveredTxId(tx._id)} onMouseLeave={() => setHoveredTxId(null)}
-                      style={{ width: "calc(100% - 16px)", border: "none", margin: "0 8px", borderRadius: 12, background: hoveredTxId === tx._id ? "var(--surface-muted)" : "transparent", padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, cursor: "pointer", textAlign: "left", transition: "all 0.2s" }}>
+                    <div key={tx._id || idx} 
+                      onClick={() => setGlobalSelectedTxId?.(tx._id)}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 12, background: "transparent", cursor: "pointer", transition: "all 0.15s" }}
+                      className="hover-bg-muted"
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                         <div style={{ width: 34, height: 34, borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", flexShrink: 0 }}>
-                          <Icon size={14} />
+                          <TxIcon size={14} />
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, color: C.text, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.merchant || tx.category || "Transaction"}</div>
@@ -706,7 +707,7 @@ export default function OverviewTab({
                         </span>
                         {tx.reviewStatus === "needs_review" && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -760,8 +761,8 @@ export default function OverviewTab({
                 </div>
                 <div style={{ marginTop: 20, fontSize: 13, color: C.muted, lineHeight: 1.5, textAlign: "center" }}>
                   {upcomingTransactionsInView.length === 0
-                    ? "Add your recurring bills and subscriptions to see what's coming up."
-                    : `${upcomingTransactionsInView.length} upcoming scheduled.`}
+                    ? "Add your recurring bills and subscriptions to see your schedule."
+                    : `${upcomingTransactionsInView.length} scheduled this month.`}
                 </div>
                 <div style={{ marginTop: 16, textAlign: "center" }}>
                   <button type="button" onClick={() => setSpendTab("recurring")}
@@ -787,21 +788,6 @@ export default function OverviewTab({
                 </button>
               </div>
               <div style={{ padding: "20px 16px 16px" }}>
-                {/* Stat cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 20 }}>
-                  {[
-                    { label: "Total income", value: fmtMoney(reportSummary.totalIncome), color: "#16a34a" },
-                    { label: "Total expenses", value: fmtMoney(reportSummary.totalExpenses) },
-                    { label: "Net cash flow", value: fmtMoney(reportSummary.net), color: reportSummary.net >= 0 ? "#16a34a" : "#ef4444" },
-                    { label: "Avg monthly net", value: fmtMoney(reportSummary.avg) },
-                  ].map((item) => (
-                    <div key={item.label} style={{ padding: 14, background: "var(--surface-muted)", borderRadius: 12 }}>
-                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 4, fontWeight: 500 }}>{item.label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: item.color || C.text }}>{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-
                 {/* Chart header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                   <div>
@@ -813,7 +799,7 @@ export default function OverviewTab({
 
                 {/* Grouped bar chart */}
                 <div style={{ width: "100%", minHeight: 248, marginBottom: 4 }}>
-                  <ResponsiveContainer width="100%" height={248}>
+                  <ResponsiveContainer width="100%" height={248} minHeight={0}>
                     <BarChart data={reportChartData} margin={{ top: 4, right: 10, bottom: 0, left: 0 }} barGap={6}>
                       <CartesianGrid vertical={false} stroke="var(--border-subtle)" strokeDasharray="4 4" />
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
@@ -829,23 +815,20 @@ export default function OverviewTab({
               </div>
             </div>
 
-            {/* ── Monthly Performance Table ── */}
+            {/* ── Monthly Overview Table ── */}
             <div style={{ ...panelStyle(C), marginTop: 4 }}>
-              <div style={{ padding: "18px 24px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--surface-muted)" }}>
+              <div style={{ padding: "18px 24px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--bg-card)", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${C.border}` }}>
-                    <CalendarDays size={14} color={C.muted} />
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: "0.05em" }}>Monthly Performance</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: "0.05em" }}>Monthly Overview</span>
                 </div>
-                <button type="button" onClick={() => setSpendTab("reports")} style={{ fontSize: 12, fontWeight: 600, color: "var(--brand-primary)", background: "transparent", border: "none", cursor: "pointer" }}>View full reports</button>
+                <button type="button" onClick={() => setSpendTab("reports")} style={{ fontSize: 12, fontWeight: 600, color: C.text, background: "transparent", border: "none", cursor: "pointer" }}>View full reports</button>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
                   <thead>
-                    <tr style={{ background: "var(--bg-card)" }}>
+                    <tr style={{ background: "transparent" }}>
                       {["Month", "Income", "Expenses", "Net Change"].map((h, i) => (
-                        <th key={h} style={{ padding: "12px 20px", textAlign: i === 0 ? "left" : "right", fontSize: 11, fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textTransform: "uppercase" }}>{h}</th>
+                        <th key={h} style={{ padding: "12px 20px", textAlign: i === 0 ? "left" : "right", fontSize: 11, fontWeight: 600, color: C.text, borderBottom: `1px solid ${C.border}`, textTransform: "uppercase" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -853,16 +836,16 @@ export default function OverviewTab({
                     {reportChartData.slice().reverse().map((row, idx, arr) => (
                       <tr key={row.key} className="performance-row"
                         style={{ cursor: "pointer", transition: "background 0.15s" }}>
-                        <td style={{ padding: "14px 20px", fontSize: 14, color: C.text, fontWeight: 600, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>{row.month}</td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: "#16a34a", fontWeight: 500, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
+                        <td style={{ padding: "14px 20px", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>{row.month}</td>
+                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
                           {formatAmount(row.income, { maximumFractionDigits: 0 })}
                         </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 500, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
+                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
                           {formatAmount(row.expense, { maximumFractionDigits: 0 })}
                         </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, fontWeight: 700, color: row.net >= 0 ? "#16a34a" : "#ef4444", borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
+                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, fontWeight: 400, color: C.text, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
-                            {row.net >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                            {row.net >= 0 ? <ArrowUpRight size={14} color={C.text} /> : <ArrowDownRight size={14} color={C.text} />}
                             {formatAmount(Math.abs(row.net), { maximumFractionDigits: 0 })}
                           </div>
                         </td>
@@ -900,7 +883,7 @@ export default function OverviewTab({
                 {/* Donut */}
                 <div style={{ padding: 18, borderRadius: 20, background: "var(--surface-muted)", display: "flex", justifyContent: "center", marginBottom: 18 }}>
                   <div style={{ position: "relative", width: 180, height: 180 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={0}>
                       <PieChart>
                         {(() => {
                           const pieData = breakdownMode === "budget"
@@ -983,19 +966,19 @@ export default function OverviewTab({
                 <Sparkles size={15} />
               </button>
             </div>
-            <div style={{ padding: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ padding: "16px 20px 20px", fontFamily: "var(--font-sans)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 {[
                   { label: "6-Month Savings", value: fmtMoney(reportSummary.net), color: reportSummary.net >= 0 ? "#16a34a" : "#ef4444" },
                   { label: "Avg Daily Spend", value: fmtMoney(avgDailySpend), suffix: "/day" },
                   { label: "Budget Remaining", value: effectiveBudget > 0 ? formatAmount(remainingBudget, { maximumFractionDigits: 0 }) : "—", color: effectiveBudget > 0 && remainingBudget === 0 ? "#ef4444" : "var(--brand-primary)" },
                   { label: "Top Expense", value: expenseRows.length > 0 ? expenseRows[0].label : "—" },
                 ].map((metric) => (
-                  <div key={metric.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{metric.label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: metric.color || C.text }}>
+                  <div key={metric.label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ fontSize: 9, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{metric.label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: metric.color || C.text, letterSpacing: "-0.01em" }}>
                       {metric.value}
-                      {metric.suffix && <span style={{ fontSize: 11, color: C.muted, marginLeft: 4, fontWeight: 500 }}>{metric.suffix}</span>}
+                      {metric.suffix && <span style={{ fontSize: 10, color: C.muted, marginLeft: 4, fontWeight: 500 }}>{metric.suffix}</span>}
                     </div>
                   </div>
                 ))}
@@ -1004,133 +987,6 @@ export default function OverviewTab({
           </div>
         </div>
       </div>
-
-      {/* ── Transaction detail drawer ── */}
-      {selectedTransaction && txDraft ? (
-        <>
-          <div onClick={() => setSelectedTxId(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 80 }} />
-          <div style={{ position: "fixed", top: 0, right: 0, height: "100vh", width: isMobile ? "100vw" : 420, background: C.white, borderLeft: `1px solid ${C.border}`, boxShadow: "-18px 0 40px rgba(0,0,0,0.35)", zIndex: 81, overflowY: "auto" }}>
-            <div style={{ padding: "20px 20px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button type="button" onClick={() => setSelectedTxId(null)}
-                  style={{ width: 28, height: 28, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: C.muted, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <ChevronLeft size={16} />
-                </button>
-                <div style={{ fontSize: 11, letterSpacing: "0.26em", textTransform: "uppercase", color: C.muted, fontWeight: 700 }}>{selectedTransaction.merchant || "Transaction"}</div>
-              </div>
-              <button type="button" onClick={() => txEdit ? saveTxEdits() : setTxEdit(true)} disabled={txSaving}
-                style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${C.border}`, background: txEdit ? C.text : "var(--bg-secondary)", cursor: "pointer", color: txEdit ? C.white : C.text, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
-                title={txEdit ? "Save changes" : "Edit transaction"}>
-                <PenLine size={14} />
-              </button>
-            </div>
-
-            <div style={{ padding: "22px 24px 20px", textAlign: "center" }}>
-              {txDraft.reviewStatus === "needs_review" && (
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#ef4444", marginBottom: 10 }}>Needs review</div>
-              )}
-              <div style={{ fontSize: 30, lineHeight: 1, letterSpacing: "-0.04em", color: C.text, marginBottom: 18 }}>
-                {formatAmount(Math.abs(selectedTransaction.amount || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--surface-muted)", borderRadius: 999, padding: "10px 14px", border: `1px solid ${C.border}` }}>
-                <Tag size={14} color="#f59e0b" />
-                {txEdit ? (
-                  <select value={txDraft.category} onChange={(e) => setTxDraft((p) => ({ ...p, category: e.target.value }))}
-                    style={{ border: "none", background: "transparent", color: C.text, fontSize: 14, outline: "none" }}>
-                    {transactionService.CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 14, color: C.text }}>
-                    {isExpenseTx(selectedTransaction) ? getSpendingCategoryLabel(txDraft.category) : txDraft.category}
-                  </span>
-                )}
-                <ChevronDown size={14} color={C.muted} />
-              </div>
-            </div>
-
-            <div style={{ padding: "0 20px 18px" }}>
-              <div style={{ border: `1px solid ${C.border}`, borderRadius: 18, overflow: "hidden" }}>
-                {/* Date */}
-                {txEdit ? (
-                  <div style={{ padding: "17px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 14, color: C.muted }}>Date</span>
-                    <input type="date" value={txDraft.date} onChange={(e) => setTxDraft((p) => ({ ...p, date: e.target.value }))}
-                      style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 10px", fontSize: 12.5, background: "var(--surface-muted)", color: C.text }} />
-                  </div>
-                ) : (
-                  <div style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <RowButton label="Date" value={new Date(selectedTransaction.date).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })} trailing={<ChevronRight size={16} color={C.muted} />} />
-                  </div>
-                )}
-                {/* Merchant */}
-                {txEdit && (
-                  <div style={{ padding: "17px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 14, color: C.muted }}>Name</span>
-                    <input value={txDraft.merchant} onChange={(e) => setTxDraft((p) => ({ ...p, merchant: e.target.value }))} placeholder="Merchant name"
-                      style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 12px", fontSize: 12.5, background: "var(--surface-muted)", color: C.text }} />
-                  </div>
-                )}
-                {/* Tag */}
-                {txEdit ? (
-                  <div style={{ padding: "17px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 14, color: C.muted }}>Tag</span>
-                    <input value={txDraft.tag} onChange={(e) => setTxDraft((p) => ({ ...p, tag: e.target.value }))} placeholder="Add tag"
-                      style={{ border: `1px solid ${C.border}`, borderRadius: 999, padding: "8px 12px", fontSize: 12.5, background: "var(--surface-muted)", color: C.text }} />
-                  </div>
-                ) : (
-                  <div style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <RowButton label="Tag" value={txDraft.tag || "—"} trailing={<ChevronRight size={16} color={C.muted} />} />
-                  </div>
-                )}
-                {/* Hide */}
-                <div style={{ padding: "17px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: 14, color: C.muted }}>Hide transaction</span>
-                  <Toggle checked={!!txDraft.isHidden} onClick={async () => { const next = !txDraft.isHidden; setTxDraft((p) => ({ ...p, isHidden: next })); await patchTx({ isHidden: next }, next ? "Transaction hidden" : "Transaction visible"); }} />
-                </div>
-                {/* Split */}
-                <div style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <RowButton label="Split transaction" action={txSaving ? undefined : splitTransaction} trailing={<GitBranch size={16} color={C.muted} />} />
-                </div>
-                {/* Notes */}
-                {txEdit ? (
-                  <div style={{ padding: "17px 20px", borderBottom: `1px solid ${C.border}` }}>
-                    <div style={{ fontSize: 14, color: C.muted, marginBottom: 10 }}>Notes</div>
-                    <textarea value={txDraft.notes} onChange={(e) => setTxDraft((p) => ({ ...p, notes: e.target.value }))} rows={4} placeholder="Add a note…"
-                      style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", fontSize: 12.5, resize: "vertical", background: "var(--surface-muted)", color: C.text, boxSizing: "border-box" }} />
-                  </div>
-                ) : (
-                  <div style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <RowButton label="Notes" value={txDraft.notes || undefined} trailing={<ChevronRight size={16} color={C.muted} />} />
-                  </div>
-                )}
-                {/* Recurring */}
-                <div style={{ padding: "17px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: 14, color: C.muted }}>Recurring</span>
-                  <Toggle checked={!!txDraft.isRecurring} onClick={async () => { const next = !txDraft.isRecurring; setTxDraft((p) => ({ ...p, isRecurring: next })); await patchTx({ isRecurring: next }, next ? "Marked as recurring" : "Recurring removed"); }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Review status */}
-            <div style={{ padding: "0 20px 18px" }}>
-              <div style={{ border: `1px solid ${C.border}`, borderRadius: 18, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ fontSize: 14, color: C.muted }}>Review status</div>
-                <button type="button"
-                  onClick={async () => { const next = txDraft.reviewStatus === "reviewed" ? "needs_review" : "reviewed"; setTxDraft((p) => ({ ...p, reviewStatus: next })); await patchTx({ reviewStatus: next }, next === "reviewed" ? "Marked as reviewed" : "Marked as needs review"); }}
-                  style={{ padding: "11px 16px", borderRadius: 12, border: "none", background: C.strong, color: C.onStrong, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                  {txDraft.reviewStatus === "reviewed" ? "Mark as needs review" : "Mark as reviewed"}
-                </button>
-              </div>
-            </div>
-
-            {(selectedTransaction.accountName || selectedTransaction.account) && (
-              <div style={{ padding: "0 20px 28px", textAlign: "center", color: C.muted }}>
-                <div style={{ fontSize: 13 }}>{selectedTransaction.accountName || selectedTransaction.account}</div>
-              </div>
-            )}
-          </div>
-        </>
-      ) : null}
 
       {/* ── Category detail drawer ── */}
       {selectedCategoryMeta ? (
@@ -1203,7 +1059,7 @@ export default function OverviewTab({
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {selectedCategoryMonthTransactions.map((tx) => (
-                      <button key={tx._id} type="button" onClick={() => { setSelectedCategoryId(null); setSelectedTxId(tx._id); }}
+                      <button key={tx._id} type="button" onClick={() => { setSelectedCategoryId(null); setGlobalSelectedTxId?.(tx._id); }}
                         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.border}`, background: "var(--surface-muted)", cursor: "pointer", textAlign: "left", width: "100%" }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, color: C.text, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.merchant || tx.category || "Transaction"}</div>

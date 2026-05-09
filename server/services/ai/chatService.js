@@ -4,7 +4,7 @@ const groq = require("../../config/groq");
  * Builds the system prompt with user's full financial context
  * so AI gives personalized answers, not generic advice
  */
-const buildSystemPrompt = ({ user, summary, categoryBreakdown, goals, monthlyTrend = [], recentTx = [], forecast, financialScore, assets }) => {
+const buildSystemPrompt = ({ user, summary, categoryBreakdown, goals, monthlyTrend = [], recentTx = [], forecast, financialScore, assets, equity }) => {
   const categories = categoryBreakdown
     .map((c) => `  - ${c.category}: $${c.amount} (${c.percent}%)`)
     .join("\n");
@@ -41,6 +41,14 @@ const buildSystemPrompt = ({ user, summary, categoryBreakdown, goals, monthlyTre
     ? `  - Assets: total value $${assets.totalValue}, cost $${assets.totalCost}, P&L $${assets.gainLoss}`
     : "  - Assets unavailable";
 
+  const equityLine = equity
+    ? `  - Equity: ${equity.count} holdings, value $${equity.totalValue}, cost $${equity.totalCost}, P&L $${equity.gainLoss}, vested shares ${equity.vestedShares}, unvested shares ${equity.unvestedShares}, exercise cost $${equity.exerciseCost}`
+    : "  - Equity unavailable";
+
+  const equityDetails = equity?.detailLines?.length
+    ? equity.detailLines.join("\n")
+    : "  - No equity holdings";
+
   return `You are FinPilot, a friendly and smart personal finance assistant.
 You give short, practical, personalized financial advice based on the user's real data.
 
@@ -73,15 +81,20 @@ ${scoreLine}
 ASSETS:
 ${assetsLine}
 
+EQUITY:
+${equityLine}
+${equityDetails}
+
 RULES:
 - Be concise. Max 4-5 sentences per reply.
 - Always refer to the user's actual numbers when relevant.
 - If user asks for "last" spending/expense, answer with the most recent single expense transaction, not category aggregates.
 - If user asks for last/latest transaction, answer with the most recent transaction from RECENT TRANSACTIONS.
 - If user asks with typo words like "speding" or "transctins", infer the intent as spending/transactions.
-- Never guarantee investment returns.
-- Never suggest illegal financial activity.
+- Never guarantee investment returns or provide specific stock picks.
+- Never suggest illegal financial activity or tax evasion schemes.
 - If asked about something outside personal finance, politely redirect.
+- MANDATORY: At the end of every response that provides financial advice or suggestions, you MUST include this exact disclaimer on a new line: "Disclaimer: I am an AI assistant, not a certified financial advisor. Please consult a professional before making major financial decisions."
 `;
 };
 
@@ -89,8 +102,8 @@ RULES:
  * Sends conversation to Groq with full financial context
  * history = array of { role: "user"|"assistant", content: string }
  */
-const chat = async ({ user, summary, categoryBreakdown, goals, monthlyTrend, recentTx, forecast, financialScore, assets, history, message }) => {
-  const systemPrompt = buildSystemPrompt({ user, summary, categoryBreakdown, goals, monthlyTrend, recentTx, forecast, financialScore, assets });
+const chat = async ({ user, summary, categoryBreakdown, goals, monthlyTrend, recentTx, forecast, financialScore, assets, equity, history, message }) => {
+  const systemPrompt = buildSystemPrompt({ user, summary, categoryBreakdown, goals, monthlyTrend, recentTx, forecast, financialScore, assets, equity });
 
   // Keep last 10 messages to stay within token limits
   const trimmedHistory = history.slice(-10);

@@ -85,7 +85,8 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 1024 : false);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [showInferred, setShowInferred] = useState(false);
+  const [showInferred, setShowInferred] = useState(() => recurringSettings?.showInferredRecurring ?? false);
+  const [showSummaryDetails, setShowSummaryDetails] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
   const categoryRef = useRef(null);
 
@@ -108,10 +109,31 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
 
   const recurringItems = useMemo(() => {
     const explicit = apiTransactions.filter((tx) => tx.isRecurring);
+    let inferred = [];
+    
+    if (showInferred) {
+      const candidates = new Map();
+      apiTransactions.forEach(tx => {
+        if (tx.isRecurring || !tx.merchant) return;
+        const amountRound = Math.round(Math.abs(tx.amount));
+        const key = `${tx.type}:${tx.merchant}:${amountRound}`;
+        if (!candidates.has(key)) candidates.set(key, []);
+        candidates.get(key).push(tx);
+      });
+      
+      candidates.forEach(txs => {
+        if (txs.length >= 3) {
+          const recent = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+          inferred.push({ ...recent, isInferred: true });
+        }
+      });
+    }
+
+    const allRecurring = [...explicit, ...inferred];
     
     // Merge by key to avoid duplicates in the list display
     const merged = new Map();
-    explicit.forEach(tx => {
+    allRecurring.forEach(tx => {
       const merchant = tx.merchant || tx.category || "Transaction";
       const key = `${tx.type}:${merchant}:${tx.category || "Other"}:${Math.abs(tx.amount).toFixed(2)}`;
       if (!merged.has(key) || new Date(tx.date) > new Date(merged.get(key).date)) {
@@ -126,7 +148,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
         recurringFrequency: getRecurringFrequency(tx)
       };
     });
-  }, [apiTransactions]);
+  }, [apiTransactions, showInferred]);
 
   const monthData = useMemo(() => {
     const start = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
@@ -346,7 +368,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
           </div>
 
           {/* AI Summary Panel */}
-          <button style={{ 
+          <button type="button" onClick={() => setShowSummaryDetails((prev) => !prev)} aria-expanded={showSummaryDetails} aria-controls="recurring-summary-details" style={{ 
             ...panelStyle(C, { padding: 0, textAlign: "left", cursor: "pointer" }), 
             border: `1px solid ${C.border}`, 
             outline: "none", 
@@ -359,7 +381,10 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                   <Sparkles size={16} />
                   <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>Summary</span>
                 </div>
-                <ChevronRight size={16} color={C.muted} />
+                <div style={{ display: "flex", alignItems: "center", gap: 6, color: C.muted, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                  <span>{showSummaryDetails ? "Show less" : "See more"}</span>
+                  <ChevronRight size={16} color={C.muted} style={{ transform: showSummaryDetails ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+                </div>
               </div>
               <p style={{ fontSize: 13.5, color: C.sub, lineHeight: 1.6, margin: 0 }}>
                 {recurringItems.length === 0 
@@ -367,6 +392,27 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                   : `You have ${recurringItems.length} recurring source(s) and ${monthData.occurrences.length} occurrences this month. Total projected expenses are ${fmtMoney(monthData.expenseTotal, preferredCurrency)}, with ${fmtMoney(monthData.incomeTotal, preferredCurrency)} in expected income.`
                 }
               </p>
+              {showSummaryDetails && (
+                <div id="recurring-summary-details" style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                    <div style={{ border: `1px solid ${C.border2}`, borderRadius: 12, background: "var(--bg-subtle)", padding: "10px 12px" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Recurring sources</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{recurringItems.length}</div>
+                    </div>
+                    <div style={{ border: `1px solid ${C.border2}`, borderRadius: 12, background: "var(--bg-subtle)", padding: "10px 12px" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Projected income</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fmtMoney(monthData.incomeTotal, preferredCurrency)}</div>
+                    </div>
+                    <div style={{ border: `1px solid ${C.border2}`, borderRadius: 12, background: "var(--bg-subtle)", padding: "10px 12px" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Projected expenses</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{fmtMoney(monthData.expenseTotal, preferredCurrency)}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: C.muted, lineHeight: 1.5 }}>
+                    Use this panel to review the month at a glance, then jump into the list below to cancel a recurrence or add a new one.
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ height: 1, background: C.border2, width: "100%" }} />
           </button>
@@ -412,8 +458,12 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
 
           {/* Upcoming List Card */}
           <div style={panelStyle(C)}>
-            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}` }}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border2}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Upcoming this month</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>Show inferred</span>
+                <Toggle checked={showInferred} onClick={() => setShowInferred(!showInferred)} C={C} />
+              </div>
             </div>
             <div style={{ maxHeight: 300, overflowY: "auto" }}>
               {monthData.occurrences.length === 0 ? (
@@ -457,6 +507,16 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                       <button 
                         onClick={async (e) => {
                           e.stopPropagation();
+                          if (occ.isInferred) {
+                            try {
+                              await transactionService.update(occ._id, { isRecurring: true });
+                              queryClient?.invalidateQueries({ queryKey: ["transactions"] });
+                              pushNotif?.("success", "Tracking as recurring");
+                            } catch {
+                              pushNotif?.("error", "Failed to update transaction");
+                            }
+                            return;
+                          }
                           if (confirmingId === occ._id) {
                             try {
                               await transactionService.update(occ._id, { isRecurring: false });
@@ -472,9 +532,9 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                           }
                         }}
                         style={{ 
-                          border: `1px solid ${confirmingId === occ._id ? "#ef4444" : "rgba(239, 68, 68, 0.22)"}`, 
-                          background: confirmingId === occ._id ? "#ef4444" : "rgba(239, 68, 68, 0.08)", 
-                          color: confirmingId === occ._id ? "#fff" : "#ef4444", 
+                          border: `1px solid ${occ.isInferred ? "rgba(16, 185, 129, 0.3)" : (confirmingId === occ._id ? "#ef4444" : "rgba(239, 68, 68, 0.22)")}`, 
+                          background: occ.isInferred ? "rgba(16, 185, 129, 0.08)" : (confirmingId === occ._id ? "#ef4444" : "rgba(239, 68, 68, 0.08)"), 
+                          color: occ.isInferred ? "#059669" : (confirmingId === occ._id ? "#fff" : "#ef4444"), 
                           fontSize: 10, 
                           fontWeight: 700, 
                           cursor: "pointer", 
@@ -484,7 +544,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                           transition: "all 0.2s"
                         }}
                       >
-                        {confirmingId === occ._id ? "Confirm?" : "Cancel"}
+                        {occ.isInferred ? "Track" : (confirmingId === occ._id ? "Confirm?" : "Cancel")}
                       </button>
                     </div>
                   </div>

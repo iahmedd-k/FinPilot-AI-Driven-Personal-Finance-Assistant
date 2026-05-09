@@ -4,7 +4,8 @@ import {
   User, Shield, Building2, Gem, Bell,
   SlidersHorizontal, BrainCircuit, Palette,
   Headphones, FileText, ChevronRight, ChevronDown,
-  Sun, Moon, LogOut, Settings, HelpCircle, Plus, Gift, BadgeDollarSign, Loader2
+  Sun, Moon, LogOut, Settings, HelpCircle, Plus, Gift, BadgeDollarSign, Loader2,
+  ArrowLeft
 } from "lucide-react";
 import { useDashboard } from "../DashboardContext";
 import { authService } from "../../../services/authService";
@@ -74,7 +75,7 @@ function Row({ icon: Icon, label, onClick, right, danger = false, isLast = false
 }
 
 export default function ProfileDropdown() {
-  const { profileOpen, setProfileOpen, profileRef, navigate, logout, queryClient, ROUTES, refreshUser, user } = useDashboard();
+  const { profileOpen, setProfileOpen, profileRef, navigate, logout, queryClient, ROUTES, refreshUser, user, notifications } = useDashboard();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showThemeOptions, setShowThemeOptions] = useState(false);
   const [showCurrencyOptions, setShowCurrencyOptions] = useState(false);
@@ -82,6 +83,23 @@ export default function ProfileDropdown() {
   const [selectedCurrency, setSelectedCurrency] = useState("USD");
   const [currencyLoading, setCurrencyLoading] = useState(false);
   const [currencySaving, setCurrencySaving] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const timeAgo = (date) => {
+    if (!date) return "";
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) return `about ${Math.floor(interval)} years ago`;
+    interval = seconds / 2592000;
+    if (interval > 1) return `about ${Math.floor(interval)} months ago`;
+    interval = seconds / 86400;
+    if (interval > 1) return `about ${Math.floor(interval)} days ago`;
+    interval = seconds / 3600;
+    if (interval > 1) return `about ${Math.floor(interval)} hours ago`;
+    interval = seconds / 60;
+    if (interval > 1) return `about ${Math.floor(interval)} minutes ago`;
+    return "just now";
+  };
 
   useEffect(() => {
     setSelectedCurrency(String(user?.preferredCurrency || "USD").toUpperCase());
@@ -91,6 +109,7 @@ export default function ProfileDropdown() {
     if (!profileOpen) {
       setShowThemeOptions(false);
       setShowCurrencyOptions(false);
+      setShowNotifications(false);
       return;
     }
 
@@ -145,8 +164,11 @@ export default function ProfileDropdown() {
       {/* Trigger — The Gear icon circle */}
       <button
         type="button"
-        onClick={() => setProfileOpen(v => !v)}
+        onClick={(e) => { e.stopPropagation(); setProfileOpen(v => !v); }}
+        aria-label="Open profile menu"
         style={{
+          position: "relative",
+          zIndex: 30,
           width: 34, height: 34, borderRadius: "50%",
           background: profileOpen ? "var(--accent-transparent)" : "var(--bg-secondary)",
           border: profileOpen ? "1px solid var(--accent)" : "1px solid var(--border-subtle)",
@@ -165,13 +187,50 @@ export default function ProfileDropdown() {
           borderRadius: 16, boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
           zIndex: 1000, overflow: "hidden", animation: "fadeUp 0.15s ease-out"
         }}>
-          <div style={{ maxHeight: "85vh", overflowY: "auto" }}>
+          <div style={{ maxHeight: "85vh", overflowY: "auto", position: "relative" }}>
+            {showNotifications ? (
+              <div style={{ animation: "fadeUp 0.15s ease-out" }}>
+                {/* Notification Header */}
+                <div style={{ display: "flex", alignItems: "center", padding: "18px 16px 14px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-primary)", position: "sticky", top: 0, zIndex: 10 }}>
+                  <button onClick={() => setShowNotifications(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-primary)", display: "flex", alignItems: "center", padding: 0, marginRight: 16 }}>
+                    <ArrowLeft size={18} />
+                  </button>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.15em" }}>NOTIFICATIONS</span>
+                </div>
+
+                {/* Notifications List */}
+                <div style={{ padding: "8px 0" }} className="custom-scrollbar">
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+                      <Bell size={24} style={{ opacity: 0.3, marginBottom: 12 }} />
+                      <div>No notifications yet</div>
+                    </div>
+                  ) : (
+                    notifications.map((n, i) => {
+                      // Try to split message if it has a bold-like structure (e.g. "Title: Body")
+                      const parts = n.message.split(" · ");
+                      const title = parts[0];
+                      const desc = parts.slice(1).join(" · ");
+                      return (
+                        <div key={n.id} style={{ padding: "18px 20px", borderBottom: i === notifications.length - 1 ? "none" : "1px solid var(--border-subtle)" }}>
+                          <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)", marginBottom: desc ? 6 : 8, lineHeight: 1.4 }}>{title}</div>
+                          {desc && <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 10 }}>{desc}</div>}
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 400 }}>{timeAgo(n.time)}</div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
 
             {/* ACCOUNT */}
             <SectionLabel label="Account" />
             <div style={{ background: "var(--bg-secondary)", margin: "0 12px", borderRadius: 12, border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
               <Row icon={User} label="Profile" onClick={() => { navigate("/profile"); setProfileOpen(false); }} />
-              <Row icon={Gem} label="Membership" onClick={() => { navigate(ROUTES.SUBSCRIPTION); setProfileOpen(false); }} />
+              <Row icon={Bell} label="Notifications" onClick={() => setShowNotifications(true)} />
+              <Row icon={Gem} label="Membership" onClick={() => { navigate("/profile?tab=membership"); setProfileOpen(false); }} />
               <Row icon={Shield} label="Security" onClick={() => { navigate("/profile?tab=security"); setProfileOpen(false); }} />
               <Row icon={Building2} label="Linked Accounts" isLast onClick={() => { navigate("/profile?tab=accounts"); setProfileOpen(false); }} />
             </div>
@@ -290,6 +349,8 @@ export default function ProfileDropdown() {
               </button>
             </div>
 
+              </>
+            )}
           </div>
         </div>
       )}

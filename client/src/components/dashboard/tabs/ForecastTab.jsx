@@ -126,7 +126,10 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const [collapsedEventIndexes, setCollapsedEventIndexes] = useState([]);
   const [activeMilestoneHint, setActiveMilestoneHint] = useState(null);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
-  const [selectedRange, setSelectedRange] = useState("lifetime"); // "12m", "5y", "10y", "lifetime"
+  const [selectedRange, setSelectedRange] = useState("custom"); // "12m", "5y", "10y", "custom"
+  const [customAge, setCustomAge] = useState(85);
+  const [isAgePickerOpen, setIsAgePickerOpen] = useState(false);
+  const [cfViewMode, setCfViewMode] = useState("chart");
 
   const { data: customizationRes } = useQuery({
     queryKey: ["forecast-customizations"],
@@ -245,9 +248,12 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
   const projectionCurrentAge = currentAge;
   const projectionEndAge = useMemo(() => {
+    if (selectedRange === "custom") {
+      return Math.min(FORECAST_MAX_AGE, Math.max(projectionCurrentAge + 1, customAge));
+    }
     const customLimit = parseFinValue(customData.lifeExpectancy);
     return Math.min(FORECAST_MAX_AGE, Math.max(projectionCurrentAge + 1, Number.isFinite(customLimit) && customLimit > 0 ? Math.round(customLimit) : FORECAST_MAX_AGE));
-  }, [customData.lifeExpectancy, projectionCurrentAge]);
+  }, [selectedRange, customAge, customData.lifeExpectancy, projectionCurrentAge]);
 
   const projectionBirthYear = useMemo(() => getBirthYear(configuredBirthDate, projectionCurrentAge, now), [configuredBirthDate, projectionCurrentAge, now]);
   const projectionStartMonth = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1), [now]);
@@ -568,11 +574,15 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   });
 
   const targetMonthIndex = useMemo(() => {
+    if (selectedRange === "6m") return 6;
     if (selectedRange === "12m") return 12;
     if (selectedRange === "5y") return 60;
     if (selectedRange === "10y") return 120;
+    if (selectedRange === "custom" && customAge > projectionCurrentAge) {
+      return Math.floor((customAge - projectionCurrentAge) * 12);
+    }
     return projectionMonths;
-  }, [selectedRange, projectionMonths]);
+  }, [selectedRange, projectionMonths, customAge, projectionCurrentAge]);
 
   const projectionFuturePoint = useMemo(() => {
     if (!projectionSeries.length) return null;
@@ -591,11 +601,12 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const displayNWGainPct = Math.abs(displayCurrentNW) > 0 ? (displayNWGain / Math.abs(displayCurrentNW)) * 100 : null;
 
   const rangeLabel = {
-    "12m": "12 months",
+    "6m": "6 months",
+    "12m": "1 year",
     "5y": "5 years",
     "10y": "10 years",
-    "lifetime": "lifetime",
-  }[selectedRange] || "lifetime";
+    "custom": `until age ${customAge}`,
+  }[selectedRange] || `until age ${customAge}`;
 
   const projectionFirstYear = projectionSeries.slice(1, 13);
   const projectionAvgIncome = projectionFirstYear.length
@@ -770,7 +781,14 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const sectionLabelSize = isMobile ? 9.5 : 10.5;
   const bodyTextSize = isMobile ? 11 : 12;
 
-  const yFmt = (v) => fmt(v);
+  const yFmt = (val) => {
+    const v = Math.abs(val);
+    let formatted = `$${v}`;
+    if (v >= 1e9) formatted = `$${(v / 1e9).toFixed(1)}B`;
+    else if (v >= 1e6) formatted = `$${(v / 1e6).toFixed(1)}M`;
+    else if (v >= 1e3) formatted = `$${(v / 1e3).toFixed(1)}k`;
+    return val < 0 ? `-${formatted}` : formatted;
+  };
 
   // [FIX] Dark-theme safe input styles — use C variables throughout
   const inputStyle = {
@@ -835,6 +853,37 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
+          {/* Top Level Tabs */}
+          <div style={{ display: "flex", gap: 8, padding: 4, background: "var(--border-subtle, rgba(0,0,0,0.03))", borderRadius: 12, width: "fit-content" }}>
+            <button
+              onClick={() => setForecastTab("networth")}
+              style={{
+                padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: forecastTab === "networth" ? C.white : "transparent",
+                color: forecastTab === "networth" ? C.text : C.muted,
+                border: "none",
+                boxShadow: forecastTab === "networth" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                cursor: "pointer", transition: "all 0.2s"
+              }}
+            >
+              Net Worth
+            </button>
+            <button
+              onClick={() => setForecastTab("cashflow")}
+              style={{
+                padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: forecastTab === "cashflow" ? C.white : "transparent",
+                color: forecastTab === "cashflow" ? C.text : C.muted,
+                border: "none",
+                boxShadow: forecastTab === "cashflow" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                cursor: "pointer", transition: "all 0.2s"
+              }}
+            >
+              Cash Flow
+            </button>
+          </div>
+
+          <div style={{ display: forecastTab === "networth" ? "flex" : "none", flexDirection: "column", gap: 24 }}>
           {/* ════ NET WORTH SECTION ════ */}
           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: isMobile ? "12px 10px 0" : "18px 22px 0" }}>
@@ -848,14 +897,18 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
               <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}` }}>
                 {[
+                  { id: "6m", label: "6M" },
                   { id: "12m", label: "1Y" },
                   { id: "5y", label: "5Y" },
                   { id: "10y", label: "10Y" },
-                  { id: "lifetime", label: "Lifetime" }
+                  { id: "custom", label: "Custom" }
                 ].map((r) => (
                   <button
                     key={r.id}
-                    onClick={() => setSelectedRange(r.id)}
+                    onClick={() => {
+                      if (r.id === "custom") setIsAgePickerOpen(true);
+                      setSelectedRange(r.id);
+                    }}
                     style={{
                       padding: isMobile ? "4px 8px" : "6px 12px",
                       borderRadius: 8,
@@ -1076,6 +1129,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               </div>
             </div>
           </div>
+          </div>
+          <div style={{ display: forecastTab === "cashflow" ? "flex" : "none", flexDirection: "column", gap: 24 }}>
 
           {/* ════ CASH FLOW SECTION ════ */}
           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
@@ -1086,6 +1141,37 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   <TrendingUp size={16} style={{ color: "#10b981" }} />
                 </div>
                 <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text }}>Cash Flow Forecast</div>
+              </div>
+              <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}` }}>
+                {[
+                  { id: "6m", label: "6M" },
+                  { id: "12m", label: "1Y" },
+                  { id: "5y", label: "5Y" },
+                  { id: "10y", label: "10Y" },
+                  { id: "custom", label: "Custom" }
+                ].map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => {
+                      if (r.id === "custom") setIsAgePickerOpen(true);
+                      setSelectedRange(r.id);
+                    }}
+                    style={{
+                      padding: isMobile ? "4px 8px" : "6px 12px",
+                      borderRadius: 8,
+                      fontSize: isMobile ? 10 : 11,
+                      fontWeight: 700,
+                      border: "none",
+                      background: selectedRange === r.id ? C.white : "transparent",
+                      color: selectedRange === r.id ? C.text : C.muted,
+                      boxShadow: selectedRange === r.id ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                      cursor: "pointer",
+                      transition: "all 0.15s"
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1146,7 +1232,6 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  {/* [FIX] Grid color uses C.border */}
                   <CartesianGrid stroke={C.border} strokeDasharray="3 3" vertical={true} horizontal={true} />
                   <XAxis
                     dataKey="age"
@@ -1210,66 +1295,6 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               </div>
             </div>
 
-            {/* Bottom two-col */}
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 0, borderTop: `1px solid ${C.border}` }}>
-              <div style={{ padding: isMobile ? "12px 10px" : "16px 18px", borderRight: isMobile ? "none" : `1px solid ${C.border}`, borderBottom: isMobile ? `1px solid ${C.border}` : "none" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Monthly Avg (Last 3 Mo)</div>
-                {recent3.length === 0 ? <div style={{ color: C.muted, fontSize: 12 }}>Not enough data</div> : (
-                  <ResponsiveContainer width="100%" height={120}>
-                    <BarChart
-                      data={recent3.map((m) => {
-                        const [y, mo] = (m.month || "").split("-").map(Number);
-                        return {
-                          label: (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short" }) : m.month,
-                          income: m.income || 0,
-                          expense: m.expense || 0,
-                        };
-                      })}
-                      margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-                    >
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted }} axisLine={false} tickLine={false} />
-                      <CartesianGrid vertical={false} stroke={C.border} strokeDasharray="3 3" />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (!active || !payload?.length) return null;
-                          return (
-                            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 11 }}>
-                              {payload.map((p, i) => (
-                                <div key={i} style={{ color: p.fill, fontWeight: 600 }}>{p.name}: {fmt(p.value)}</div>
-                              ))}
-                            </div>
-                          );
-                        }}
-                      />
-                      <Bar dataKey="income" name="Income" fill={"#10b981"} radius={[4, 4, 0, 0]} maxBarSize={36} />
-                      <Bar dataKey="expense" name="Expense" fill={C.red} radius={[4, 4, 0, 0]} maxBarSize={36} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-              <div style={{ padding: isMobile ? "12px 10px" : "16px 18px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Next Month — by Category</div>
-                {catBreakdown.length === 0 ? <div style={{ color: C.muted, fontSize: 12 }}>No expense data yet</div> : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                    {catBreakdown.map((c, i) => {
-                      const pct = predictedExpense > 0 ? Math.round((c.projected / predictedExpense) * 100) : 0;
-                      return (
-                        <div key={c.cat}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                            <span style={{ fontSize: 11.5, color: C.text, fontWeight: 500 }}>{c.cat}</span>
-                            <span style={{ fontSize: 10.5, color: C.muted }}>{fmt(c.projected)} ({pct}%)</span>
-                          </div>
-                          <div style={{ height: 4, background: C.border2 || C.border, borderRadius: 99, overflow: "hidden" }}>
-                            <div style={{ width: `${pct}%`, height: "100%", background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 99 }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Summary bar */}
             <div style={{ borderTop: `1px solid ${C.border}`, padding: isMobile ? "10px" : "13px 22px", display: "flex", alignItems: "center", gap: 9, background: C.bg }}>
               <div style={{ width: 26, height: 26, borderRadius: 8, background: C.greenBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1283,6 +1308,110 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               </div>
             </div>
           </div>
+
+          {/* ════ CASH FLOW TABLE ════ */}
+          <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: isMobile ? "12px 10px" : "16px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <CalendarDays size={16} style={{ color: C.muted }} />
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Monthly Breakdown</div>
+            </div>
+            <div style={{ maxHeight: 350, overflowY: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12 }}>
+                <thead style={{ position: "sticky", top: 0, background: C.bg, zIndex: 1, boxShadow: `0 1px 0 ${C.border}` }}>
+                  <tr>
+                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}` }}>Month</th>
+                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right" }}>Income</th>
+                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right" }}>Expenses</th>
+                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}`, textAlign: "right" }}>Balance</th>
+                    <th style={{ padding: "10px 16px", fontWeight: 600, color: C.muted, borderBottom: `1px solid ${C.border}` }}>Events</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectionCFData.slice(0, targetMonthIndex + 1).map((row, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${C.border}`, background: row.events?.length > 0 ? "var(--color-blue-tint, rgba(59, 130, 246, 0.04))" : "transparent" }}>
+                      <td style={{ padding: "10px 16px", color: C.text, fontWeight: 500, whiteSpace: "nowrap" }}>{row.label}</td>
+                      <td style={{ padding: "10px 16px", color: "#10b981", textAlign: "right", fontWeight: 500 }}>{fmt(row.income)}</td>
+                      <td style={{ padding: "10px 16px", color: C.red, textAlign: "right", fontWeight: 500 }}>{fmt(row.expense)}</td>
+                      <td style={{ padding: "10px 16px", color: C.text, textAlign: "right", fontWeight: 700 }}>{fmt(row.balance)}</td>
+                      <td style={{ padding: "10px 16px", color: C.sub, fontSize: 11 }}>
+                        {row.events?.length > 0 ? row.events.join(", ") : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ════ CATEGORY BREAKDOWN & MONTHLY AVG ════ */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 24 }}>
+            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: isMobile ? "16px 14px" : "20px 22px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Monthly Avg (Last 3 Mo)</div>
+              {recent3.length === 0 ? <div style={{ color: C.muted, fontSize: 12 }}>Not enough data</div> : (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart
+                    data={recent3.map((m) => {
+                      const [y, mo] = (m.month || "").split("-").map(Number);
+                      return {
+                        label: (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short" }) : m.month,
+                        income: m.income || 0,
+                        expense: m.expense || 0,
+                      };
+                    })}
+                    margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
+                    barGap={6}
+                  >
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: C.muted, fontWeight: 500 }} axisLine={false} tickLine={false} tickMargin={8} />
+                    <YAxis tickFormatter={yFmt} axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: C.muted }} width={55} />
+                    <CartesianGrid vertical={false} stroke={C.border} strokeDasharray="3 3" />
+                    <Tooltip
+                      cursor={{ fill: "rgba(0,0,0,0.02)" }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                            <div style={{ fontWeight: 700, color: C.text, marginBottom: 4 }}>{payload[0].payload.label}</div>
+                            {payload.map((p, i) => (
+                              <div key={i} style={{ color: p.fill, fontWeight: 600, display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                <span>{p.name}:</span>
+                                <span>{fmt(p.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="income" name="Income" fill={"#10b981"} radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="expense" name="Expense" fill={C.red} radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            
+            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: isMobile ? "16px 14px" : "20px 22px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Next Month — by Category</div>
+              {catBreakdown.length === 0 ? <div style={{ color: C.muted, fontSize: 12 }}>No expense data yet</div> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {catBreakdown.map((c, i) => {
+                    const pct = predictedExpense > 0 ? Math.round((c.projected / predictedExpense) * 100) : 0;
+                    return (
+                      <div key={c.cat}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{c.cat}</span>
+                          <span style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>{fmt(c.projected)} <span style={{ opacity: 0.6 }}>({pct}%)</span></span>
+                        </div>
+                        <div style={{ height: 6, background: "var(--border-subtle, rgba(0,0,0,0.05))", borderRadius: 99, overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, height: "100%", background: CAT_COLORS[i % CAT_COLORS.length], borderRadius: 99, transition: "width 0.5s ease" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          </div>
+          <div style={{ display: forecastTab === "networth" ? "flex" : "none", flexDirection: "column", gap: 24 }}>
 
           {/* ════ ASSETS & LIABILITIES SECTION ════ */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1364,6 +1493,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                 </div>
               </>
             )}
+          </div>
           </div>
         </div>
       )}
@@ -1674,6 +1804,41 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             </div>
           </div>
         </div>
+      )}
+      {/* ── Age Picker Modal ── */}
+      {isAgePickerOpen && (
+        <>
+          <div onClick={() => setIsAgePickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />
+          <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: C.white, border: `1px solid ${C.border}`, borderRadius: 20, padding: 24, width: "90%", maxWidth: 340, zIndex: 201, boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Forecast to Age</div>
+              <button onClick={() => setIsAgePickerOpen(false)} style={{ border: "none", background: "none", cursor: "pointer", color: C.muted }}><X size={18} /></button>
+            </div>
+            
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 13, color: C.sub, marginBottom: 12 }}>At what age do you want to see your financial forecast?</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.bg, borderRadius: 12, padding: "12px 16px", border: `1px solid ${C.border}` }}>
+                <Baby size={18} color={C.muted} />
+                <input 
+                  type="number" 
+                  value={customAge} 
+                  onChange={(e) => setCustomAge(Math.max(1, Math.min(120, Number(e.target.value))))}
+                  onKeyDown={(e) => { if (e.key === "Enter") setIsAgePickerOpen(false); }}
+                  autoFocus
+                  style={{ width: "100%", border: "none", background: "transparent", fontSize: 18, fontWeight: 700, color: C.text, outline: "none" }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 600, color: C.muted }}>Years</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setIsAgePickerOpen(false)}
+              style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: C.strong, color: C.onStrong, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+            >
+              Update Forecast
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuthContext } from "../../hooks/useAuthContext";
 import { ROUTES } from "../../constants/routes";
+import Logo from "../common/Logo";
 
 /* ─── Exact Origin Navbar — 1:1 Clone ─── */
 export default function Navbar() {
@@ -31,20 +32,7 @@ export default function Navbar() {
       <div className="div-block-7">
         {/* ── Left: Logo ── */}
         <div className="navbar-left">
-          <Link
-            to={ROUTES.HOME}
-            aria-current="page"
-            className="brand w-nav-brand w--current"
-            aria-label="home"
-            style={{ display: "flex", alignItems: "center", gap: 10 }}
-          >
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "#0A0A1A", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #fff", position: "relative" }}>
-                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
-              </div>
-            </div>
-            <span style={{ fontSize: 18, fontWeight: 700, color: "#e5e7eb", letterSpacing: "-0.02em", fontFamily: "var(--font-sans)" }}>FinPilot</span>
-          </Link>
+          <Logo size="sm" />
         </div>
 
         {/* ── Center: Navigation Menu ── */}

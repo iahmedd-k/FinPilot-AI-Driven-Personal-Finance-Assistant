@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cryptoService } from "../services/cryptoService";
 import { useAuthContext } from "../hooks/useAuthContext";
 
@@ -6,32 +7,26 @@ const PortfolioContext = createContext();
 
 export function PortfolioProvider({ children }) {
   const { user } = useAuthContext();
-  const [assets, setAssets]   = useState([]);
-  const [loading, setLoading] = useState(false);
 
-  const refreshAssets = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await cryptoService.list();
-      setAssets(data.assets || []);
-    } catch (err) {
-      console.error("Failed to load portfolio", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    data: assets = [],
+    isLoading: loading,
+    refetch: refreshAssets,
+  } = useQuery({
+    queryKey: ["profile-assets", user?._id],
+    queryFn: () => cryptoService.list().then((r) => r.data?.assets || []),
+    enabled: !!user?._id,
+    staleTime: 0,
+    refetchOnMount: true,
+  });
 
-  useEffect(() => {
-    if (user?._id) {
-      refreshAssets();      // fetch this user's portfolio
-    } else {
-      setAssets([]);        // logged out → clear immediately
-      setLoading(false);
-    }
-  }, [user?._id]);          // re-runs whenever user changes (login / logout / switch)
+  const netWorthAssets = useMemo(
+    () => assets.filter((asset) => asset?.includeInNetWorth !== false),
+    [assets]
+  );
 
   return (
-    <PortfolioContext.Provider value={{ assets, loading, refreshAssets }}>
+    <PortfolioContext.Provider value={{ assets, netWorthAssets, loading, refreshAssets }}>
       {children}
     </PortfolioContext.Provider>
   );

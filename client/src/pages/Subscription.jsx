@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { subscriptionService } from "../services/subscriptionService";
 import { ROUTES } from "../constants/routes";
+import Logo from "../components/common/Logo";
 
 const C = {
   successText: "#1A8B5C",
@@ -36,12 +37,7 @@ const O = {
 function BrandLockup() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ width: 28, height: 28, borderRadius: 8, background: "#0A0A1A", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #fff", position: "relative" }}>
-          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
-        </div>
-      </div>
-      <span style={{ fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", fontFamily: "Inter, sans-serif" }}>FinPilot</span>
+      <Logo size="md" dark />
     </div>
   );
 }

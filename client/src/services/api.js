@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const rawApiBase = import.meta.env.VITE_API_URL || "http://localhost:5005";
+const rawApiBase = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const normalizedApiBase = String(rawApiBase).replace(/\/+$/, "");
 const resolvedApiBase = /\/api$/i.test(normalizedApiBase)
   ? normalizedApiBase
@@ -41,6 +41,11 @@ api.interceptors.response.use(
   async (err) => {
     const original = err.config;
 
+    // Don't attempt refresh if there's no token or no response status
+    if (!localStorage.getItem("accessToken") || !err.response) {
+      return Promise.reject(err);
+    }
+
     // If 401 and not already retried
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true;
@@ -52,7 +57,11 @@ api.interceptors.response.use(
           refreshQueue.push({ resolve, reject });
         })
           .then((token) => {
-            original.headers.Authorization = `Bearer ${token}`;
+            if (original.headers) {
+              typeof original.headers.set === 'function' 
+                ? original.headers.set('Authorization', `Bearer ${token}`) 
+                : (original.headers.Authorization = `Bearer ${token}`);
+            }
             return api(original);
           })
           .catch((e) => Promise.reject(e));
@@ -60,7 +69,7 @@ api.interceptors.response.use(
 
       isRefreshing = true;
       try {
-        const baseURL = api.defaults.baseURL || "http://localhost:5005/api";
+        const baseURL = api.defaults.baseURL || "http://localhost:5000/api";
         const { data } = await axios.post(
           `${baseURL}/auth/refresh`,
           {},
@@ -68,8 +77,14 @@ api.interceptors.response.use(
         );
         const newToken = data.accessToken;
         localStorage.setItem("accessToken", newToken);
-        api.defaults.headers.common.Authorization = `Bearer ${newToken}`; // update default for future calls
-        original.headers.Authorization = `Bearer ${newToken}`;
+        if (api.defaults.headers.common) {
+          api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+        }
+        if (original.headers) {
+          typeof original.headers.set === 'function'
+            ? original.headers.set('Authorization', `Bearer ${newToken}`)
+            : (original.headers.Authorization = `Bearer ${newToken}`);
+        }
         processQueue(null, newToken);
         return api(original);
       } catch (refreshErr) {

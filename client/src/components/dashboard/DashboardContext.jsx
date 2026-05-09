@@ -21,6 +21,7 @@ import { aiService } from "../../services/aiService";
 // ── Hooks (../../hooks/...) ─────────────────────────────────
 import { useAuth } from "../../hooks/useAuth";
 import { useAuthContext } from "../../hooks/useAuthContext";
+import { getOccurrencesInMonth } from "./dashboardShared";
 
 // ── Constants (../../constants/routes) ──────────────────────
 import { ROUTES } from "../../constants/routes";
@@ -76,8 +77,9 @@ export function DashboardProvider({ children }) {
 
   // ── UI state ────────────────────────────────────────────
   const [activeNav,      setActiveNav]      = useState("dashboard");
-  const [activeTab,      setActiveTab]      = useState("1M");
+  const [activeTab,      setActiveTab]      = useState("YTD");
   const [dashSubTab,     setDashSubTab]     = useState("overview");
+  const [globalSelectedTxId, setGlobalSelectedTxId] = useState(null);
   const [showForecast,   setShowForecast]   = useState(false);
   const [mobileOpen,     setMobileOpen]     = useState(false);
   const [sideCollapsed,  setSideCollapsed]  = useState(false);
@@ -113,14 +115,28 @@ export function DashboardProvider({ children }) {
 
   const pushNotif = (type, message) => {
     const notify = dedupToast[type] || dedupToast.info;
-    notify(message, { id: `notification-${Date.now()}-${Math.random()}`, duration: 2200 });
-    setNotifications(prev => [{
-      id: Date.now() + Math.random(),
-      type, message,
-      time: new Date(),
-      read: false,
-    }, ...prev].slice(0, 50));
+    notify(message, { id: message, duration: 2200 });
   };
+
+  // ── Global Notification Listener ────────────────────────
+  useEffect(() => {
+    const handleGlobalNotif = (e) => {
+      const { type, message } = e.detail;
+      setNotifications(prev => {
+        if (prev.length > 0 && prev[0].message === message && (Date.now() - prev[0].time.getTime()) < 2000) {
+          return prev;
+        }
+        return [{
+          id: Date.now() + Math.random(),
+          type, message,
+          time: new Date(),
+          read: false,
+        }, ...prev].slice(0, 100);
+      });
+    };
+    window.addEventListener("fp-notification", handleGlobalNotif);
+    return () => window.removeEventListener("fp-notification", handleGlobalNotif);
+  }, []);
 
   // ── Responsive detection ────────────────────────────────
   useEffect(() => {
@@ -178,6 +194,12 @@ export function DashboardProvider({ children }) {
     refetchOnMount: true,
   });
 
+  const { data: customizationRes } = useQuery({
+    queryKey: ["forecast-customizations", user?._id],
+    queryFn: () => dashboardService.getForecastCustomizations().then((r) => r.data),
+    enabled: !!user?._id,
+  });
+
   const { data: txRes } = useQuery({
     queryKey: ["transactions", user?._id],
     queryFn:  () => transactionService.getList({ limit: 500 }).then((r) => r.data),
@@ -219,6 +241,8 @@ export function DashboardProvider({ children }) {
 
   // ── Derived dashboard data ──────────────────────────────
   const dashboard         = dashboardRes?.dashboard || {};
+  const spendingSettings  = dashboard.spendingSettings || {};
+  const customizations    = customizationRes?.customizations || {};
   const summary           = dashboard.summary         || {};
   const categoryBreakdown = dashboard.categoryBreakdown || [];
   const monthlyChart      = dashboard.monthlyChart    || [];
@@ -307,6 +331,69 @@ export function DashboardProvider({ children }) {
   }, [monthlyChart]);
 
   const effectiveForecast = dashboard.forecast || clientForecast;
+
+  // ── Upcoming / Recurring ────────────────────────────────
+  const upcomingTransactions = useMemo(() => {
+    if (!apiTransactions || !spendingSettings) return [];
+    
+    const recurringSettings = spendingSettings.recurringSettings || {};
+    const showInferred = recurringSettings.showInferredRecurring ?? true;
+
+    const explicit = apiTransactions.filter((tx) => tx.isRecurring);
+    let inferred = [];
+    
+    if (showInferred) {
+      const candidates = new Map();
+      apiTransactions.forEach(tx => {
+        if (tx.isRecurring || !tx.merchant) return;
+        const amountRound = Math.round(Math.abs(tx.amount));
+        const key = `${tx.type}:${tx.merchant}:${amountRound}`;
+        if (!candidates.has(key)) candidates.set(key, []);
+        candidates.get(key).push(tx);
+      });
+      candidates.forEach(txs => {
+        if (txs.length >= 3) {
+          const recent = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+          inferred.push({ ...recent, isInferred: true });
+        }
+      });
+    }
+
+    const allRecurring = [...explicit, ...inferred];
+    const merged = new Map();
+    allRecurring.forEach(tx => {
+      const merchant = tx.merchant || tx.category || "Transaction";
+      const key = `${tx.type}:${merchant}:${tx.category || "Other"}:${Math.abs(tx.amount).toFixed(2)}`;
+      if (!merged.has(key) || new Date(tx.date) > new Date(merged.get(key).date)) {
+        merged.set(key, tx);
+      }
+    });
+
+    const occurrences = [];
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const next30Days = new Date(today);
+    next30Days.setDate(next30Days.getDate() + 30);
+
+    // Project for this month and next month
+    const monthsToProject = [
+      new Date(now.getFullYear(), now.getMonth(), 1),
+      new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    ];
+
+    [...merged.values()].forEach((tx) => {
+      monthsToProject.forEach(monthDate => {
+        const dates = getOccurrencesInMonth(tx, monthDate);
+        dates.forEach((date) => {
+          if (date >= today && date <= next30Days) {
+            occurrences.push({ ...tx, date: date.toISOString() });
+          }
+        });
+      });
+    });
+
+    return occurrences.sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [apiTransactions, spendingSettings]);
 
   // ── Net worth data ──────────────────────────────────────
   const netWorthData = useMemo(() => {
@@ -612,6 +699,7 @@ export function DashboardProvider({ children }) {
     navigate, activeNav, setActiveNav,
     activeTab, setActiveTab,
     dashSubTab, setDashSubTab,
+    globalSelectedTxId, setGlobalSelectedTxId,
     showForecast, setShowForecast,
     // layout
     isMobile, isTablet,
@@ -646,6 +734,7 @@ export function DashboardProvider({ children }) {
     statCards, dashCalc, effectiveForecast,
     netWorthData, cashFlowData, categoryData,
     goals, transactions, spendMerchants,
+    upcomingTransactions, spendingSettings, customizations,
     // actions
     handleExportData,
     // services (passed through for tabs)

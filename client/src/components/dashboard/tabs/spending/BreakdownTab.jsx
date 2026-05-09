@@ -28,6 +28,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
   const [showAllCats, setShowAllCats]         = useState(false);
   const [viewBy, setViewBy]                 = useState("Category"); // Category | Merchant
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedIncomeCategoryId, setSelectedIncomeCategoryId] = useState(null);
   const timelineRef       = useRef(null);
   const currentMonthBtnRef = useRef(null);
   const prevDefaultMonthRef = useRef(currentMonth);
@@ -49,6 +50,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
 
   useEffect(() => {
     if (breakdownTab === "income") setSelectedCategoryId(null);
+    if (breakdownTab !== "income") setSelectedIncomeCategoryId(null);
   }, [breakdownTab]);
 
   useEffect(() => {
@@ -349,6 +351,25 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
     selectedCategoryChangeDisplay = `${isUp ? "+" : ""}${rawPct < 0 ? "-" : ""}${displayPct} vs last month`;
   }
 
+  const selectedIncomeCategoryTransactions = useMemo(() => {
+    if (!selectedIncomeCategoryId) return [];
+    return monthTx
+      .filter((tx) => tx.type === "income" && (tx.category || "Other Income") === selectedIncomeCategoryId)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 6);
+  }, [monthTx, selectedIncomeCategoryId]);
+  const selectedIncomeCategoryTotal = selectedIncomeCategoryId ? (incomeCatTotals[selectedIncomeCategoryId] || 0) : 0;
+  const selectedIncomeCategoryShare = totalIncome > 0 ? (selectedIncomeCategoryTotal / totalIncome) * 100 : 0;
+  const selectedIncomeCategoryPrev = selectedIncomeCategoryId ? (prevTotals[selectedIncomeCategoryId] || 0) : 0;
+  let selectedIncomeCategoryChangeDisplay = "No previous-month comparison";
+  if (selectedIncomeCategoryPrev > 0) {
+    const rawPct = ((selectedIncomeCategoryTotal - selectedIncomeCategoryPrev) / selectedIncomeCategoryPrev) * 100;
+    const isUp = rawPct > 0;
+    const absPct = Math.abs(Math.round(rawPct));
+    const displayPct = absPct > 999 ? ">999%" : `${absPct}%`;
+    selectedIncomeCategoryChangeDisplay = `${isUp ? "+" : ""}${rawPct < 0 ? "-" : ""}${displayPct} vs last month`;
+  }
+
   const donutData = activeRows.slice(0, 8).map(row => [row.id, row.amount]);
   const R = 90, cx = 110, cy = 110, stroke = 10;
   const circ = 2 * Math.PI * R;
@@ -616,7 +637,15 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
     if (isMobile) {
       /* Mobile: condensed 2-col card-style row */
       return (
-        <div key={cat} onClick={() => viewBy === "Category" && breakdownTab !== "income" && setSelectedCategoryId(cat)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, cursor: (viewBy === "Category" && breakdownTab !== "income") ? "pointer" : "default", background: selectedCategoryId === cat ? "var(--surface-muted)" : "transparent", transition: "background 0.2s" }}>
+        <div key={cat} onClick={() => {
+          if (viewBy === "Category") {
+            if (breakdownTab === "income") {
+              setSelectedIncomeCategoryId(cat);
+            } else {
+              setSelectedCategoryId(cat);
+            }
+          }
+        }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, cursor: viewBy === "Category" ? "pointer" : "default", background: (selectedCategoryId === cat || selectedIncomeCategoryId === cat) ? "var(--surface-muted)" : "transparent", transition: "background 0.2s" }}>
           {/* Icon */}
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--surface-muted)", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: color }}>
             <Icon size={16} />
@@ -647,8 +676,16 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
 
     /* Desktop: full 4-col table row */
     return (
-      <tr key={cat} style={{ borderBottom: `1px solid ${C.border2}`, transition: "all 0.2s ease", cursor: (viewBy === "Category" && breakdownTab !== "income") ? "pointer" : "default", background: selectedCategoryId === cat ? "var(--surface-muted)" : "transparent" }}
-        onClick={() => viewBy === "Category" && breakdownTab !== "income" && setSelectedCategoryId(cat)}
+      <tr key={cat} style={{ borderBottom: `1px solid ${C.border2}`, transition: "all 0.2s ease", cursor: viewBy === "Category" ? "pointer" : "default", background: (selectedCategoryId === cat || selectedIncomeCategoryId === cat) ? "var(--surface-muted)" : "transparent" }}
+        onClick={() => {
+          if (viewBy === "Category") {
+            if (breakdownTab === "income") {
+              setSelectedIncomeCategoryId(cat);
+            } else {
+              setSelectedCategoryId(cat);
+            }
+          }
+        }}
         className="breakdown-row"
       >
         <td style={{ padding: "16px 20px" }}>
@@ -1149,6 +1186,47 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
                   <div key={tx._id || index} style={{ padding: "12px 14px", borderTop: index ? `1px solid ${C.border2}` : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.merchant || selectedCategoryMeta.label}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                    </div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, flexShrink: 0 }}>{fmt(Math.abs(tx.amount || 0))}</div>
+                  </div>
+                )) : <div style={{ padding: "16px 14px", textAlign: "center", fontSize: 11.5, color: C.muted }}>No transactions found for this category in the selected month.</div>}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {selectedIncomeCategoryId && (
+        <>
+          <div onClick={() => setSelectedIncomeCategoryId(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 380 }} />
+          <div style={{ position: "fixed", top: isMobile ? "auto" : 12, right: isMobile ? 0 : 12, bottom: 0, width: isMobile ? "100vw" : 360, height: isMobile ? "72vh" : "calc(100vh - 24px)", background: C.white, borderLeft: isMobile ? "none" : `1px solid ${C.border}`, borderTop: isMobile ? `1px solid ${C.border}` : "none", borderRadius: isMobile ? "20px 20px 0 0" : 16, boxShadow: "-18px 0 40px rgba(0,0,0,0.28)", zIndex: 381, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {isMobile && <div style={{ width: 40, height: 4, borderRadius: 99, background: C.border, margin: "10px auto 0" }} />}
+            <div style={{ padding: isMobile ? "14px 16px" : "16px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: C.muted, fontWeight: 700, marginBottom: 6 }}>Income detail</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 10, background: "#2f9cff20", color: "#2f9cff", display: "flex", alignItems: "center", justifyContent: "center" }}><BadgeDollarSign size={15} /></div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{selectedIncomeCategoryId}</div>
+                </div>
+              </div>
+              <button type="button" onClick={() => setSelectedIncomeCategoryId(null)} style={{ width: 30, height: 30, borderRadius: 10, border: `1px solid ${C.border}`, background: "var(--bg-secondary)", color: C.muted, cursor: "pointer" }}><X size={16} style={{ margin: "0 auto" }} /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", minHeight: 0, scrollbarGutter: "stable", padding: isMobile ? "14px" : "16px" }}>
+              <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", marginBottom: 14 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Earned in {fmtMonth(selectedMonth)}</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: "-0.04em", marginBottom: 8 }}>{fmt(selectedIncomeCategoryTotal)}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 11.5, color: C.muted }}>
+                  <span>{selectedIncomeCategoryShare.toFixed(0)}% of income</span>
+                  <span>{selectedIncomeCategoryChangeDisplay}</span>
+                </div>
+              </div>
+              <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border2}`, fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: C.muted }}>Latest transactions</div>
+                {selectedIncomeCategoryTransactions.length ? selectedIncomeCategoryTransactions.map((tx, index) => (
+                  <div key={tx._id || index} style={{ padding: "12px 14px", borderTop: index ? `1px solid ${C.border2}` : "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.merchant || selectedIncomeCategoryId}</div>
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
                     </div>
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text, flexShrink: 0 }}>{fmt(Math.abs(tx.amount || 0))}</div>

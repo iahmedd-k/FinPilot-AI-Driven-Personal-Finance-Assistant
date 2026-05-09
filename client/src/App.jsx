@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "sonner";
@@ -12,7 +12,7 @@ import Landing        from "./pages/Landing";
 import Login          from "./pages/auth/Login";
 import ResetPassword  from "./pages/auth/ResetPassword";
 import Dashboard      from "./pages/Dashboard";
-import Transactions   from "./pages/Transactions";
+
 import Goals          from "./pages/Goals";
 import Subscription   from "./pages/Subscription";
 import NotFound       from "./pages/NotFound";
@@ -46,7 +46,7 @@ export default function App() {
 
               <Route element={<ProtectedRoute />}>
                 <Route path={ROUTES.DASHBOARD}    element={<Dashboard />} />
-                <Route path={ROUTES.TRANSACTIONS} element={<Transactions />} />
+                <Route path={ROUTES.TRANSACTIONS} element={<Navigate to="/dashboard?nav=spending" replace />} />
                 <Route path ={ROUTES.PROFILEPAGE} element={<ProfilePage />}/>
                 <Route path={ROUTES.GOALS}        element={<Goals />} />
                 <Route path={ROUTES.SUBSCRIPTION} element={<Subscription />} />

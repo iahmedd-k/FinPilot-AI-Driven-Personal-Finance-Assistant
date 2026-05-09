@@ -39,7 +39,6 @@ const globalLimiter = rateLimit({
   // This suppresses the warning and uses the correct IP from X-Forwarded-For
   validate: { trustProxy: false },
 });
-app.use("/api", globalLimiter);
 
 // ─── Stricter limiter for auth routes only ─────────────
 // Login/register are the most abused endpoints — tighten them separately
@@ -51,6 +50,10 @@ const authLimiter = rateLimit({
   message: { success: false, message: "Too many login attempts. Please try again in 15 minutes." },
   validate: { trustProxy: false },
 });
+
+app.use("/api", globalLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
 
 // ─── Stripe Webhook (must be before body parsers) ──────
 const { handleWebhook } = require("./controllers/subscription.controller");

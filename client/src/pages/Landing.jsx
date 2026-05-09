@@ -14,6 +14,7 @@ import ForecastSection from "../components/landing/ForecastSection";
 import InsightsSection from "../components/landing/InsightsSection";
 import FeatureCardsSection from "../components/landing/FeatureCardsSection";
 import { ROUTES } from "../constants/routes";
+import Logo from "../components/common/Logo";
 
 /* ── Final CTA ── */
 function FinalCTA() {
@@ -268,15 +269,8 @@ function LandingFooter() {
       }}>
       <div className="max-w-[1100px] mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-12">
         <div className="sm:col-span-2 md:col-span-1">
-          <div className="flex items-center gap-2 mb-4">
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "#0A0A1A", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #fff", position: "relative" }}>
-                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 5, height: 5, borderRadius: "50%", background: "#fff" }} />
-              </div>
-            </div>
-            <span className="text-lg font-bold text-white" style={{ fontFamily: "Inter, sans-serif", letterSpacing: "-0.02em" }}>
-              Fin<span style={{ color: "rgba(255,255,255,0.6)" }}>Pilot</span> AI
-            </span>
+          <div className="mb-4">
+            <Logo size="sm" />
           </div>
           <p className="text-sm text-zinc-500 leading-relaxed mb-4">
             Your AI-powered personal finance co-pilot. Track everything, ask anything, save more.

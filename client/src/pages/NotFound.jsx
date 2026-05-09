@@ -13,10 +13,10 @@ export default function NotFound() {
     >
       <div className="mb-10"><Logo size="lg" /></div>
 
-      <p className="text-8xl font-bold mb-4" style={{ color: "rgba(45,212,191,0.15)", fontFamily: "Playfair Display, serif" }}>
+      <p className="text-8xl font-black mb-4" style={{ color: "rgba(45,212,191,0.15)", letterSpacing: "-0.04em" }}>
         404
       </p>
-      <h1 className="text-2xl font-bold mb-3" style={{ color: "#f5f0e8", fontFamily: "Playfair Display, serif" }}>
+      <h1 className="text-2xl font-bold mb-3" style={{ color: "#f5f0e8", letterSpacing: "-0.02em" }}>
         Page not found
       </h1>
       <p className="text-sm mb-8 max-w-xs" style={{ color: "#8b90a0", lineHeight: 1.7 }}>
