@@ -510,7 +510,7 @@ export default function OverviewTab({
         .hover-bg-muted:hover { background: var(--surface-muted) !important; }
       `}</style>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) 308px", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "minmax(0, 1fr) 308px", gap: 16, alignItems: "start" }}>
 
         {/* ── Left column ─────────────────────────────────────────────────── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

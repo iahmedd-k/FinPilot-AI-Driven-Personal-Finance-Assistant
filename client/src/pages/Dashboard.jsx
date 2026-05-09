@@ -388,8 +388,8 @@ html,body { height:100%; background:${C.bg}; }
 @media (max-width:767px) {
   .center-grid3 { grid-template-columns:1fr !important; }
   .stat-grid    { grid-template-columns:1fr 1fr !important; }
-  .right-strip  { display:none !important; }
-  .mobile-bottom-strip { display:flex !important; }
+  .right-strip  { width:100% !important; padding-left:16px !important; padding-right:16px !important; padding-bottom:80px !important; }
+  .mobile-stack > .main-content:not(:last-child) { padding-bottom: 20px !important; }
   .mobile-hide  { display:none !important; }
   .mobile-full  { width:100% !important; min-width:0 !important; flex:1 1 100% !important; }
   .mobile-stack { flex-direction:column !important; }
@@ -689,7 +689,7 @@ html,body { height:100%; background:${C.bg}; }
           <TransactionDetailSidebar />
 
           {/* ── BODY ── */}
-          <div style={{ flex: 1, display: "flex", minWidth: 0, minHeight: 0 }}>
+          <div className={isMobile ? "mobile-stack" : ""} style={{ flex: 1, display: "flex", minWidth: 0, minHeight: 0 }}>
             <div className="main-content" style={{ flex: 1, padding: "8px 20px 40px", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
 
               {/* HOME — wrapped in PortfolioProvider so HomeTabWrapper can call usePortfolio() */}
@@ -970,6 +970,7 @@ function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, set
           handleExportData={handleExportData} isExporting={isExporting}
           setDashSubTab={setDashSubTab}
           setGlobalSelectedTxId={setGlobalSelectedTxId}
+          isMobile={isMobile}
         />
       )}
 
@@ -1148,7 +1149,7 @@ function BenefitsTab({ isPro, navigate }) {
 }
 
 /* ─── OverviewSubTab ─────────────────────────────────────── */
-function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, setActiveNav, setShowAdvisor, handleExportData, isExporting, setDashSubTab, setGlobalSelectedTxId, dashboard }) {
+function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, setActiveNav, setShowAdvisor, handleExportData, isExporting, setDashSubTab, setGlobalSelectedTxId, dashboard, isMobile }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
   const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
@@ -1283,7 +1284,7 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
 
       {/* Combined Calendar + Recent Transactions Card */}
       <Card className="anim-3" style={{ padding: "16px 18px", overflow: "hidden", background: C.white, borderRadius: 18, fontFamily: "Inter, system-ui, sans-serif" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1fr)", gap: 18, minHeight: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 0.9fr) minmax(0, 1fr)", gap: isMobile ? 24 : 18, minHeight: "auto" }}>
           
           {/* LEFT: Calendar Section */}
           <div style={{ minWidth: 0 }}>
@@ -1310,7 +1311,7 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
           </div>
 
           {/* RIGHT: Recent Transactions Section */}
-          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", paddingLeft: 18 }}>
+          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", paddingLeft: isMobile ? 0 : 18, paddingTop: isMobile ? 24 : 0, borderTop: isMobile ? `1px solid ${C.border2}` : "none" }}>
             {/* Header */}
             <div style={{ marginBottom: 12, flexShrink: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Recent transactions</div>
@@ -1381,12 +1382,7 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
         <InvestmentsChartCard C={C} setActiveNav={setActiveNav} />
       </Card>
 
-      {/* Mobile-only: AI + spending */}
-      <div className="mobile-bottom-strip anim-4" style={{ display: "none", flexDirection: "column", gap: 14 }}>
-        <Card style={{ padding: "18px" }}>
-          <SpendingContent transactions={transactions} totalExpense={summary.totalExpense} C={C} />
-        </Card>
-      </div>
+
     </>
   );
 }

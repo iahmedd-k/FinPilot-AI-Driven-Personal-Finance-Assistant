@@ -75,7 +75,7 @@ function Toggle({ checked, onClick, C }) {
   );
 }
 
-export default function RecurringTab({ C, apiTransactions = [], openAdd, transactionService, queryClient, pushNotif, refreshUser, txLimitReached, preferredCurrency: preferredCurrencyProp, spendingSettings }) {
+export default function RecurringTab({ C, apiTransactions = [], openAdd, transactionService, queryClient, pushNotif, refreshUser, txLimitReached, preferredCurrency: preferredCurrencyProp, spendingSettings, isMobile }) {
   const { user } = useAuthContext();
   const preferredCurrency = preferredCurrencyProp || getUserCurrency(user);
   const recurringSettings = spendingSettings?.recurringSettings || {};
@@ -83,7 +83,6 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
   const [viewMonth, setViewMonth] = useState(new Date());
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 1024 : false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [showInferred, setShowInferred] = useState(() => recurringSettings?.showInferredRecurring ?? false);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
@@ -100,12 +99,6 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
     notes: "",
   };
   const [form, setForm] = useState(emptyForm);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const recurringItems = useMemo(() => {
     const explicit = apiTransactions.filter((tx) => tx.isRecurring);
@@ -394,7 +387,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
               </p>
               {showSummaryDetails && (
                 <div id="recurring-summary-details" style={{ marginTop: 14, display: "grid", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))", gap: 10 }}>
                     <div style={{ border: `1px solid ${C.border2}`, borderRadius: 12, background: "var(--bg-subtle)", padding: "10px 12px" }}>
                       <div style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Recurring sources</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{recurringItems.length}</div>

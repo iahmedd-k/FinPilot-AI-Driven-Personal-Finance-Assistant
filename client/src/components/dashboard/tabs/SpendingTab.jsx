@@ -1131,6 +1131,7 @@ function SpendingPage({
 
       {/* ── Sub-tab navigation ── */}
       <div
+        className="spend-subtabs tx-table-scroll"
         style={{
           display: "flex",
           gap: 8,

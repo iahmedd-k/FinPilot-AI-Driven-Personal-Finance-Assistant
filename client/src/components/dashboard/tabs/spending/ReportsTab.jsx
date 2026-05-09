@@ -1151,13 +1151,13 @@ function ReportsTab({
   // RENDER
   // ──────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 16, alignItems: "flex-start" }}>
 
       {/* ════════ LEFT: main panel ════════ */}
-      <div style={{ flex: 1, minWidth: 0, background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ width: "100%", flex: 1, minWidth: 0, background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "12px 16px" : "14px 20px", borderBottom: `1px solid ${C.border}` }}>
           <span style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.12em" }}>Reports</span>
           <button
             type="button" onClick={() => setFilterOpen((v) => !v)}
@@ -1180,7 +1180,7 @@ function ReportsTab({
 
 
         {/* Sub-tabs */}
-        <div style={{ display: "flex", background: "var(--bg-subtle)", borderRadius: 10, padding: 4, margin: "14px 20px" }}>
+        <div style={{ display: "flex", background: "var(--bg-subtle)", borderRadius: 10, padding: 4, margin: isMobile ? "10px 16px" : "14px 20px" }}>
           {REPORT_TABS.map((t) => (
             <button key={t.id} type="button" onClick={() => setReportTab(t.id)}
               style={{
@@ -1198,7 +1198,7 @@ function ReportsTab({
         </div>
 
         {/* Title + controls */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "16px 20px 12px", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: isMobile ? "stretch" : "flex-start", justifyContent: "space-between", padding: isMobile ? "12px 16px 12px" : "16px 20px 12px", flexDirection: isMobile ? "column" : "row", gap: 10 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Report Summary</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
@@ -1268,9 +1268,9 @@ function ReportsTab({
 
         {/* Chart + KPIs + Table */}
         {!hasData ? <EmptyState /> : (
-          <div style={{ padding: "0 20px 24px" }}>
+          <div style={{ padding: isMobile ? "0 16px 24px" : "0 20px 24px" }}>
 
-            <div style={{ background: C.white, borderRadius: 16, padding: "20px 16px 16px", border: `1px solid ${C.border}`, overflow: "hidden", position: "relative", minWidth: 0, minHeight: 0 }}>
+            <div style={{ background: C.white, borderRadius: 16, padding: isMobile ? "16px 8px 12px" : "20px 16px 16px", border: `1px solid ${C.border}`, overflow: "hidden", position: "relative", minWidth: 0, minHeight: 0 }}>
               {renderChart()}
             </div>
 
@@ -1304,7 +1304,8 @@ function ReportsTab({
 
             {/* Table */}
             <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginTop: 6 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 450 : "auto" }}>
                 <thead style={{ background: "var(--bg-secondary)" }}>
                   <tr>
                     {viewBy === "Month" && (
@@ -1424,6 +1425,7 @@ function ReportsTab({
               </table>
             </div>
           </div>
+        </div>
         )}
       </div>
 

@@ -115,7 +115,8 @@ export function DashboardProvider({ children }) {
 
   const pushNotif = (type, message) => {
     const notify = dedupToast[type] || dedupToast.info;
-    notify(message, { id: message, duration: 2200 });
+    const duration = isMobile ? 1200 : 1800;
+    notify(message, { id: message, duration });
   };
 
   // ── Global Notification Listener ────────────────────────
