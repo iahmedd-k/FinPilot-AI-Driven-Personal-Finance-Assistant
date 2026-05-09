@@ -271,7 +271,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen px-3 py-3 md:px-5 font-sans" style={{ background: "#f7f5f1", fontFamily: "var(--font-sans)" }}>
-      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1660px] gap-3 rounded-[28px] border border-black/8 bg-[#fcfbf8] p-3 shadow-[0_10px_40px_rgba(15,23,42,0.06)] grid-cols-[1.08fr_0.92fr]">
+      <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-[1660px] gap-3 rounded-[28px] border border-black/8 bg-[#fcfbf8] p-3 shadow-[0_10px_40px_rgba(15,23,42,0.06)] grid-cols-1 lg:grid-cols-[1.08fr_0.92fr]">
         <div className="flex rounded-[24px] border border-black/8 bg-[#fcfbf8] px-6 py-7 md:px-9 lg:px-12" style={{ color: "#0b0914" }}>
           <div className="mx-auto flex w-full max-w-[510px] flex-col justify-center text-[#0b0914]">
             <div className="mb-5 flex flex-col items-center text-center">
@@ -520,7 +520,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[24px] bg-[#09111d] p-7 flex flex-col items-center justify-center min-h-[740px]">
+        <div className="relative overflow-hidden rounded-[24px] bg-[#09111d] p-7 hidden lg:flex flex-col items-center justify-center min-h-[740px]">
           <div
             style={{
               position: "absolute",

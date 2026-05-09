@@ -354,6 +354,23 @@ export default function OverviewTab({
     return rows;
   }, [daysInMonth, expenseByDay]);
 
+  // ─── Get transactions for a specific day ───────────────────────────────────
+  const getTransactionsForDay = (day) => {
+    return expenseTransactions.filter((tx) => {
+      if (!tx?.date) return false;
+      const d = new Date(tx.date);
+      if (isNaN(d.getTime())) return false;
+      return d.getDate() === day;
+    });
+  };
+
+  const handleCalendarDayClick = (day) => {
+    const txsForDay = getTransactionsForDay(day);
+    if (txsForDay.length > 0) {
+      setGlobalSelectedTxId?.(txsForDay[0]._id);
+    }
+  };
+
   // ─── Reports (last 6 months) ──────────────────────────────────────────────
   const reportChartData = useMemo(() => {
     const items = [];
@@ -656,7 +673,12 @@ export default function OverviewTab({
                 <div style={{ padding: "20px 16px 16px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
                     {spendCalendarRows.flat().map(({ day, amount, active }) => (
-                      <div key={day} style={{ height: 36, borderRadius: 8, border: `1px solid ${active ? "transparent" : C.border}`, background: active ? "#ffb95a" : "transparent", color: active ? "#fff" : C.text, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                      <div key={day} 
+                        onClick={() => handleCalendarDayClick(day)}
+                        style={{ height: 36, borderRadius: 8, border: `1px solid ${active ? "transparent" : C.border}`, background: active ? "#ffb95a" : "transparent", color: active ? "#fff" : C.text, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, cursor: amount > 0 ? "pointer" : "default", transition: "all 0.15s" }}
+                        onMouseEnter={(e) => amount > 0 && (e.currentTarget.style.background = active ? "#f59e0b" : C.white)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = active ? "#ffb95a" : "transparent")}
+                      >
                         <div style={{ fontSize: 10, fontWeight: 700 }}>{day}</div>
                         {amount > 0 && <div style={{ fontSize: 8, fontWeight: 600 }}>{formatAmount(Math.round(amount), { maximumFractionDigits: 0, style: "decimal" })}</div>}
                       </div>
