@@ -316,9 +316,9 @@ export default function Subscription() {
                 </div>
               </div>
 
-              <div style={{ border: `1px solid ${O.border}`, borderRadius: 16, padding: "16px 18px", background: O.bg }}>
+              <div style={{ minWidth: 0, border: `1px solid ${O.border}`, borderRadius: 16, padding: "16px 18px", background: O.bg }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: O.textSecondary, textTransform: "uppercase", letterSpacing: "0.08em" }}>Account</div>
-                <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700, color: O.textPrimary }}>{user?.email || "Signed in user"}</div>
+                <div style={{ marginTop: 10, fontSize: 18, fontWeight: 700, color: O.textPrimary, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email || "Signed in user"}</div>
                 <div style={{ marginTop: 6, fontSize: 13.5, color: O.textSecondary }}>
                   {hasBillingAccount ? "Billing account found for this user." : "A Stripe billing account will be created when checkout completes."}
                 </div>
