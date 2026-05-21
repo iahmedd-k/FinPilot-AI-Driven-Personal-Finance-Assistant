@@ -115,7 +115,6 @@ const isDateMatch = (dateValue, filter, customStart, customEnd) => {
   if (filter === "custom") {
     const t = target.getTime();
     const s = customStart ? new Date(customStart).getTime() : 0;
-    const e = customEnd ? new Date(customEnd).getTime() : Infinity;
     // Set e to end of that day
     const eDay = customEnd ? new Date(customEnd) : null;
     if (eDay) eDay.setHours(23, 59, 59, 999);
@@ -158,8 +157,7 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
     refetchOnMount: true,
   });
 
-  const isLoading = false;
-  const customCategoryRecords = categoryData?.categories || [];
+  const customCategoryRecords = useMemo(() => categoryData?.categories || [], [categoryData]);
   const dotsRef = useRef(null);
   const [dotsOpen, setDotsOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -167,24 +165,17 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   const [selectMode, setSelectMode] = useState(false);
   const [search, setSearch] = useState("");
   const [sortDir, setSortDir] = useState(spendingSettings?.transactionPreferences?.defaultSortDirection || "desc");
-  const [detailDraft, setDetailDraft] = useState(null);
-  const [inlineField, setInlineField] = useState(null);
-  const [confirmingId, setConfirmingId] = useState(null);
   const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 640 : false));
-  const [isWideScreen, setIsWideScreen] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 1280 : true));
   const [openPickerTxId, setOpenPickerTxId] = useState(null);
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryFormOpen, setCategoryFormOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categorySaving, setCategorySaving] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState(null);
-  const [editingCategoryName, setEditingCategoryName] = useState("");
   const [activeFilterSection, setActiveFilterSection] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [draftFilters, setDraftFilters] = useState(DEFAULT_FILTERS);
-  const [splitAmount, setSplitAmount] = useState("");
 
   useEffect(() => {
     setSortDir(spendingSettings?.transactionPreferences?.defaultSortDirection || "desc");
@@ -201,12 +192,11 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   }, [filterOpen, filters]);
 
   useEffect(() => {
-    if (!openPickerTxId) { setCategorySearch(""); setCategoryFormOpen(false); setNewCategoryName(""); setEditingCategoryId(null); setEditingCategoryName(""); }
+    if (!openPickerTxId) { setCategorySearch(""); setCategoryFormOpen(false); setNewCategoryName(""); }
   }, [openPickerTxId]);
 
   useEffect(() => {
     const onResize = () => {
-      setIsWideScreen(window.innerWidth >= 1280);
       setIsMobile(window.innerWidth < 640);
     };
     window.addEventListener("resize", onResize);
@@ -252,97 +242,13 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   useEffect(() => {
     if (!filtered.length) { setSelectedId(null); return; }
     if (selectedId && !filtered.some((t) => t._id === selectedId)) setSelectedId(null);
-  }, [filtered, selectedId]);
-
-  useEffect(() => {
-    if (selectedTransaction) {
-      setDetailDraft({ 
-        merchant: selectedTransaction.merchant || "", 
-        category: selectedTransaction.category || transactionService.CATEGORIES[0], 
-        date: selectedTransaction.date ? new Date(selectedTransaction.date).toISOString().slice(0, 10) : "", 
-        notes: selectedTransaction.notes || "", 
-        tag: selectedTransaction.tag || "", 
-        amount: selectedTransaction.amount || 0,
-        isRecurring: !!selectedTransaction.isRecurring, 
-        isHidden: !!selectedTransaction.isHidden, 
-        reviewStatus: selectedTransaction.reviewStatus || "needs_review" 
-      });
-      setInlineField(null);
-    }
-  }, [selectedTransaction, transactionService.CATEGORIES]);
+  }, [filtered, selectedId, setSelectedId]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["transactions"] });
     queryClient.invalidateQueries({ queryKey: ["transactions-page"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["transaction-categories"] });
-  };
-
-  const syncLocalTransaction = (id, patch) => {
-    const updater = (current) => { if (!current?.transactions) return current; return { ...current, transactions: current.transactions.map((tx) => (tx._id === id ? { ...tx, ...patch } : tx)) }; };
-    queryClient.setQueryData(["transactions-page", user?._id], updater);
-    queryClient.setQueryData(["transactions", user?._id], updater);
-  };
-
-  const patchTx = async (patch, success) => {
-    if (!selectedTransaction) return;
-    try {
-      setSaving(true);
-      // AUTO-REVIEW logic: if user is changing a meaningful field, mark as reviewed
-      const userEdited = ["category", "date", "notes", "tag", "merchant", "amount"].some(k => k in patch);
-      const finalPatch = (userEdited && !("reviewStatus" in patch))
-        ? { ...patch, reviewStatus: "reviewed" }
-        : patch;
-
-      syncLocalTransaction(selectedTransaction._id, finalPatch);
-      const response = await transactionService.update(selectedTransaction._id, finalPatch);
-      const updatedTx = response?.data?.transaction;
-      if (updatedTx) {
-        syncLocalTransaction(selectedTransaction._id, updatedTx);
-        setDetailDraft((prev) => ({ ...prev, ...updatedTx }));
-      }
-      refresh();
-      if (success) pushNotif?.("success", success);
-    } catch (e) {
-      dedupToast.error(e?.response?.data?.message || e?.message || "Failed to update transaction");
-    } finally { setSaving(false); }
-  };
-
-  const saveInlineField = async (field) => {
-    if (!detailDraft) return;
-    const patch = 
-      field === "date" ? { date: detailDraft.date } : 
-      field === "tag" ? { tag: detailDraft.tag } : 
-      field === "notes" ? { notes: detailDraft.notes } : 
-      field === "amount" ? { amount: Number(detailDraft.amount) } :
-      field === "merchant" ? { merchant: detailDraft.merchant } :
-      null;
-    if (!patch) return;
-    await patchTx(patch, "Transaction updated");
-    setInlineField(null);
-  };
-
-  const splitTransaction = async () => {
-    if (!selectedTransaction) return;
-    const total = Math.abs(selectedTransaction.amount || 0);
-    const first = Number(Number(splitAmount).toFixed(2));
-    if (isNaN(first) || first <= 0 || first >= total) {
-      dedupToast.error("Please enter a valid amount less than the total");
-      return;
-    }
-    const second = Number((total - first).toFixed(2));
-    try {
-      setSaving(true);
-      await transactionService.create({ merchant: `${selectedTransaction.merchant || "Split"} (Part 1)`, category: selectedTransaction.category, amount: first, type: selectedTransaction.type, date: selectedTransaction.date, notes: selectedTransaction.notes, tag: selectedTransaction.tag, isRecurring: selectedTransaction.isRecurring, isHidden: selectedTransaction.isHidden, reviewStatus: "reviewed" });
-      await transactionService.create({ merchant: `${selectedTransaction.merchant || "Split"} (Part 2)`, category: selectedTransaction.category, amount: second, type: selectedTransaction.type, date: selectedTransaction.date, notes: selectedTransaction.notes, tag: selectedTransaction.tag, isRecurring: selectedTransaction.isRecurring, isHidden: selectedTransaction.isHidden, reviewStatus: "reviewed" });
-      await transactionService.delete(selectedTransaction._id);
-      refresh();
-      dedupToast.success("Transaction split successfully");
-      setSelectedId(null);
-      setInlineField(null);
-    } catch (e) {
-      dedupToast.error(e?.response?.data?.message || e?.message || "Failed to split transaction");
-    } finally { setSaving(false); }
   };
 
   const summary = useMemo(() => {
@@ -375,46 +281,6 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
   const selectedCount = selectedRows.size;
   const allVisibleSelected = filtered.length > 0 && filtered.every((tx) => selectedRows.has(tx._id));
 
-  const categoryOptions = useMemo(() => {
-    const q = categorySearch.trim().toLowerCase();
-    const selectedType = selectedTransaction?.type === "income" ? "income" : "expense";
-    return allCategoryRecords.filter((c) => c.type === selectedType).filter((c) => !q || getSpendingCategoryLabel(c.name).toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
-  }, [allCategoryRecords, categorySearch, selectedTransaction?.type]);
-
-  const createCategory = async () => {
-    const name = newCategoryName.trim();
-    if (!name || !selectedTransaction) return;
-    try {
-      setCategorySaving(true);
-      const response = await transactionCategoryService.create({ name, type: selectedTransaction.type === "income" ? "income" : "expense" });
-      queryClient.setQueryData(["transaction-categories", user?._id], (current) => ({ ...(current || {}), categories: [...(current?.categories || []), response.data.category] }));
-      setNewCategoryName(""); setCategoryFormOpen(false);
-      setDetailDraft((prev) => ({ ...prev, category: name }));
-      await patchTx({ category: name }, "Category updated");
-      setShowCategoryPicker(false);
-    } catch (e) { dedupToast.error(e?.response?.data?.message || e?.message || "Failed to create category"); } finally { setCategorySaving(false); }
-  };
-
-  const renameCategory = async () => {
-    const name = editingCategoryName.trim();
-    if (!name || !editingCategoryId) return;
-    try {
-      setCategorySaving(true);
-      const response = await transactionCategoryService.update(editingCategoryId, { name });
-      const updatedCategory = response?.data?.category;
-      const previousName = response?.data?.previousName;
-      queryClient.setQueryData(["transaction-categories", user?._id], (current) => ({ ...(current || {}), categories: (current?.categories || []).map((item) => (item._id === editingCategoryId ? updatedCategory : item)) }));
-      if (previousName) {
-        const txUpdater = (current) => { if (!current?.transactions) return current; return { ...current, transactions: current.transactions.map((tx) => (tx.category === previousName ? { ...tx, category: updatedCategory.name } : tx)) }; };
-        queryClient.setQueryData(["transactions-page", user?._id], txUpdater);
-        queryClient.setQueryData(["transactions", user?._id], txUpdater);
-        if (detailDraft?.category === previousName) setDetailDraft((prev) => ({ ...prev, category: updatedCategory.name }));
-      }
-      setEditingCategoryId(null); setEditingCategoryName("");
-      refresh(); dedupToast.success("Category updated");
-    } catch (e) { dedupToast.error(e?.response?.data?.message || e?.message || "Failed to update category"); } finally { setCategorySaving(false); }
-  };
-
   const toggleSelectAll = () => {
     setSelectedRows(() => {
       if (allVisibleSelected) return new Set();
@@ -443,33 +309,6 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
       pushNotif?.("success", `${ids.length} transaction${ids.length === 1 ? "" : "s"} deleted`);
     } catch (e) {
       dedupToast.error(e?.response?.data?.message || e?.message || "Failed to delete selected transactions");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteTransaction = async (id) => {
-    if (!id) return;
-    if (confirmingId !== id) {
-      setConfirmingId(id);
-      setTimeout(() => setConfirmingId(null), 3000);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await transactionService.delete(id);
-      setSelectedRows((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-      setConfirmingId(null);
-      if (selectedId === id) setSelectedId(null);
-      refresh();
-      pushNotif?.("success", "Transaction deleted");
-    } catch (e) {
-      dedupToast.error(e?.response?.data?.message || e?.message || "Failed to delete transaction");
     } finally {
       setSaving(false);
     }
@@ -742,7 +581,7 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
                                     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
                                     pushNotif?.("success", "Category updated");
                                     setOpenPickerTxId(null);
-                                  } catch (e) {
+                                  } catch {
                                     dedupToast.error("Failed to update category");
                                   }
                                 }}
@@ -922,9 +761,8 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
           {isMobile ? (
             /* Mobile: card list */
             <div style={{ minHeight: 300 }}>
-              {isLoading && <div style={{ padding: "40px 16px", textAlign: "center", color: C.muted }}>Loading…</div>}
-              {!isLoading && filtered.length === 0 && <div style={{ padding: "40px 16px", textAlign: "center", color: C.muted }}>No transactions found.</div>}
-              {!isLoading && filtered.map((tx) => <MobileRow key={tx._id} tx={tx} />)}
+              {filtered.length === 0 && <div style={{ padding: "40px 16px", textAlign: "center", color: C.muted }}>No transactions found.</div>}
+              {filtered.map((tx) => <MobileRow key={tx._id} tx={tx} />)}
             </div>
           ) : (
             /* Desktop: table */
@@ -945,9 +783,8 @@ export default function TransactionsPage({ transactionService, queryClient, C, a
                     <span className="origin-section-label" style={{ fontSize: C.fSizeXs }}>Amount</span> {sortDir === "asc" ? <SortAsc size={13} color={C.muted} /> : <SortDesc size={13} color={C.muted} />}
                   </button>
                 </div>
-                {isLoading && <div style={{ padding: "46px 18px", textAlign: "center", color: C.muted }}>Loading…</div>}
-                {!isLoading && filtered.length === 0 && <div style={{ padding: "46px 18px", textAlign: "center", color: C.muted }}>No transactions found.</div>}
-                {!isLoading && filtered.map((tx) => <DesktopRow key={tx._id} tx={tx} />)}
+                {filtered.length === 0 && <div style={{ padding: "46px 18px", textAlign: "center", color: C.muted }}>No transactions found.</div>}
+                {filtered.map((tx) => <DesktopRow key={tx._id} tx={tx} />)}
               </div>
             </div>
           )}

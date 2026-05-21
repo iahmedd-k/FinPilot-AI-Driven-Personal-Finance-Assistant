@@ -241,6 +241,24 @@ const userSchema = new mongoose.Schema(
         defaultTab: { type: String, enum: ["cashflow", "expenses", "income"], default: "cashflow" },
         defaultViewBy: { type: String, enum: ["Category", "Merchant"], default: "Category" },
       },
+      rules: [
+        {
+          name: { type: String, default: "" },
+          conditions: [
+            {
+              field: { type: String, required: true },
+              operator: { type: String, required: true },
+              value: { type: String, default: "" }
+            }
+          ],
+          actions: [
+            {
+              field: { type: String, required: true },
+              value: { type: String, default: "" }
+            }
+          ]
+        }
+      ]
     },
   },
   {

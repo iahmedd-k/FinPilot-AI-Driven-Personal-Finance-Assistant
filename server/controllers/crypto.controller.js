@@ -10,6 +10,19 @@ const VALID_TYPES = ["crypto", "equity", "cash", "vehicle", "property", "private
 
 const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== "";
 const toNumber = (value) => Number(value);
+const normalizeGrantType = (value, fallback = "STOCK_OPTION") => {
+  if (!hasValue(value)) return fallback;
+  const normalized = String(value).trim().toUpperCase();
+  if (["ISO", "NSO", "SHARE", "STOCK_OPTION"].includes(normalized)) return "STOCK_OPTION";
+  if (["RSU", "RESTRICTED_SHARE", "ESOP"].includes(normalized)) return normalized;
+  return fallback;
+};
+const normalizeCompanyStructure = (value, fallback = "private") => {
+  if (!hasValue(value)) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  return ["a_share", "hk_listed", "us_listed", "vie", "private"].includes(normalized) ? normalized : fallback;
+};
+const deriveCompanyType = (structure) => (structure === "private" ? "private" : "public");
 
 const buildEquityPayload = (body, fallback = {}) => {
   const quantity = hasValue(body.quantity) ? toNumber(body.quantity) : (fallback.quantity ?? 0);
@@ -21,6 +34,8 @@ const buildEquityPayload = (body, fallback = {}) => {
   const inferredCurrentPrice = manualCurrentPrice !== undefined ? manualCurrentPrice : (fairMarketValue > 0 ? fairMarketValue : undefined);
   const currentValue = manualCurrentValue ?? (inferredCurrentPrice !== undefined ? inferredCurrentPrice * quantity : (fallback.currentValue ?? buyingPrice));
   const currentPrice = inferredCurrentPrice ?? (quantity > 0 ? currentValue / quantity : 0);
+  const companyStructure = normalizeCompanyStructure(body.companyStructure, fallback.companyStructure || "private");
+  const grantType = normalizeGrantType(body.grantType, normalizeGrantType(fallback.grantType, "STOCK_OPTION"));
 
   return {
     assetType: "equity",
@@ -32,16 +47,32 @@ const buildEquityPayload = (body, fallback = {}) => {
     buyingPrice,
     currentPrice,
     currentValue,
-    companyType: hasValue(body.companyType) ? String(body.companyType).trim().toLowerCase() : (fallback.companyType || "private"),
+    companyType: hasValue(body.companyType)
+      ? String(body.companyType).trim().toLowerCase()
+      : deriveCompanyType(companyStructure),
+    companyStructure,
     fairMarketValue,
+    fxRateAtGrant: hasValue(body.fxRateAtGrant) ? toNumber(body.fxRateAtGrant) : (fallback.fxRateAtGrant ?? null),
+    fxRateAtVest: hasValue(body.fxRateAtVest) ? toNumber(body.fxRateAtVest) : (fallback.fxRateAtVest ?? null),
+    fxRateAtExercise: hasValue(body.fxRateAtExercise) ? toNumber(body.fxRateAtExercise) : (fallback.fxRateAtExercise ?? null),
     vestedQuantity: hasValue(body.vestedQuantity) ? toNumber(body.vestedQuantity) : (fallback.vestedQuantity ?? 0),
-    grantType: hasValue(body.grantType) ? String(body.grantType).trim().toUpperCase() : (fallback.grantType || "SHARE"),
+    grantType,
     grantId: body.grantId !== undefined ? String(body.grantId || "").trim() : (fallback.grantId || ""),
+    fmvAtExercise: hasValue(body.fmvAtExercise) ? toNumber(body.fmvAtExercise) : (fallback.fmvAtExercise ?? null),
+    expirationDate: body.expirationDate || fallback.expirationDate || null,
+    postTerminationWindow: hasValue(body.postTerminationWindow) ? toNumber(body.postTerminationWindow) : (fallback.postTerminationWindow ?? 90),
     exercised: hasValue(body.exercised) ? toNumber(body.exercised) : (fallback.exercised ?? 0),
     earlyExercisable: body.earlyExercisable !== undefined ? Boolean(body.earlyExercisable) : Boolean(fallback.earlyExercisable),
     vestingSchedule: body.vestingSchedule !== undefined ? String(body.vestingSchedule || "").trim() : (fallback.vestingSchedule || "immediate"),
     vestingStartDate: body.vestingStartDate || fallback.vestingStartDate || null,
+    cliffMonths: hasValue(body.cliffMonths) ? toNumber(body.cliffMonths) : (fallback.cliffMonths ?? 12),
     hasVestingSchedule: body.hasVestingSchedule !== undefined ? Boolean(body.hasVestingSchedule) : (fallback.hasVestingSchedule ?? true),
+    safeFilingStatus: body.safeFilingStatus !== undefined ? String(body.safeFilingStatus || "").trim().toLowerCase() : (fallback.safeFilingStatus || "not_required"),
+    safeFilingDeadline: body.safeFilingDeadline || fallback.safeFilingDeadline || null,
+    lockupPeriod: body.lockupPeriod !== undefined ? String(body.lockupPeriod || "").trim().toLowerCase() : (fallback.lockupPeriod || "none"),
+    lockupExpiry: body.lockupExpiry || fallback.lockupExpiry || null,
+    iitPreferentialMethod: body.iitPreferentialMethod !== undefined ? Boolean(body.iitPreferentialMethod) : (fallback.iitPreferentialMethod ?? true),
+    salePrice: hasValue(body.salePrice) ? toNumber(body.salePrice) : (fallback.salePrice ?? null),
     includeInNetWorth: body.includeInNetWorth !== undefined ? Boolean(body.includeInNetWorth) : (fallback.includeInNetWorth ?? true),
     notes: body.notes !== undefined ? body.notes : (fallback.notes || ""),
   };
@@ -101,9 +132,16 @@ exports.addCryptoAsset = async (req, res, next) => {
         notes: notes || "",
       });
     } else if (assetType === "equity") {
-      const { name, ticker, quantity, buyPrice } = req.body;
-      if (!name || !ticker || !hasValue(quantity) || !hasValue(buyPrice)) {
-        return res.status(400).json({ success: false, message: "name, ticker, quantity and buyPrice are required for equity" });
+      const { name, ticker, quantity, buyPrice, companyStructure } = req.body;
+      const structure = normalizeCompanyStructure(companyStructure);
+      const isPrivate = structure === "private";
+      if (!name || (!isPrivate && !ticker) || !hasValue(quantity) || !hasValue(buyPrice)) {
+        return res.status(400).json({
+          success: false,
+          message: isPrivate
+            ? "name, quantity and buyPrice are required for equity"
+            : "name, ticker, quantity and buyPrice are required for equity"
+        });
       }
       asset = await CryptoAsset.create({
         userId: req.user._id,

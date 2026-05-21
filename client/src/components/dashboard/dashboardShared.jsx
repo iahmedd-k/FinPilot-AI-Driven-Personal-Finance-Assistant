@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { toast } from "sonner";
+import { formatCurrencyAmount } from "../../utils/currency";
 import {
   Lock,
   ShoppingCart, BadgeDollarSign, Bolt, Bus, Utensils,
@@ -20,11 +21,7 @@ import {
    once at a time. Uses the message text as the toast ID.      */
 export const _activeToasts = new Set();
 export const formatAmount = (val, opts = { maximumFractionDigits: 0 }) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    ...opts,
-  }).format(val || 0);
+  return formatCurrencyAmount(val || 0, "USD", opts);
 };
 
 export const dedupToast = {

@@ -21,6 +21,7 @@ import api from "../../../../services/api";
 import { dashboardService } from "../../../../services/dashboardService";
 import { transactionCategoryService } from "../../../../services/transactionCategoryService";
 import { useAuthContext } from "../../../../hooks/useAuthContext";
+import { formatCurrencyAmount } from "../../../../utils/currency";
 import { dedupToast, getSpendingCategoryLabel, getSpendingCategoryMeta } from "../../dashboardShared.jsx";
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
@@ -216,9 +217,10 @@ function StatBadge({ label, value, C }) {
       borderRadius: radius.md,
       background: "var(--bg-card)",
       padding: "13px 16px",
+      minWidth: 0,
     }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 7 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere", lineHeight: 1.15 }}>{value}</div>
     </div>
   );
 }
@@ -441,7 +443,7 @@ export default function SpendingSettingsTab({
               <div style={{ fontSize: 10.5, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
                 Spending Settings
               </div>
-              <div style={{ fontSize: isMobile ? 21 : 24, fontWeight: 800, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 6 }}>
+              <div style={{ fontSize: isMobile ? 21 : 24, fontWeight: C.fWeightSemi, color: C.text, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 6 }}>
                 Manage how spending works
               </div>
               <div style={{ fontSize: 13.5, color: C.sub, lineHeight: 1.65, maxWidth: 580 }}>
@@ -503,7 +505,7 @@ export default function SpendingSettingsTab({
 
           {/* Stats row */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: 10 }}>
-            <StatBadge label="Month spend" value={`${preferredCurrency} ${Math.round(monthSpend).toLocaleString()}`} C={C} />
+            <StatBadge label="Month spend" value={formatCurrencyAmount(Math.round(monthSpend), preferredCurrency, { maximumFractionDigits: 0 })} C={C} />
             <StatBadge label="Budget alerts" value={budgetThresholdEnabled ? "Active" : "Off"} C={C} />
             <StatBadge label="Hidden categories" value={String(draft.categorySettings.hiddenCategoryIds.length)} C={C} style={isMobile ? { gridColumn: "1 / -1" } : {}} />
           </div>
@@ -538,7 +540,7 @@ export default function SpendingSettingsTab({
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, gap: 10, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12.5, color: C.sub }}>
                     Current: <strong style={{ color: C.text }}>
-                      {budget?.amount ? `${preferredCurrency} ${Math.round(budget.amount).toLocaleString()}` : "Not set"}
+                      {budget?.amount ? formatCurrencyAmount(Math.round(budget.amount), preferredCurrency, { maximumFractionDigits: 0 }) : "Not set"}
                     </strong>
                   </span>
                   <button

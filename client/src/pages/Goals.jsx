@@ -30,17 +30,6 @@ const O = {
   goldLight: "rgba(212,168,83,0.12)",
 };
 
-const goalCategoryIcons = {
-  "Emergency Fund": Target,
-  Travel: Target,
-  Education: Target,
-  Home: Target,
-  Car: Target,
-  Retirement: Target,
-  Business: Target,
-  Other: Target,
-};
-
 const goalCategoryColors = {
   "Emergency Fund": "#1A8B5C",
   Travel: "#0D7377",

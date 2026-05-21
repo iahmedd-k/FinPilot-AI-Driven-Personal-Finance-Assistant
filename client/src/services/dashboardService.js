@@ -1,6 +1,6 @@
 import api from "./api";
 
-export const dashboardService = {
+  export const dashboardService = {
   getDashboard: () => api.get("/dashboard"),
   getSummary: () => api.get("/dashboard/summary"),
   getForecast: (params = {}) => api.get("/dashboard/forecast", { params }),
@@ -13,4 +13,6 @@ export const dashboardService = {
   getSavedReports: () => api.get("/dashboard/reports"),
   saveReport: (payload) => api.post("/dashboard/reports", payload),
   deleteSavedReport: (id) => api.delete(`/dashboard/reports/${id}`),
+  setBudget: (payload) => api.post("/dashboard/budget", payload),
+  getBudget: (params) => api.get("/dashboard/budget", { params }),
 };

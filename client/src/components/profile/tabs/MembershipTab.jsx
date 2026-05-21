@@ -74,7 +74,7 @@ export default function MembershipTab({ user, navigate, isMobile }) {
               return (
                 <div key={stat.label} style={{ padding: "14px 16px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG }}>
                   <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>{stat.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: TEXT, marginBottom: 8 }}>
+                  <div style={{ fontSize: 22, fontWeight: 600, color: TEXT, marginBottom: 8 }}>
                     {stat.used}
                     <span style={{ fontSize: 13, fontWeight: 400, color: MUTED }}> / {stat.limit}</span>
                   </div>

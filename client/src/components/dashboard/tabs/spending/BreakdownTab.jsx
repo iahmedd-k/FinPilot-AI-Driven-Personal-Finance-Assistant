@@ -6,7 +6,7 @@ import { dedupToast, getSpendingCategoryMeta, SPENDING_CATEGORY_META } from "../
 import { useAuthContext } from "../../../../hooks/useAuthContext";
 import { formatCurrencyAmount, getUserCurrency } from "../../../../utils/currency";
 
-function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {}, onBudgetSaved, isMobile, preferredCurrency: preferredCurrencyProp, setSpendTab, initialTab = "expenses" }) {
+function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isMobile, preferredCurrency: preferredCurrencyProp, setSpendTab, initialTab = "expenses" }) {
   const { user } = useAuthContext();
   const preferredCurrency = preferredCurrencyProp || getUserCurrency(user);
   const latestTransactionDate = useMemo(() => {
@@ -105,12 +105,6 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
     return () => { ignore = true; };
   }, [budget, currentMonth, selectedMonth, timePeriod]);
 
-  const allMonths = useMemo(() => {
-    const fromChart = monthlyChart.map(m => m.month);
-    const set = new Set([...fromChart, currentMonth]);
-    return [...set].sort().reverse();
-  }, [monthlyChart, currentMonth]);
-
   const prevMonthKey = useMemo(() => {
     if (timePeriod === "Yearly") {
       return String(parseInt(selectedMonth) - 1);
@@ -121,7 +115,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
       if (q === 1) return `${y - 1}-Q4`;
       return `${y}-Q${q - 1}`;
     } else {
-      const [y,mo] = selectedMonth.split("-").map(Number);
+      const [y, mo] = selectedMonth.split("-").map(Number);
       const d = new Date(y, mo-2, 1);
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
     }
@@ -136,7 +130,6 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
       const parts = selectedMonth.split("-");
       y = parseInt(parts[0]);
       const q = parseInt(parts[1]?.replace("Q", "") || "1");
-      const startMo = (q - 1) * 3 + 1;
       return apiTransactions.filter(t => {
         const d = new Date(t.date);
         const ty = d.getFullYear();
@@ -225,7 +218,6 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
   const totalSpent  = Object.values(catTotals).reduce((s,v)=>s+v, 0);
   const totalIncome = monthTx.filter(t=>t.type==="income").reduce((s,t)=>s+Math.abs(t.amount||0), 0);
   const netCashFlow = totalIncome - totalSpent;
-  const isCurrentMonth = selectedMonth === currentMonth;
   const budgetAmt   = timePeriod === "Monthly" ? (monthBudget?.amount || 0) : 0;
   const rawBudgetPct = budgetAmt > 0 ? (totalSpent / budgetAmt) * 100 : 0;
   const budgetPct   = Math.min(rawBudgetPct, 100);
@@ -235,7 +227,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
   const largestTx = useMemo(() => {
     const type = breakdownTab === "income" ? "income" : "expense";
     return [...monthTx]
-      .filter(t => t.type === type)
+      .filter((t) => t.type === type)
       .sort((a, b) => Math.abs(b.amount || 0) - Math.abs(a.amount || 0))
       .slice(0, 3);
   }, [monthTx, breakdownTab]);
@@ -243,19 +235,13 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
   const freqCats = useMemo(() => {
     const freq = {};
     const type = breakdownTab === "income" ? "income" : "expense";
-    
-    monthTx.filter(t => t.type === type).forEach(t => {
-      let key;
-      if (type === "expense") {
-        key = getSpendingCategoryMeta(t.category).id;
-      } else {
-        key = t.category || "Other Income";
-      }
+    monthTx.filter((t) => t.type === type).forEach((t) => {
+      const key = type === "expense" ? getSpendingCategoryMeta(t.category).id : t.category || "Other Income";
       freq[key] = (freq[key] || 0) + 1;
     });
-    
     return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 3);
   }, [monthTx, breakdownTab]);
+
   const fmt = n => {
     const abs = Math.abs(n||0), s = n<0?"-":"";
     const formatted = formatCurrencyAmount(abs, preferredCurrency, { maximumFractionDigits: 0 });
@@ -280,20 +266,6 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
     if (isNaN(mo)) return m;
     return new Date(y,mo-1,1).toLocaleDateString("en-US",{month:"short",year:"numeric"});
   };
-  const selectedPeriodLabel = useMemo(() => {
-    if (timePeriod === "Yearly") {
-      return selectedMonth;
-    }
-    if (timePeriod === "Quarterly") {
-      const parts = selectedMonth.split("-");
-      const y = parseInt(parts[0]);
-      const q = parseInt(parts[1]?.replace("Q", "") || "1");
-      return `Q${q} ${y}`;
-    }
-    const [y, mo] = selectedMonth.split("-").map(Number);
-    return fmtMonth(selectedMonth);
-  }, [selectedMonth, timePeriod]);
-
   const activeRows = useMemo(() => {
     if (viewBy === "Merchant") {
       const map = {};
@@ -370,8 +342,8 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
     selectedIncomeCategoryChangeDisplay = `${isUp ? "+" : ""}${rawPct < 0 ? "-" : ""}${displayPct} vs last month`;
   }
 
-  const donutData = activeRows.slice(0, 8).map(row => [row.id, row.amount]);
-  const R = 90, cx = 110, cy = 110, stroke = 10;
+  const R = 90;
+  const stroke = 10;
   const circ = 2 * Math.PI * R;
 
   const pieData = useMemo(() => {
@@ -390,7 +362,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
       onBudgetSaved?.();
       setBudgetModalOpen(false);
       setBudgetInput("");
-    } catch(e) {
+    } catch {
       dedupToast.error("Failed to save budget");
     } finally { setBudgetSaving(false); }
   };
@@ -537,7 +509,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
 
         <div style={{ flex:1, overflowX:"auto", overflowY:"visible", WebkitOverflowScrolling:"touch", scrollbarWidth:"none" }} ref={timelineRef}>
           <div style={{ display:"flex", alignItems:"flex-end", gap:0, minWidth:"max-content", borderBottom:`1px solid ${C.border2}` }}>
-            {periodList.map((m, idx) => {
+            {periodList.map((m) => {
               const isSelected = m === selectedMonth;
               let isCurrentPeriod = false;
               if (timePeriod === "Yearly") {
@@ -616,7 +588,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
   })();
 
   /* ─── Category table rows ─── */
-  const CategoryRows = displayRows.map((row, i) => {
+  const CategoryRows = displayRows.map((row) => {
     const cat   = row.id;
     const amt   = row.amount;
     const pct   = activeTotal > 0 ? ((amt/activeTotal)*100).toFixed(0) : "0";
@@ -743,7 +715,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
           <div style={{ display:"flex", alignItems: "center", gap: 16 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
               <div style={{ fontSize:10, fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em" }}>Analytics Mode</div>
-              <div style={{ fontSize:15, fontWeight:800, color:C.text }}>{timePeriod}</div>
+              <div style={{ fontSize:15, fontWeight:600, color:C.text }}>{timePeriod}</div>
             </div>
           </div>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:isMobile?"flex-start":"flex-end" }}>
@@ -809,7 +781,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
                 <>
                   <div style={{ textAlign:"center", marginBottom:20 }}>
                     <div style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>Budget for {fmtMonth(selectedMonth)}</div>
-                    <div style={{ fontSize:26, fontWeight:800, color:C.text, letterSpacing:"-0.4px" }}>{fmt(budgetAmt)}</div>
+                    <div style={{ fontSize:22, fontWeight:600, color:C.text, letterSpacing:"-0.4px" }}>{fmt(budgetAmt)}</div>
                     {budgetLoading && <div style={{ marginTop: 6, fontSize: 11.5, color: C.muted }}>Loading budget…</div>}
                   </div>
                   <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}>
@@ -823,7 +795,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
                         transform="rotate(-90 110 110)"
                         style={{ transition:"stroke-dasharray 0.6s ease" }}
                       />
-                      <text x={110} y={105} textAnchor="middle" style={{ fontSize: fmt(totalSpent).length > 10 ? (fmt(totalSpent).length > 13 ? 15 : 18) : 22, fontWeight:800, fill:C.text, fontFamily:"'Inter', sans-serif" }}>{fmt(totalSpent)}</text>
+                      <text x={110} y={105} textAnchor="middle" style={{ fontSize: fmt(totalSpent).length > 10 ? (fmt(totalSpent).length > 13 ? 15 : 18) : 22, fontWeight:600, fill:C.text, fontFamily:"'Inter', sans-serif" }}>{fmt(totalSpent)}</text>
                       <text x={110} y={125} textAnchor="middle" style={{ fontSize:11, fill:C.muted, fontFamily:"'Inter', sans-serif" }}>Spent this month</text>
                     </svg>
                   </div>
@@ -1174,7 +1146,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
             <div style={{ flex: 1, overflowY: "auto", minHeight: 0, scrollbarGutter: "stable", padding: isMobile ? "14px" : "16px" }}>
               <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Spent in {fmtMonth(selectedMonth)}</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: "-0.04em", marginBottom: 8 }}>{fmt(selectedCategorySpent)}</div>
+                <div style={{ fontSize: 24, fontWeight: C.fWeightSemi, color: C.text, letterSpacing: "-0.04em", marginBottom: 8 }}>{fmt(selectedCategorySpent)}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 11.5, color: C.muted }}>
                   <span>{selectedCategoryShare.toFixed(0)}% of {breakdownTab === "budget" ? "budget spending" : "expenses"}</span>
                   <span>{selectedCategoryChangeDisplay}</span>
@@ -1215,7 +1187,7 @@ function BreakdownTab({ C, apiTransactions = [], monthlyChart = [], budget = {},
             <div style={{ flex: 1, overflowY: "auto", minHeight: 0, scrollbarGutter: "stable", padding: isMobile ? "14px" : "16px" }}>
               <div style={{ border: `1px solid ${C.border}`, borderRadius: 16, padding: "16px 18px", marginBottom: 14 }}>
                 <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Earned in {fmtMonth(selectedMonth)}</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: "-0.04em", marginBottom: 8 }}>{fmt(selectedIncomeCategoryTotal)}</div>
+                <div style={{ fontSize: 24, fontWeight: C.fWeightSemi, color: C.text, letterSpacing: "-0.04em", marginBottom: 8 }}>{fmt(selectedIncomeCategoryTotal)}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 11.5, color: C.muted }}>
                   <span>{selectedIncomeCategoryShare.toFixed(0)}% of income</span>
                   <span>{selectedIncomeCategoryChangeDisplay}</span>

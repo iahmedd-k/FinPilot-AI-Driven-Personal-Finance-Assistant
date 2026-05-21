@@ -666,7 +666,7 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                           <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 700, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{primaryName}</span>
                           <span style={{
-                            fontSize: 8, fontWeight: 800, color: "#059669",
+                            fontSize: 8, fontWeight: 600, color: "#059669",
                             background: "#ecfdf5", border: "1px solid #10b981",
                             borderRadius: 6, padding: "1px 5px", letterSpacing: "0.05em", flexShrink: 0
                           }}>ACTIVE</span>

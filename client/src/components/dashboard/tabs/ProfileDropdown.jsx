@@ -9,7 +9,21 @@ import {
 } from "lucide-react";
 import { useDashboard } from "../DashboardContext";
 import { authService } from "../../../services/authService";
+import { getUserCurrency } from "../../../utils/currency";
 import { dedupToast } from "../dashboardShared";
+
+const TOP_CURRENCIES = [
+  { code: "USD", flag: "🇺🇸", name: "US Dollar" },
+  { code: "EUR", flag: "🇪🇺", name: "Euro" },
+  { code: "GBP", flag: "🇬🇧", name: "British Pound" },
+  { code: "JPY", flag: "🇯🇵", name: "Japanese Yen" },
+  { code: "CNY", flag: "🇨🇳", name: "Chinese Yuan" },
+  { code: "CAD", flag: "🇨🇦", name: "Canadian Dollar" },
+  { code: "AUD", flag: "🇦🇺", name: "Australian Dollar" },
+  { code: "CHF", flag: "🇨🇭", name: "Swiss Franc" },
+  { code: "HKD", flag: "🇭🇰", name: "Hong Kong Dollar" },
+  { code: "SGD", flag: "🇸🇬", name: "Singapore Dollar" },
+];
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -75,11 +89,10 @@ function Row({ icon: Icon, label, onClick, right, danger = false, isLast = false
 }
 
 export default function ProfileDropdown() {
-  const { profileOpen, setProfileOpen, profileRef, navigate, logout, queryClient, ROUTES, refreshUser, user, notifications } = useDashboard();
+  const { profileOpen, setProfileOpen, profileRef, navigate, logout, queryClient, ROUTES, refreshUser, user, notifications, setMobileOpen } = useDashboard();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showThemeOptions, setShowThemeOptions] = useState(false);
   const [showCurrencyOptions, setShowCurrencyOptions] = useState(false);
-  const [currencyOptions, setCurrencyOptions] = useState([]);
   const [selectedCurrency, setSelectedCurrency] = useState("USD");
   const [currencyLoading, setCurrencyLoading] = useState(false);
   const [currencySaving, setCurrencySaving] = useState(false);
@@ -102,7 +115,7 @@ export default function ProfileDropdown() {
   };
 
   useEffect(() => {
-    setSelectedCurrency(String(user?.preferredCurrency || "USD").toUpperCase());
+    setSelectedCurrency(getUserCurrency(user));
   }, [user?.preferredCurrency]);
 
   useEffect(() => {
@@ -119,12 +132,9 @@ export default function ProfileDropdown() {
       try {
         const { data } = await authService.getCurrencyOptions();
         if (!mounted) return;
-        const list = Array.isArray(data?.currencies) ? data.currencies : [];
-        setCurrencyOptions(list);
-        setSelectedCurrency(String(data?.selectedCurrency || user?.preferredCurrency || "USD").toUpperCase());
+        setSelectedCurrency(getUserCurrency({ preferredCurrency: data?.selectedCurrency || user?.preferredCurrency || "USD" }));
       } catch {
         if (!mounted) return;
-        setCurrencyOptions(["USD"]);
       } finally {
         if (mounted) setCurrencyLoading(false);
       }
@@ -137,7 +147,7 @@ export default function ProfileDropdown() {
   }, [profileOpen, user?.preferredCurrency]);
 
   const handleCurrencyChange = async (currencyCode) => {
-    const nextCurrency = String(currencyCode || "").toUpperCase();
+    const nextCurrency = getUserCurrency({ preferredCurrency: currencyCode });
     if (!nextCurrency || nextCurrency === selectedCurrency || currencySaving) return;
 
     setCurrencySaving(true);
@@ -238,7 +248,17 @@ export default function ProfileDropdown() {
             {/* PREFERENCES */}
             <SectionLabel label="Preferences" />
             <div style={{ background: "var(--bg-secondary)", margin: "0 12px", borderRadius: 12, border: "1px solid var(--border-subtle)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <Row icon={SlidersHorizontal} label="Spending Settings" onClick={() => { navigate(`${ROUTES.DASHBOARD}?nav=spending&spend=settings`); setProfileOpen(false); }} />
+              <Row icon={SlidersHorizontal} label="Spending Settings" onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                params.set("spend", "settings");
+                if (window.location.pathname === ROUTES.DASHBOARD) {
+                  navigate(`${ROUTES.DASHBOARD}?${params.toString()}`);
+                } else {
+                  navigate(`${ROUTES.DASHBOARD}?spend=settings`);
+                }
+                setMobileOpen?.(false);
+                setProfileOpen(false);
+              }} />
               <Row icon={BrainCircuit} label="AI Financial Profile" onClick={() => { navigate("/profile?tab=aiprofile"); setProfileOpen(false); }} />
               <div style={{ position: "relative" }}>
                 <Row
@@ -299,7 +319,8 @@ export default function ProfileDropdown() {
                     {currencyLoading ? (
                       <div style={{ fontSize: 12, color: "var(--text-secondary)", padding: "8px 10px" }}>Loading currencies...</div>
                     ) : (
-                      currencyOptions.map((code) => {
+                      TOP_CURRENCIES.map((currency) => {
+                        const { code, flag, name } = currency;
                         const active = code === selectedCurrency;
                         return (
                           <button
@@ -314,8 +335,9 @@ export default function ProfileDropdown() {
                               opacity: currencySaving ? 0.7 : 1,
                             }}
                           >
+                            <span style={{ fontSize: 16 }}>{flag}</span>
                             <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? "var(--text-primary)" : "var(--text-secondary)" }}>
-                              {code}
+                              {code} - {name}
                             </span>
                             {active && <div style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />}
                           </button>

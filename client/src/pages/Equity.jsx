@@ -5,11 +5,12 @@ import {
   CartesianGrid,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
   Cell,
+  ReferenceLine,
+  ResponsiveContainer,
 } from "recharts";
 import {
   Calendar,
@@ -30,61 +31,68 @@ import { toast } from "sonner";
 import { usePortfolio } from "../context/PortfolioContext";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { cryptoService } from "../services/cryptoService";
+import { CalendarPicker } from "../components/dashboard/tabs/SpendingTab";
 import { formatCurrencyAmount, getUserCurrency } from "../utils/currency";
+import { C } from "../components/dashboard/dashboardShared.jsx";
 
 // ---------------------------------------------------------------------------
 // Constants & style helpers
 // ---------------------------------------------------------------------------
 
 const buttonReset = {
-  appearance: "none",
   border: "none",
-  background: "none",
-  fontFamily: "inherit",
-};
-
-const sectionLabelStyle = {
-  fontSize: 10,
-  fontWeight: 700,
-  color: "var(--text-muted)",
-  textTransform: "uppercase",
-  letterSpacing: "0.28em",
+  background: "transparent",
+  padding: 0,
+  margin: 0,
+  font: "inherit",
 };
 
 const inputStyle = {
   width: "100%",
-  minHeight: 40,
-  borderRadius: 10,
+  padding: "9px 12px",
+  borderRadius: 8,
   border: "1px solid var(--border-default)",
-  background: "var(--bg-card)",
+  background: "var(--bg-input, var(--bg-secondary))",
   color: "var(--text-primary)",
-  padding: "0 12px",
   fontSize: 13,
+  lineHeight: 1.4,
   outline: "none",
-  fontFamily: "inherit",
+  transition: "border-color 0.15s",
   boxSizing: "border-box",
 };
 
-const secondaryButtonStyle = {
-  ...buttonReset,
-  borderRadius: 10,
-  border: "1px solid var(--border-default)",
-  background: "var(--bg-card)",
-  color: "var(--text-primary)",
-  padding: "9px 16px",
+const primaryButtonStyle = {
+  background: "var(--text-primary)",
+  color: "var(--bg-card)",
+  border: "1px solid transparent",
+  padding: "8px 14px",
+  borderRadius: 8,
   cursor: "pointer",
+  fontWeight: 500,
   fontSize: 13,
+  lineHeight: 1.4,
+  whiteSpace: "nowrap",
 };
 
-const primaryButtonStyle = {
-  ...buttonReset,
-  borderRadius: 10,
-  border: "1px solid #09090f",
-  background: "#09090f",
-  color: "#ffffff",
-  padding: "9px 16px",
+const secondaryButtonStyle = {
+  background: "transparent",
+  color: "var(--text-primary)",
+  border: "1px solid var(--border-default)",
+  padding: "8px 14px",
+  borderRadius: 8,
   cursor: "pointer",
   fontSize: 13,
+  lineHeight: 1.4,
+  whiteSpace: "nowrap",
+};
+
+const sectionLabelStyle = {
+  fontSize: 11,
+  color: "var(--text-muted)",
+  marginBottom: 0,
+  fontWeight: 600,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
 };
 
 // ---------------------------------------------------------------------------
@@ -94,34 +102,42 @@ const grantTypeOptions = [
   {
     value: "STOCK_OPTION",
     label: "Stock Option",
-    badgeColor: "#00a6ff",
-    badgeBg: "rgba(0,166,255,0.10)",
+    labelEn: "Employee option",
+    badge: "SAT 35",
+    badgeColor: "#2196f3",
+    badgeBg: "rgba(33,150,243,0.10)",
     description:
       "Employee stock options granting the right to purchase shares at a fixed strike price. Taxed at exercise under SAT Circular 35 using the 12-month spread preferential IIT method.",
   },
   {
     value: "RSU",
     label: "RSU",
-    badgeColor: "#d870ff",
-    badgeBg: "rgba(216,112,255,0.12)",
+    labelEn: "Restricted stock unit",
+    badge: "Vest tax",
+    badgeColor: "#9c27b0",
+    badgeBg: "rgba(156,39,176,0.10)",
     description:
       "Restricted Stock Units that vest over time. Taxed as employment income at each vest event. Common in VIE-structured and overseas-listed Chinese companies.",
   },
   {
     value: "RESTRICTED_SHARE",
     label: "Restricted Share",
-    badgeColor: "#b0a600",
-    badgeBg: "rgba(176,166,0,0.12)",
+    labelEn: "Restricted stock",
+    badge: "CSRC",
+    badgeColor: "#f59e0b",
+    badgeBg: "rgba(245,158,11,0.10)",
     description:
-      "Actual shares transferred to the employee at grant but subject to a vesting / lock-up schedule. Regulated by CSRC Measures for Equity Incentives of Listed Companies. Lock-up period applies after IPO.",
+      "Actual shares transferred to the employee at grant but subject to a vesting / lock-up schedule. Regulated by CSRC Measures for Equity Incentives of Listed Companies.",
   },
   {
     value: "ESOP",
     label: "ESOP",
-    badgeColor: "#c78a14",
-    badgeBg: "rgba(199,138,20,0.12)",
+    labelEn: "Employee share plan",
+    badge: "Trust / plan",
+    badgeColor: "#f97316",
+    badgeBg: "rgba(249,115,22,0.10)",
     description:
-      "Employee Share Ownership Plan. Governed by CSRC Guiding Opinions on ESOP (2014). Shares are held collectively through an asset management plan or trust, and employees hold beneficiary interests.",
+      "Employee Share Ownership Plan. Governed by CSRC Guiding Opinions on ESOP (2014). Shares are held collectively through an asset management plan or trust.",
   },
 ];
 
@@ -150,7 +166,6 @@ const vestingScheduleOptions = [
   { value: "annual_4yr", label: "Annual over 4 years" },
 ];
 
-// CSRC mandatory lock-up periods post-IPO
 const lockupPeriodOptions = [
   { value: "none", label: "None / already unlocked" },
   { value: "12", label: "12 months" },
@@ -159,7 +174,6 @@ const lockupPeriodOptions = [
   { value: "custom", label: "Custom" },
 ];
 
-// SAFE filing status
 const safeStatusOptions = [
   { value: "not_required", label: "Not required" },
   { value: "pending", label: "Pending filing" },
@@ -167,68 +181,58 @@ const safeStatusOptions = [
   { value: "expired", label: "Expired - renewal needed" },
 ];
 
-// IIT brackets used in the SAT Circular 35 preferential calculation
-// Taxable monthly income = spread / 12; then tax = bracket rate × 12
+// IIT brackets
 const IIT_BRACKETS = [
-  { limit: 3000,   rate: 0.03, deduction: 0 },
-  { limit: 12000,  rate: 0.10, deduction: 210 },
-  { limit: 25000,  rate: 0.20, deduction: 1410 },
-  { limit: 35000,  rate: 0.25, deduction: 2660 },
-  { limit: 55000,  rate: 0.30, deduction: 4410 },
-  { limit: 80000,  rate: 0.35, deduction: 7160 },
+  { limit: 3000, rate: 0.03, deduction: 0 },
+  { limit: 12000, rate: 0.1, deduction: 210 },
+  { limit: 25000, rate: 0.2, deduction: 1410 },
+  { limit: 35000, rate: 0.25, deduction: 2660 },
+  { limit: 55000, rate: 0.3, deduction: 4410 },
+  { limit: 80000, rate: 0.35, deduction: 7160 },
   { limit: Infinity, rate: 0.45, deduction: 15160 },
 ];
 
-/**
- * SAT Circular 35 preferential IIT calculation for equity income.
- * spread = (FMV at exercise - strike price) × quantity
- * Monthly taxable = spread / 12
- * Annual IIT = (monthly taxable × rate - deduction) × 12
- */
 function calcSATTax(spread) {
   if (!spread || spread <= 0) return 0;
   const monthly = spread / 12;
-  const bracket = IIT_BRACKETS.find((b) => monthly <= b.limit) || IIT_BRACKETS[IIT_BRACKETS.length - 1];
+  const bracket =
+    IIT_BRACKETS.find((b) => monthly <= b.limit) ||
+    IIT_BRACKETS[IIT_BRACKETS.length - 1];
   return (monthly * bracket.rate - bracket.deduction) * 12;
 }
 
 // ---------------------------------------------------------------------------
-// Blank grant state — extended for Chinese standards
+// Blank grant state
 // ---------------------------------------------------------------------------
 const blankGrant = {
   _id: null,
-  // Company info
   name: "",
   ticker: "",
-  companyStructure: "private",          // replaces simple public/private
-  fairMarketValue: "",                   // 409A / latest valuation
+  companyStructure: "private",
+  fairMarketValue: "",
   currentPrice: "",
-  fxRateAtGrant: "",                     // exchange rate at grant date
-  fxRateAtVest: "",                      // for IIT calculation on RSUs
-  fxRateAtExercise: "",                  // for IIT calculation on options
-  // Grant core
+  fxRateAtGrant: "",
+  fxRateAtVest: "",
+  fxRateAtExercise: "",
   grantType: "STOCK_OPTION",
   grantId: "",
   quantity: "",
   vestedQuantity: "",
-  buyPrice: "",                          // strike price
-  fmvAtExercise: "",                     // FMV at time of exercise (for IIT)
+  buyPrice: "",
+  fmvAtExercise: "",
   buyDate: new Date().toISOString().slice(0, 10),
   expirationDate: "",
-  postTerminationWindow: "90",           // days to exercise after leaving
+  postTerminationWindow: "90",
   exercised: "",
-  // Vesting
   hasVestingSchedule: true,
   vestingSchedule: "monthly_48_12",
   vestingStartDate: "",
-  cliffMonths: "12",                     // user-defined, not hardcoded
-  // China-specific
-  safeFilingStatus: "not_required",      // SAFE Circular 7 registration
+  cliffMonths: "12",
+  safeFilingStatus: "not_required",
   safeFilingDeadline: "",
-  lockupPeriod: "none",                  // CSRC post-IPO lock-up
+  lockupPeriod: "none",
   lockupExpiry: "",
-  iitPreferentialMethod: true,           // SAT Circular 35 spread-12 method
-  // Sale & net worth
+  iitPreferentialMethod: true,
   salePrice: "",
   includeInNetWorth: true,
   notes: "",
@@ -243,7 +247,11 @@ function asNumber(value) {
 }
 
 function buildCompanyKey(asset) {
-  return `${String(asset?.ticker || "").trim().toUpperCase()}::${String(asset?.name || "").trim().toLowerCase()}`;
+  return `${String(asset?.ticker || "").trim().toUpperCase()}::${String(
+    asset?.name || ""
+  )
+    .trim()
+    .toLowerCase()}`;
 }
 
 function getGrantTypeMeta(type) {
@@ -251,15 +259,154 @@ function getGrantTypeMeta(type) {
 }
 
 function getScheduleLabel(value) {
-  return vestingScheduleOptions.find((o) => o.value === value)?.label || "Immediate";
+  return (
+    vestingScheduleOptions.find((o) => o.value === value)?.label || "Immediate"
+  );
 }
 
 function getStructureLabel(value) {
   return companyStructureOptions.find((o) => o.value === value)?.label || value;
 }
 
-function getSafeLabel(value) {
-  return safeStatusOptions.find((o) => o.value === value)?.label || value;
+function formatShareCount(value, maximumFractionDigits = 0) {
+  const amount = Number(value ?? 0);
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+function safeDate(value, fallback = new Date()) {
+  if (!value)
+    return fallback instanceof Date ? fallback : new Date(fallback);
+  const d = new Date(value);
+  return isNaN(d.getTime())
+    ? fallback instanceof Date
+      ? fallback
+      : new Date(fallback)
+    : d;
+}
+
+function startOfMonth(dateLike) {
+  const date = safeDate(dateLike);
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(dateLike, months) {
+  const date = safeDate(dateLike);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth() + months,
+    date.getDate()
+  );
+}
+
+function getMonthsDiff(fromDate, toDate) {
+  const start = safeDate(fromDate);
+  const end = safeDate(toDate);
+  let months =
+    (end.getFullYear() - start.getFullYear()) * 12 +
+    (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
+function getGrantSharePrice(grant) {
+  const quantity = asNumber(grant.quantity);
+  const perShareFromValue =
+    quantity > 0 ? asNumber(grant.currentValue) / quantity : 0;
+  return (
+    asNumber(grant.currentPrice) ||
+    asNumber(grant.fairMarketValue) ||
+    perShareFromValue ||
+    asNumber(grant.buyPrice)
+  );
+}
+
+function getGrantValuePerShare(grant, price) {
+  const p = price !== undefined ? price : getGrantSharePrice(grant);
+  if (grant.grantType === "STOCK_OPTION") {
+    return Math.max(0, p - asNumber(grant.buyPrice));
+  }
+  return p;
+}
+
+function parseVestingSchedule(grant) {
+  const schedule = String(grant.vestingSchedule || "immediate");
+  if (!grant.hasVestingSchedule || schedule === "immediate") {
+    return { kind: "immediate", totalMonths: 0, cliffMonths: 0 };
+  }
+  const monthlyMatch = schedule.match(/^monthly_(\d+)_(\d+)$/);
+  if (monthlyMatch) {
+    return {
+      kind: "monthly",
+      totalMonths: Number(monthlyMatch[1]) || 48,
+      cliffMonths: Number(monthlyMatch[2]) || 12,
+    };
+  }
+  const annualMatch = schedule.match(/^annual_(\d+)yr$/);
+  if (annualMatch) {
+    const years = Number(annualMatch[1]) || 4;
+    return { kind: "annual", totalMonths: years * 12, cliffMonths: 12 };
+  }
+  return { kind: "immediate", totalMonths: 0, cliffMonths: 0 };
+}
+
+function getGrantFullyVestedDate(grant) {
+  const startDate = grant.vestingStartDate
+    ? safeDate(grant.vestingStartDate)
+    : safeDate(grant.buyDate || Date.now());
+  const schedule = parseVestingSchedule(grant);
+  if (schedule.kind === "immediate") return startDate;
+  return addMonths(startDate, schedule.totalMonths);
+}
+
+function getGrantVestedSharesAtDate(grant, dateLike) {
+  const quantity = asNumber(grant.quantity);
+  if (quantity <= 0) return 0;
+  const date = safeDate(dateLike);
+  const grantDate = safeDate(grant.buyDate || Date.now());
+  if (date < grantDate) return 0;
+  const explicitVested = asNumber(grant.vestedQuantity);
+  const schedule = parseVestingSchedule(grant);
+  if (schedule.kind === "immediate") {
+    return explicitVested > 0 ? Math.min(quantity, explicitVested) : quantity;
+  }
+  const vestStartDate = grant.vestingStartDate
+    ? safeDate(grant.vestingStartDate)
+    : grantDate;
+  if (date < vestStartDate) return 0;
+  const monthsElapsed = getMonthsDiff(vestStartDate, date) + 1;
+  if (schedule.kind === "monthly") {
+    if (monthsElapsed < schedule.cliffMonths) return 0;
+    const vestedMonths = Math.min(schedule.totalMonths, monthsElapsed);
+    return Math.min(quantity, (quantity * vestedMonths) / schedule.totalMonths);
+  }
+  if (schedule.kind === "annual") {
+    const vestedYears = Math.min(
+      schedule.totalMonths / 12,
+      Math.floor(monthsElapsed / 12)
+    );
+    return Math.min(
+      quantity,
+      (quantity * vestedYears * 12) / schedule.totalMonths
+    );
+  }
+  return explicitVested > 0 ? Math.min(quantity, explicitVested) : quantity;
+}
+
+function buildDurationLabel(targetDate) {
+  if (!targetDate) return "All vested";
+  const today = new Date();
+  const end = new Date(targetDate);
+  if (end <= today) return "All vested";
+  const totalMonths = getMonthsDiff(today, end);
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  const parts = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}m`);
+  return parts.length ? parts.join(" ") : "< 1 month";
 }
 
 // ---------------------------------------------------------------------------
@@ -277,19 +424,23 @@ function ModalShell({ children, onClose, width = 700 }) {
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
-        background: "rgba(32, 28, 20, 0.45)",
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(2px)",
       }}
     >
       <div
+        className="modal-scroll"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: `min(${width}px, calc(100vw - 24px))`,
           maxHeight: "min(92vh, 860px)",
-          overflow: "auto",
-          borderRadius: 20,
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: 16,
           background: "var(--bg-card)",
           border: "1px solid var(--border-default)",
-          boxShadow: "0 28px 80px rgba(0,0,0,0.22)",
+          boxShadow:
+            "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.10)",
         }}
       >
         {children}
@@ -300,13 +451,67 @@ function ModalShell({ children, onClose, width = 700 }) {
 
 function Field({ label, sublabel, children }) {
   return (
-    <label style={{ display: "grid", gap: 6 }}>
-      <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>
+    <label style={{ display: "grid", gap: 5 }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: "var(--text-secondary)",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
         {label}
-        {sublabel && <span style={{ marginLeft: 6, fontWeight: 400, color: "var(--text-muted)", fontSize: 11 }}>{sublabel}</span>}
+        {sublabel && (
+          <span
+            style={{
+              fontWeight: 400,
+              color: "var(--text-muted)",
+              fontSize: 11,
+            }}
+          >
+            {sublabel}
+          </span>
+        )}
       </span>
       {children}
     </label>
+  );
+}
+
+function ModalHeader({ title, onClose }) {
+  return (
+    <div
+      style={{
+        padding: "16px 18px",
+        borderBottom: "1px solid var(--border-subtle)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexShrink: 0,
+      }}
+    >
+      <span style={sectionLabelStyle}>{title}</span>
+      <button
+        type="button"
+        onClick={onClose}
+        style={{
+          ...buttonReset,
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          borderRadius: 6,
+          transition: "background 0.15s",
+        }}
+      >
+        <X size={16} />
+      </button>
+    </div>
   );
 }
 
@@ -314,34 +519,141 @@ function ModalFooter({ children, onClose, onBack, showBack = false }) {
   return (
     <div
       style={{
-        marginTop: 20,
-        padding: "12px 16px",
+        padding: "12px 18px",
         borderTop: "1px solid var(--border-subtle)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
         flexWrap: "wrap",
+        flexShrink: 0,
+        background: "var(--bg-card)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)", fontSize: 11.5, lineHeight: 1.45 }}>
-        <Lock size={16} />
-        <span>Your financial information is encrypted and secure.</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          color: "var(--text-muted)",
+          fontSize: 11.5,
+          lineHeight: 1.4,
+        }}
+      >
+        <Lock size={13} style={{ flexShrink: 0 }} />
+        <span>Encrypted and secure.</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {showBack && <button type="button" onClick={onBack} style={secondaryButtonStyle}>Back</button>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {showBack && (
+          <button type="button" onClick={onBack} style={secondaryButtonStyle}>
+            Back
+          </button>
+        )}
         {children}
       </div>
     </div>
   );
 }
 
-function InfoBadge({ text }) {
+function InfoBadge({ text, variant = "info" }) {
+  const colors = {
+    info: {
+      bg: "var(--info-bg, rgba(33,150,243,0.06))",
+      border: "var(--info-border, rgba(33,150,243,0.18))",
+      icon: "var(--info-icon, #2196f3)",
+    },
+    warning: {
+      bg: "rgba(245,158,11,0.06)",
+      border: "rgba(245,158,11,0.20)",
+      icon: "#f59e0b",
+    },
+    danger: {
+      bg: "rgba(239,68,68,0.06)",
+      border: "rgba(239,68,68,0.20)",
+      icon: "#ef4444",
+    },
+  };
+  const c = colors[variant] || colors.info;
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 10, background: "rgba(0,166,255,0.07)", border: "1px solid rgba(0,166,255,0.18)", marginTop: 10 }}>
-      <AlertCircle size={14} style={{ color: "#00a6ff", marginTop: 1, flexShrink: 0 }} />
-      <span style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}>{text}</span>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 8,
+        padding: "9px 12px",
+        borderRadius: 8,
+        background: c.bg,
+        border: `1px solid ${c.border}`,
+        marginTop: 10,
+      }}
+    >
+      <AlertCircle
+        size={13}
+        style={{ color: c.icon, marginTop: 1, flexShrink: 0 }}
+      />
+      <span
+        style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}
+      >
+        {text}
+      </span>
     </div>
+  );
+}
+
+// Radio-style option row
+function RadioOption({ selected, onClick, label, description }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        ...buttonReset,
+        width: "100%",
+        border: `1px solid ${
+          selected ? "var(--border-active, var(--text-primary))" : "var(--border-subtle)"
+        }`,
+        borderRadius: 10,
+        padding: "13px 16px",
+        cursor: "pointer",
+        textAlign: "left",
+        background: selected
+          ? "var(--bg-selected, rgba(0,0,0,0.03))"
+          : "transparent",
+        display: "grid",
+        gridTemplateColumns: "20px 1fr",
+        gap: 12,
+        transition: "border-color 0.15s, background 0.15s",
+      }}
+    >
+      <div
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          border: `2px solid ${
+            selected ? "var(--text-primary)" : "var(--border-default)"
+          }`,
+          marginTop: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          transition: "border-color 0.15s",
+        }}
+      >
+        {selected && (
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "var(--text-primary)",
+            }}
+          />
+        )}
+      </div>
+      <div>{label}</div>
+    </button>
   );
 }
 
@@ -350,14 +662,14 @@ function InfoBadge({ text }) {
 // ---------------------------------------------------------------------------
 function GrantTypeModal({ selectedType, onSelect, onClose, onNext }) {
   return (
-    <ModalShell onClose={onClose} width={660}>
-      <div style={{ padding: "18px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={sectionLabelStyle}>Select Grant Type</div>
-        <button type="button" onClick={onClose} style={{ ...buttonReset, color: "var(--text-secondary)", cursor: "pointer" }}><X size={18} /></button>
-      </div>
-      <div style={{ padding: "14px 16px 0", borderTop: "1px solid var(--border-subtle)", marginTop: 10 }}>
-        <InfoBadge text="Grant types follow the applicable equity compensation rules for this page. SAT Circular 35 is referenced where relevant." />
-        <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
+    <ModalShell onClose={onClose} width={620}>
+      <ModalHeader title="Select Grant Type" onClose={onClose} />
+      <div
+        className="modal-scroll"
+        style={{ padding: "16px 18px", flex: 1, minHeight: 0, overflowY: "auto" }}
+      >
+        <InfoBadge text="Select the grant type that matches your equity compensation. Tax treatment varies by type under Chinese and international regulations." />
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
           {grantTypeOptions.map((option) => {
             const active = selectedType === option.value;
             return (
@@ -368,27 +680,97 @@ function GrantTypeModal({ selectedType, onSelect, onClose, onNext }) {
                 style={{
                   ...buttonReset,
                   width: "100%",
-                  border: `1px solid ${active ? "var(--text-secondary)" : "var(--border-subtle)"}`,
-                  borderRadius: 12,
-                  padding: "16px",
+                  border: `1px solid ${
+                    active ? "var(--text-primary)" : "var(--border-subtle)"
+                  }`,
+                  borderRadius: 10,
+                  padding: "13px 16px",
                   cursor: "pointer",
                   textAlign: "left",
-                  background: active ? "rgba(0,0,0,0.02)" : "var(--bg-card)",
+                  background: active
+                    ? "var(--bg-selected, rgba(0,0,0,0.03))"
+                    : "transparent",
                   display: "grid",
-                  gridTemplateColumns: "28px 1fr",
-                  gap: 14,
+                  gridTemplateColumns: "20px 1fr",
+                  gap: 12,
+                  transition: "border-color 0.15s",
                 }}
               >
-                <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${active ? "#111" : "var(--text-secondary)"}`, marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {active && <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#111" }} />}
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    border: `2px solid ${
+                      active ? "var(--text-primary)" : "var(--border-default)"
+                    }`,
+                    marginTop: 3,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {active && (
+                    <div
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: "var(--text-primary)",
+                      }}
+                    />
+                  )}
                 </div>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 17, fontWeight: 500, color: "var(--text-primary)" }}>{option.label}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{option.labelEn}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: option.badgeColor, background: option.badgeBg, borderRadius: 999, padding: "4px 8px" }}>{option.badge}</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {option.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {option.labelEn}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: option.badgeColor,
+                        background: option.badgeBg,
+                        borderRadius: 999,
+                        padding: "2px 7px",
+                      }}
+                    >
+                      {option.badge}
+                    </span>
                   </div>
-                  <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.55, color: "var(--text-secondary)" }}>{option.description}</div>
+                  <div
+                    style={{
+                      marginTop: 5,
+                      fontSize: 12,
+                      lineHeight: 1.55,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {option.description}
+                  </div>
                 </div>
               </button>
             );
@@ -396,35 +778,94 @@ function GrantTypeModal({ selectedType, onSelect, onClose, onNext }) {
         </div>
       </div>
       <ModalFooter onClose={onClose}>
-        <button type="button" onClick={onNext} style={{ ...primaryButtonStyle, minWidth: 92 }}>Next</button>
+        <button
+          type="button"
+          onClick={onNext}
+          style={{ ...primaryButtonStyle, minWidth: 80 }}
+        >
+          Next
+        </button>
       </ModalFooter>
     </ModalShell>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Company structure modal  (replaces simple public/private)
+// Company structure modal
 // ---------------------------------------------------------------------------
 function CompanyStructureModal({ companyStructure, onSelect, onClose, onNext }) {
   return (
-    <ModalShell onClose={onClose} width={640}>
-      <div style={{ padding: "18px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={sectionLabelStyle}>Company Structure</div>
-        <button type="button" onClick={onClose} style={{ ...buttonReset, color: "var(--text-secondary)", cursor: "pointer" }}><X size={18} /></button>
-      </div>
-      <div style={{ padding: "20px 18px 0", borderTop: "1px solid var(--border-subtle)", marginTop: 12 }}>
-        <div style={{ fontSize: 14, color: "var(--text-primary)" }}>What is the company's listing structure?</div>
+    <ModalShell onClose={onClose} width={560}>
+      <ModalHeader title="Company Structure" onClose={onClose} />
+      <div
+        className="modal-scroll"
+        style={{ padding: "16px 18px", flex: 1, minHeight: 0, overflowY: "auto" }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: "var(--text-primary)",
+            lineHeight: 1.5,
+          }}
+        >
+          What is the company&apos;s listing structure?
+        </p>
         <InfoBadge text="VIE / Red-chip structures may require SAFE filing for employees holding equity in offshore entities." />
-        <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
+        <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
           {companyStructureOptions.map((choice) => (
             <button
               key={choice.value}
               type="button"
               onClick={() => onSelect(choice.value)}
-              style={{ ...buttonReset, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", color: "var(--text-primary)", fontSize: 15 }}
+              style={{
+                ...buttonReset,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                cursor: "pointer",
+                color: "var(--text-primary)",
+                fontSize: 13,
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: `1px solid ${
+                  companyStructure === choice.value
+                    ? "var(--text-primary)"
+                    : "var(--border-subtle)"
+                }`,
+                background:
+                  companyStructure === choice.value
+                    ? "var(--bg-selected, rgba(0,0,0,0.03))"
+                    : "transparent",
+                transition: "border-color 0.15s",
+              }}
             >
-              <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--text-secondary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                {companyStructure === choice.value && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#111" }} />}
+              <span
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  border: `2px solid ${
+                    companyStructure === choice.value
+                      ? "var(--text-primary)"
+                      : "var(--border-default)"
+                  }`,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {companyStructure === choice.value && (
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "var(--text-primary)",
+                    }}
+                  />
+                )}
               </span>
               {choice.label}
             </button>
@@ -432,178 +873,1014 @@ function CompanyStructureModal({ companyStructure, onSelect, onClose, onNext }) 
         </div>
       </div>
       <ModalFooter onClose={onClose}>
-        <button type="button" onClick={onNext} style={{ ...primaryButtonStyle, minWidth: 92 }}>Next</button>
+        <button
+          type="button"
+          onClick={onNext}
+          style={{ ...primaryButtonStyle, minWidth: 80 }}
+        >
+          Next
+        </button>
       </ModalFooter>
     </ModalShell>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Company info modal — adds FX rate fields
+// Company info modal
 // ---------------------------------------------------------------------------
-function CompanyInfoModal({ form, setForm, onClose, onBack, onNext, saving, currency }) {
-  const needsFx = ["us_listed", "hk_listed", "vie"].includes(form.companyStructure);
+function CompanyInfoModal({
+  form,
+  setForm,
+  onClose,
+  onBack,
+  onNext,
+  saving,
+  currency,
+}) {
   return (
-    <ModalShell onClose={onClose} width={640}>
-      <div style={{ padding: "18px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={sectionLabelStyle}>Company Info</div>
-        <button type="button" onClick={onClose} style={{ ...buttonReset, color: "var(--text-secondary)", cursor: "pointer" }}><X size={18} /></button>
-      </div>
-      <div style={{ padding: "14px 16px 0", borderTop: "1px solid var(--border-subtle)", marginTop: 10 }}>
-        <div style={{ display: "grid", gap: 14, marginTop: 10 }}>
+    <ModalShell onClose={onClose} width={580}>
+      <ModalHeader title="Company Info" onClose={onClose} />
+      <div
+        className="modal-scroll"
+        style={{ padding: "16px 18px", flex: 1, minHeight: 0, overflowY: "auto" }}
+      >
+        <div style={{ display: "grid", gap: 14 }}>
           <Field label="Company name">
-            <input value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} placeholder="e.g. ByteDance" style={inputStyle} />
+            <input
+              value={form.name}
+              onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
+              placeholder="e.g. ByteDance"
+              style={inputStyle}
+            />
           </Field>
           <Field label="Stock ticker">
-            <input value={form.ticker} onChange={(e) => setForm((c) => ({ ...c, ticker: e.target.value.toUpperCase() }))} placeholder="e.g. 0700.HK or BABA" style={inputStyle} />
+            <input
+              value={form.ticker}
+              onChange={(e) =>
+                setForm((c) => ({
+                  ...c,
+                  ticker: e.target.value.toUpperCase(),
+                }))
+              }
+              placeholder="e.g. 0700.HK or BABA"
+              style={inputStyle}
+            />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 14,
+            }}
+          >
             <Field label={`Latest valuation / FMV per share (${currency})`}>
-              <input type="number" min="0" step="0.01" value={form.fairMarketValue} onChange={(e) => setForm((c) => ({ ...c, fairMarketValue: e.target.value }))} placeholder={formatCurrencyAmount(0, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} style={inputStyle} />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.fairMarketValue}
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, fairMarketValue: e.target.value }))
+                }
+                placeholder="0.00"
+                style={inputStyle}
+              />
             </Field>
             <Field label="Current market price per share">
-              <input type="number" min="0" step="0.01" value={form.currentPrice} onChange={(e) => setForm((c) => ({ ...c, currentPrice: e.target.value }))} placeholder={formatCurrencyAmount(0, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} style={inputStyle} />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.currentPrice}
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, currentPrice: e.target.value }))
+                }
+                placeholder="0.00"
+                style={inputStyle}
+              />
             </Field>
           </div>
-          {needsFx && (
-            <>
-              <InfoBadge text="For overseas-listed or VIE companies, IIT is calculated in the dashboard currency. Record the exchange rate at key dates for accurate tax reporting under SAT Circular 35." />
-              <Field label="Exchange rate at grant date">
-                <input type="number" min="0" step="0.0001" value={form.fxRateAtGrant} onChange={(e) => setForm((c) => ({ ...c, fxRateAtGrant: e.target.value }))} placeholder="e.g. 7.24" style={inputStyle} />
-              </Field>
-            </>
-          )}
-          <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-            All monetary values should be entered in the dashboard currency unless your company's equity plan specifies a foreign currency.
-          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 11.5,
+              color: "var(--text-muted)",
+              lineHeight: 1.5,
+            }}
+          >
+            All monetary values should be entered in the dashboard currency
+            unless your company&apos;s equity plan specifies a foreign currency.
+          </p>
         </div>
       </div>
       <ModalFooter onClose={onClose} onBack={onBack} showBack>
-        <button type="button" disabled={saving} onClick={onNext} style={{ ...primaryButtonStyle, minWidth: 92, opacity: saving ? 0.7 : 1 }}>Next</button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onNext}
+          style={{ ...primaryButtonStyle, minWidth: 80, opacity: saving ? 0.7 : 1 }}
+        >
+          Next
+        </button>
       </ModalFooter>
     </ModalShell>
   );
 }
 
+function DateField({ label, value, onChange, minDate, hint }) {
+  return (
+    <Field label={label}>
+      <div style={{ display: "grid", gap: 4 }}>
+        <CalendarPicker C={C} value={value} onChange={onChange} minDate={minDate} />
+        {hint && (
+          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{hint}</div>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+// Reusable select wrapper
+function SelectField({ value, onChange, options, placeholder }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        value={value}
+        onChange={onChange}
+        style={{
+          ...inputStyle,
+          appearance: "none",
+          paddingRight: 36,
+          cursor: "pointer",
+        }}
+      >
+        {placeholder && (
+          <option value="" disabled hidden>
+            {placeholder}
+          </option>
+        )}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={15}
+        style={{
+          position: "absolute",
+          right: 12,
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "var(--text-muted)",
+          pointerEvents: "none",
+        }}
+      />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// Grant details modal — full Chinese-standard fields
+// Add grant modal (simplified for new grants)
 // ---------------------------------------------------------------------------
-function GrantDetailsModal({ title, form, setForm, onClose, onBack, onSubmit, saving, isEdit = false, currency }) {
+function AddGrantDetailsModal({
+  title,
+  form,
+  setForm,
+  onClose,
+  onBack,
+  onSubmit,
+  saving,
+  currency,
+}) {
+  const meta = getGrantTypeMeta(form.grantType);
+  const isOption = form.grantType === "STOCK_OPTION";
+  const isRSU = form.grantType === "RSU";
+
+  const SectionDivider = ({ label }) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        margin: "20px 0 14px",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.07em",
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+      <div
+        style={{ height: 1, flex: 1, background: "var(--border-subtle)" }}
+      />
+    </div>
+  );
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 220,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(2px)",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(800px, calc(100vw - 24px))",
+          maxHeight: "min(90vh, 820px)",
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: 16,
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-default)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--border-subtle)",
+            flexShrink: 0,
+          }}
+        >
+          <div>
+            <div style={sectionLabelStyle}>Add Share Details</div>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 15,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+              }}
+            >
+              {title}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              ...buttonReset,
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div
+          className="modal-scroll"
+          style={{ padding: "16px 20px 20px", overflowY: "auto", flex: 1 }}
+        >
+          {/* Grant type badge row */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 18,
+              padding: "10px 12px",
+              borderRadius: 8,
+              background: "var(--bg-secondary, rgba(0,0,0,0.03))",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+              }}
+            >
+              {meta.label}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                padding: "2px 8px",
+                borderRadius: 999,
+                background: meta.badgeBg,
+                color: meta.badgeColor,
+                fontWeight: 600,
+              }}
+            >
+              {meta.labelEn}
+            </span>
+          </div>
+
+          <SectionDivider label="Grant details" />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 14,
+            }}
+          >
+            <Field label="Grant ID">
+              <input
+                type="text"
+                value={form.grantId || ""}
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, grantId: e.target.value }))
+                }
+                placeholder="EQ-2024-001"
+                style={inputStyle}
+              />
+            </Field>
+            <Field
+              label={isOption ? "Number of options" : "Number of shares"}
+            >
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.quantity}
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, quantity: e.target.value }))
+                }
+                placeholder="e.g. 10000"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+
+          {isOption && (
+            <>
+              <SectionDivider label="Exercise" />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                <Field label={`Strike price (${currency})`}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.buyPrice}
+                    onChange={(e) =>
+                      setForm((c) => ({ ...c, buyPrice: e.target.value }))
+                    }
+                    placeholder="0.00"
+                    style={inputStyle}
+                  />
+                </Field>
+                <Field label="Options exercised">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.exercised}
+                    onChange={(e) =>
+                      setForm((c) => ({ ...c, exercised: e.target.value }))
+                    }
+                    placeholder="0"
+                    style={inputStyle}
+                  />
+                </Field>
+              </div>
+            </>
+          )}
+
+          {!isOption && !isRSU && (
+            <>
+              <SectionDivider label="Purchase" />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                <Field label="Grant / purchase date">
+                  <CalendarPicker
+                    C={C}
+                    value={form.buyDate}
+                    onChange={(value) =>
+                      setForm((c) => ({ ...c, buyDate: value }))
+                    }
+                  />
+                </Field>
+                <Field label={`Price (${currency})`}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.buyPrice}
+                    onChange={(e) =>
+                      setForm((c) => ({ ...c, buyPrice: e.target.value }))
+                    }
+                    placeholder="0.00"
+                    style={inputStyle}
+                  />
+                </Field>
+              </div>
+            </>
+          )}
+
+          <SectionDivider label="Vesting schedule" />
+
+          {!isRSU && (
+            <div style={{ marginBottom: 14 }}>
+              <p
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 12,
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {isOption
+                  ? "Is it early exercisable?"
+                  : "Does it have a vesting schedule?"}
+              </p>
+              <div style={{ display: "flex", gap: 16 }}>
+                {[
+                  { value: true, label: "Yes" },
+                  { value: false, label: "No" },
+                ].map((choice) => (
+                  <button
+                    key={String(choice.value)}
+                    type="button"
+                    onClick={() =>
+                      setForm((c) => ({
+                        ...c,
+                        hasVestingSchedule: choice.value,
+                      }))
+                    }
+                    style={{
+                      ...buttonReset,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      cursor: "pointer",
+                      color: "var(--text-primary)",
+                      fontSize: 13,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        border: `2px solid ${
+                          form.hasVestingSchedule === choice.value
+                            ? "var(--text-primary)"
+                            : "var(--border-default)"
+                        }`,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {form.hasVestingSchedule === choice.value && (
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: "var(--text-primary)",
+                          }}
+                        />
+                      )}
+                    </span>
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(form.hasVestingSchedule || isRSU) && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 14,
+              }}
+            >
+              <Field label="Vesting start date">
+                <CalendarPicker
+                  C={C}
+                  value={form.vestingStartDate}
+                  onChange={(value) =>
+                    setForm((c) => ({ ...c, vestingStartDate: value }))
+                  }
+                />
+              </Field>
+              <Field label="Vesting schedule">
+                <SelectField
+                  value={form.vestingSchedule}
+                  onChange={(e) =>
+                    setForm((c) => ({
+                      ...c,
+                      vestingSchedule: e.target.value,
+                    }))
+                  }
+                  options={vestingScheduleOptions}
+                  placeholder="Select schedule"
+                />
+              </Field>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            <Field label="Notes (optional)">
+              <input
+                type="text"
+                value={form.notes || ""}
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, notes: e.target.value }))
+                }
+                placeholder="Add any context for this grant"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "12px 20px",
+            borderTop: "1px solid var(--border-subtle)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              color: "var(--text-muted)",
+              fontSize: 11.5,
+            }}
+          >
+            <Lock size={13} style={{ flexShrink: 0 }} />
+            <span>Encrypted and secure.</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              onClick={onBack}
+              style={{ ...secondaryButtonStyle, minWidth: 70 }}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onSubmit}
+              style={{
+                ...primaryButtonStyle,
+                minWidth: 80,
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? "Saving..." : "Add grant"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Grant details modal (full edit)
+// ---------------------------------------------------------------------------
+function GrantDetailsModal({
+  title,
+  form,
+  setForm,
+  onClose,
+  onBack,
+  onSubmit,
+  saving,
+  currency,
+}) {
   const meta = getGrantTypeMeta(form.grantType);
   const isOption = form.grantType === "STOCK_OPTION";
   const isRSU = form.grantType === "RSU";
   const isRestrictedShare = form.grantType === "RESTRICTED_SHARE";
   const isESOP = form.grantType === "ESOP";
-  const needsFx = ["us_listed", "hk_listed", "vie"].includes(form.companyStructure);
   const hasVesting = isOption || isRSU || isRestrictedShare;
+  const needsFx = ["us_listed", "hk_listed", "vie"].includes(
+    form.companyStructure
+  );
 
-  // SAT Circular 35 IIT estimate
-  const spread = (asNumber(form.fmvAtExercise) - asNumber(form.buyPrice)) * asNumber(form.exercised || form.quantity);
-  const estimatedIIT = form.iitPreferentialMethod ? calcSATTax(spread) : 0;
+  const formatEquityAmount = (value, opts = {}) =>
+    formatCurrencyAmount(value, currency, { maximumFractionDigits: 0, ...opts });
+
+  const spread =
+    (asNumber(form.fmvAtExercise) - asNumber(form.buyPrice)) *
+    asNumber(form.exercised || 0);
+  const estimatedIIT =
+    form.iitPreferentialMethod ? calcSATTax(spread) : 0;
+
+  const SectionDivider = ({ label }) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        margin: "20px 0 14px",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.07em",
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+      <div
+        style={{ height: 1, flex: 1, background: "var(--border-subtle)" }}
+      />
+    </div>
+  );
 
   return (
-    <ModalShell onClose={onClose} width={580}>
-      <div style={{ padding: "18px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={sectionLabelStyle}>{title}</div>
-        <button type="button" onClick={onClose} style={{ ...buttonReset, color: "var(--text-secondary)", cursor: "pointer" }}><X size={18} /></button>
-      </div>
-      <div style={{ padding: "14px 16px 0", borderTop: "1px solid var(--border-subtle)", marginTop: 10 }}>
-
+    <ModalShell onClose={onClose} width={760}>
+      <ModalHeader title={title} onClose={onClose} />
+      <div
+        className="modal-scroll"
+        style={{ padding: "16px 18px 20px", overflowY: "auto", flex: 1 }}
+      >
         {/* Grant type badge */}
-        <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-           <div style={{ fontSize: 17, color: "var(--text-primary)", fontWeight: 500 }}>{getGrantTypeMeta(form.grantType).label}</div>
-          <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{meta.labelEn}</div>
-          <span style={{ fontSize: 11, color: meta.badgeColor, background: meta.badgeBg, borderRadius: 999, padding: "4px 8px" }}>{meta.badge}</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+            padding: "9px 12px",
+            borderRadius: 8,
+            background: "var(--bg-secondary, rgba(0,0,0,0.03))",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "var(--text-primary)",
+            }}
+          >
+            {meta.label}
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--text-muted)",
+            }}
+          >
+            {meta.labelEn}
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: meta.badgeColor,
+              background: meta.badgeBg,
+              borderRadius: 999,
+              padding: "2px 7px",
+            }}
+          >
+            {meta.badge}
+          </span>
         </div>
 
-        {/* ── Section: Grant Details ─────────────────────── */}
-        <div style={{ marginTop: 18, fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>Grant Details</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 14 }}>
+        <SectionDivider label="Grant Details" />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 14,
+          }}
+        >
           <Field label="Grant ID">
-            <input value={form.grantId} onChange={(e) => setForm((c) => ({ ...c, grantId: e.target.value }))} placeholder="e.g. EQ-2024-001" style={inputStyle} />
+            <input
+              value={form.grantId}
+              onChange={(e) =>
+                setForm((c) => ({ ...c, grantId: e.target.value }))
+              }
+              placeholder="e.g. EQ-2024-001"
+              style={inputStyle}
+            />
           </Field>
-          <Field label={isOption ? "Number of options" : "Number of shares"}>
-            <input type="number" min="0" step="1" value={form.quantity} onChange={(e) => setForm((c) => ({ ...c, quantity: e.target.value }))} placeholder="Quantity" style={inputStyle} />
+          <Field
+            label={isOption ? "Number of options" : "Number of shares"}
+          >
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.quantity}
+              onChange={(e) =>
+                setForm((c) => ({ ...c, quantity: e.target.value }))
+              }
+              placeholder="Quantity"
+              style={inputStyle}
+            />
           </Field>
           <Field label="Vested quantity">
-            <input type="number" min="0" step="1" value={form.vestedQuantity} onChange={(e) => {
-              const v = asNumber(e.target.value);
-              if (v > asNumber(form.quantity)) return toast.error("Vested quantity cannot exceed total quantity.");
-              setForm((c) => ({ ...c, vestedQuantity: e.target.value }));
-            }} placeholder="0" style={inputStyle} />
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={form.vestedQuantity}
+              onChange={(e) => {
+                const v = asNumber(e.target.value);
+                if (v > asNumber(form.quantity))
+                  return toast.error(
+                    "Vested quantity cannot exceed total quantity."
+                  );
+                setForm((c) => ({ ...c, vestedQuantity: e.target.value }));
+              }}
+              placeholder="0"
+              style={inputStyle}
+            />
           </Field>
           {(isOption || isRestrictedShare) && (
             <Field label="Exercised shares">
-              <input type="number" min="0" step="1" value={form.exercised} onChange={(e) => {
-                const v = asNumber(e.target.value);
-                if (v > asNumber(form.vestedQuantity || form.quantity)) return toast.error("Exercised cannot exceed vested quantity.");
-                setForm((c) => ({ ...c, exercised: e.target.value }));
-              }} placeholder="0" style={inputStyle} />
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.exercised}
+                onChange={(e) => {
+                  const v = asNumber(e.target.value);
+                  if (v > asNumber(form.vestedQuantity || form.quantity))
+                    return toast.error(
+                      "Exercised cannot exceed vested quantity."
+                    );
+                  setForm((c) => ({ ...c, exercised: e.target.value }));
+                }}
+                placeholder="0"
+                style={inputStyle}
+              />
             </Field>
           )}
         </div>
 
-        {/* ── Section: Price & Dates ────────────────────── */}
-        <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={sectionLabelStyle}>{isOption ? "Option Terms" : "Share Terms"}</div>
-          <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 12 }}>
-          <Field label={isOption ? `Strike price (${currency})` : isRSU ? `Grant date FMV (${currency})` : `Purchase price (${currency})`}>
-            <input type="number" min="0" step="0.01" value={form.buyPrice} onChange={(e) => setForm((c) => ({ ...c, buyPrice: e.target.value }))} placeholder={formatCurrencyAmount(0, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} style={inputStyle} />
+        <SectionDivider
+          label={isOption ? "Option Terms" : "Share Terms"}
+        />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 14,
+          }}
+        >
+          <Field
+            label={
+              isOption
+                ? `Strike price (${currency})`
+                : isRSU
+                ? `Grant date FMV (${currency})`
+                : `Purchase price (${currency})`
+            }
+          >
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.buyPrice}
+              onChange={(e) =>
+                setForm((c) => ({ ...c, buyPrice: e.target.value }))
+              }
+              placeholder="0.00"
+              style={inputStyle}
+            />
           </Field>
-          <Field label={isOption ? "Grant date" : "Grant / purchase date"}>
-            <input type="date" value={form.buyDate} onChange={(e) => setForm((c) => ({ ...c, buyDate: e.target.value }))} style={inputStyle} />
-          </Field>
+          <DateField
+            label={isOption ? "Grant date" : "Grant / purchase date"}
+            value={form.buyDate}
+            onChange={(value) =>
+              setForm((c) => ({ ...c, buyDate: value }))
+            }
+          />
           {isOption && (
             <>
-              <Field label="Expiration date">
-                <input type="date" value={form.expirationDate || ""} onChange={(e) => setForm((c) => ({ ...c, expirationDate: e.target.value }))} style={inputStyle} />
-              </Field>
-              <Field label="Post-termination exercise window (days)">
-                <input type="number" min="0" step="1" value={form.postTerminationWindow} onChange={(e) => setForm((c) => ({ ...c, postTerminationWindow: e.target.value }))} placeholder="e.g. 90" style={inputStyle} />
+              <DateField
+                label="Expiration date"
+                value={form.expirationDate || ""}
+                onChange={(value) =>
+                  setForm((c) => ({ ...c, expirationDate: value }))
+                }
+                minDate={form.buyDate}
+              />
+              <Field label="Post-termination window (days)">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.postTerminationWindow}
+                  onChange={(e) =>
+                    setForm((c) => ({
+                      ...c,
+                      postTerminationWindow: e.target.value,
+                    }))
+                  }
+                  placeholder="90"
+                  style={inputStyle}
+                />
               </Field>
             </>
           )}
         </div>
 
-        {/* ── Section: IIT / Tax (SAT Circular 35) ─────── */}
+        {needsFx && (
+          <>
+            <SectionDivider label="Exchange Rate" />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 14,
+              }}
+            >
+              <Field label="Exchange rate at grant date">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={form.fxRateAtGrant}
+                  onChange={(e) =>
+                    setForm((c) => ({ ...c, fxRateAtGrant: e.target.value }))
+                  }
+                  placeholder="e.g. 7.24"
+                  style={inputStyle}
+                />
+              </Field>
+            </div>
+          </>
+        )}
+
         {isOption && (
           <>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={sectionLabelStyle}>IIT Calculation (SAT Circular 35)</div>
-              <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-            </div>
-            <InfoBadge text="Under SAT Circular 35, IIT on stock option income = (FMV at exercise - strike price) x shares, then taxed using the 12-month spread preferential method." />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 14 }}>
+            <SectionDivider label="IIT Calculation (SAT Circular 35)" />
+            <InfoBadge text="Under SAT Circular 35, IIT on stock option income = (FMV at exercise − strike price) × shares exercised, taxed using the 12-month spread preferential method." />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 14,
+                marginTop: 14,
+              }}
+            >
               <Field label={`FMV per share at exercise (${currency})`}>
-                <input type="number" min="0" step="0.01" value={form.fmvAtExercise} onChange={(e) => setForm((c) => ({ ...c, fmvAtExercise: e.target.value }))} placeholder={formatCurrencyAmount(0, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} style={inputStyle} />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.fmvAtExercise}
+                  onChange={(e) =>
+                    setForm((c) => ({ ...c, fmvAtExercise: e.target.value }))
+                  }
+                  placeholder="0.00"
+                  style={inputStyle}
+                />
               </Field>
               {needsFx && (
                 <Field label="Exchange rate at exercise date">
-                  <input type="number" min="0" step="0.0001" value={form.fxRateAtExercise} onChange={(e) => setForm((c) => ({ ...c, fxRateAtExercise: e.target.value }))} placeholder="e.g. 7.24" style={inputStyle} />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={form.fxRateAtExercise}
+                    onChange={(e) =>
+                      setForm((c) => ({
+                        ...c,
+                        fxRateAtExercise: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. 7.24"
+                    style={inputStyle}
+                  />
                 </Field>
               )}
             </div>
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ marginTop: 12 }}>
               <button
                 type="button"
-                onClick={() => setForm((c) => ({ ...c, iitPreferentialMethod: !c.iitPreferentialMethod }))}
-                style={{ ...buttonReset, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "var(--text-primary)", fontSize: 13 }}
+                onClick={() =>
+                  setForm((c) => ({
+                    ...c,
+                    iitPreferentialMethod: !c.iitPreferentialMethod,
+                  }))
+                }
+                style={{
+                  ...buttonReset,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                }}
               >
-                <span style={{ width: 18, height: 18, borderRadius: 4, border: "2px solid var(--text-secondary)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                  {form.iitPreferentialMethod && <span style={{ width: 10, height: 10, borderRadius: 2, background: "#111" }} />}
+                <span
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 4,
+                    border: `2px solid ${
+                      form.iitPreferentialMethod
+                        ? "var(--text-primary)"
+                        : "var(--border-default)"
+                    }`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {form.iitPreferentialMethod && (
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 2,
+                        background: "var(--text-primary)",
+                      }}
+                    />
+                  )}
                 </span>
                 Use SAT Circular 35 preferential 12-month spread method
               </button>
             </div>
             {spread > 0 && (
-              <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "rgba(0,166,255,0.06)", border: "1px solid rgba(0,166,255,0.15)" }}>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Estimated IIT on exercise (pre-deductions)</div>
-                <div style={{ marginTop: 4, fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "rgba(33,150,243,0.05)",
+                  border: "1px solid rgba(33,150,243,0.15)",
+                }}
+              >
+                <div
+                  style={{ fontSize: 11, color: "var(--text-muted)" }}
+                >
+                  Estimated IIT on exercise (pre-deductions)
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                  }}
+                >
                   {formatEquityAmount(estimatedIIT)}
                 </div>
-                <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>Spread: {formatEquityAmount(spread)} · Consult a tax advisor for final figures.</div>
+                <div
+                  style={{ marginTop: 3, fontSize: 11, color: "var(--text-muted)" }}
+                >
+                  Spread: {formatEquityAmount(spread)} · Consult a tax advisor
+                  for final figures.
+                </div>
               </div>
             )}
           </>
@@ -611,163 +1888,306 @@ function GrantDetailsModal({ title, form, setForm, onClose, onBack, onSubmit, sa
 
         {isRSU && needsFx && (
           <>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={sectionLabelStyle}>RSU Tax - Vest Date FX (SAT Circular 35)</div>
-              <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-            </div>
-            <InfoBadge text="RSU income is taxed at vest. For overseas-listed companies, the dashboard-currency equivalent of the FMV at vest is used for IIT. Record the exchange rate at each vest event." />
-            <div style={{ marginTop: 12 }}>
+            <SectionDivider label="RSU Tax — Vest Date FX" />
+            <InfoBadge text="RSU income is taxed at vest. For overseas-listed companies, record the exchange rate at each vest event for IIT calculation." />
+            <div style={{ marginTop: 14 }}>
               <Field label="Exchange rate at vest date">
-                <input type="number" min="0" step="0.0001" value={form.fxRateAtVest} onChange={(e) => setForm((c) => ({ ...c, fxRateAtVest: e.target.value }))} placeholder="e.g. 7.24" style={inputStyle} />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={form.fxRateAtVest}
+                  onChange={(e) =>
+                    setForm((c) => ({ ...c, fxRateAtVest: e.target.value }))
+                  }
+                  placeholder="e.g. 7.24"
+                  style={inputStyle}
+                />
               </Field>
             </div>
           </>
         )}
 
-        {/* ── Section: Vesting Schedule ─────────────────── */}
         {hasVesting && (
           <>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={sectionLabelStyle}>Vesting Schedule</div>
-              <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-            </div>
-            <div style={{ display: "flex", gap: 24, marginTop: 14, flexWrap: "wrap" }}>
-              {[{ value: true, label: "Has vesting schedule" }, { value: false, label: "No schedule" }].map((choice) => (
+            <SectionDivider label="Vesting Schedule" />
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {[
+                { value: true, label: "Has vesting schedule" },
+                { value: false, label: "No schedule" },
+              ].map((choice) => (
                 <button
                   key={String(choice.value)}
                   type="button"
-                  onClick={() => setForm((c) => ({ ...c, hasVestingSchedule: choice.value }))}
-                  style={{ ...buttonReset, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "var(--text-primary)", fontSize: 14 }}
+                  onClick={() =>
+                    setForm((c) => ({
+                      ...c,
+                      hasVestingSchedule: choice.value,
+                    }))
+                  }
+                  style={{
+                    ...buttonReset,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                  }}
                 >
-                  <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--text-secondary)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                    {form.hasVestingSchedule === choice.value && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#111" }} />}
+                  <span
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: `2px solid ${
+                        form.hasVestingSchedule === choice.value
+                          ? "var(--text-primary)"
+                          : "var(--border-default)"
+                      }`,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {form.hasVestingSchedule === choice.value && (
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "var(--text-primary)",
+                        }}
+                      />
+                    )}
                   </span>
                   {choice.label}
                 </button>
               ))}
             </div>
             {form.hasVestingSchedule && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 16 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: 14,
+                  marginTop: 14,
+                }}
+              >
                 <Field label="Vesting schedule">
-                  <div style={{ position: "relative" }}>
-                    <select value={form.vestingSchedule} onChange={(e) => setForm((c) => ({ ...c, vestingSchedule: e.target.value }))} style={{ ...inputStyle, appearance: "none", paddingRight: 42 }}>
-                      {vestingScheduleOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                    <ChevronDown size={18} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
-                  </div>
+                  <SelectField
+                    value={form.vestingSchedule}
+                    onChange={(e) =>
+                      setForm((c) => ({
+                        ...c,
+                        vestingSchedule: e.target.value,
+                      }))
+                    }
+                    options={vestingScheduleOptions}
+                  />
                 </Field>
-                <Field label="Vesting start date">
-                  <input type="date" value={form.vestingStartDate} onChange={(e) => setForm((c) => ({ ...c, vestingStartDate: e.target.value }))} style={inputStyle} />
-                </Field>
+                <DateField
+                  label="Vesting start date"
+                  value={form.vestingStartDate}
+                  onChange={(value) =>
+                    setForm((c) => ({ ...c, vestingStartDate: value }))
+                  }
+                  minDate={form.buyDate}
+                />
                 <Field label="Cliff period (months)">
-                  <input type="number" min="0" step="1" value={form.cliffMonths} onChange={(e) => setForm((c) => ({ ...c, cliffMonths: e.target.value }))} placeholder="e.g. 12" style={inputStyle} />
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.cliffMonths}
+                    onChange={(e) =>
+                      setForm((c) => ({ ...c, cliffMonths: e.target.value }))
+                    }
+                    placeholder="e.g. 12"
+                    style={inputStyle}
+                  />
                 </Field>
               </div>
             )}
           </>
         )}
 
-        {/* ── Section: CSRC Lock-up ────────────── */}
-        {(isRestrictedShare || isRSU) && (
+        {(isRestrictedShare || isRSU || isESOP) && (
           <>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={sectionLabelStyle}>CSRC Post-IPO Lock-up</div>
-              <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-            </div>
-            <InfoBadge text="CSRC requires a mandatory lock-up after IPO. Employees: 12 months. Core management / founders: 36 months. Selling before lock-up expiry is prohibited." />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 14 }}>
+            <SectionDivider
+              label={
+                isESOP ? "ESOP Lock-up & Trust Details" : "CSRC Post-IPO Lock-up"
+              }
+            />
+            <InfoBadge
+              text={
+                isESOP
+                  ? "Under CSRC Guiding Opinions on ESOP (2014), shares are held via an asset management plan or trust."
+                  : "CSRC requires a mandatory post-IPO lock-up. Employees: 12 months. Core management/founders: 36 months."
+              }
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 14,
+                marginTop: 14,
+              }}
+            >
               <Field label="Lock-up period">
-                <div style={{ position: "relative" }}>
-                  <select value={form.lockupPeriod} onChange={(e) => setForm((c) => ({ ...c, lockupPeriod: e.target.value }))} style={{ ...inputStyle, appearance: "none", paddingRight: 42 }}>
-                    {lockupPeriodOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                  <ChevronDown size={18} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
-                </div>
+                <SelectField
+                  value={form.lockupPeriod}
+                  onChange={(e) =>
+                    setForm((c) => ({ ...c, lockupPeriod: e.target.value }))
+                  }
+                  options={lockupPeriodOptions}
+                />
               </Field>
-              <Field label="Lock-up expiry date">
-                <input type="date" value={form.lockupExpiry || ""} onChange={(e) => setForm((c) => ({ ...c, lockupExpiry: e.target.value }))} style={inputStyle} />
-              </Field>
+              <DateField
+                label="Lock-up expiry date"
+                value={form.lockupExpiry || ""}
+                onChange={(value) =>
+                  setForm((c) => ({ ...c, lockupExpiry: value }))
+                }
+              />
             </div>
           </>
         )}
 
-        {/* ── Section: SAFE Filing ─────────────── */}
         {["us_listed", "hk_listed", "vie"].includes(form.companyStructure) && (
           <>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={sectionLabelStyle}>SAFE Filing Status</div>
-              <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-            </div>
-            <InfoBadge text="Chinese employees holding equity in offshore entities must register with SAFE (State Administration of Foreign Exchange) under Circular 7. Failure to file carries financial penalties." />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 14 }}>
+            <SectionDivider label="SAFE Filing Status" />
+            <InfoBadge text="Chinese employees holding equity in offshore entities must register with SAFE (State Administration of Foreign Exchange) under Circular 7." />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 14,
+                marginTop: 14,
+              }}
+            >
               <Field label="SAFE filing status">
-                <div style={{ position: "relative" }}>
-                  <select value={form.safeFilingStatus} onChange={(e) => setForm((c) => ({ ...c, safeFilingStatus: e.target.value }))} style={{ ...inputStyle, appearance: "none", paddingRight: 42 }}>
-                    {safeStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                  <ChevronDown size={18} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
-                </div>
+                <SelectField
+                  value={form.safeFilingStatus}
+                  onChange={(e) =>
+                    setForm((c) => ({
+                      ...c,
+                      safeFilingStatus: e.target.value,
+                    }))
+                  }
+                  options={safeStatusOptions}
+                />
               </Field>
-              <Field label="SAFE filing / renewal deadline" sublabel="optional">
-                <input type="date" value={form.safeFilingDeadline || ""} onChange={(e) => setForm((c) => ({ ...c, safeFilingDeadline: e.target.value }))} style={inputStyle} />
-              </Field>
+              <DateField
+                label="SAFE filing / renewal deadline"
+                value={form.safeFilingDeadline || ""}
+                onChange={(value) =>
+                  setForm((c) => ({ ...c, safeFilingDeadline: value }))
+                }
+                hint="optional"
+              />
             </div>
           </>
         )}
 
-        {/* ── Section: ESOP specific ───────────────────── */}
-        {isESOP && (
-          <>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={sectionLabelStyle}>ESOP Plan Details</div>
-              <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-            </div>
-            <InfoBadge text="Under CSRC Guiding Opinions on ESOP (2014), shares are held via an asset management plan or trust. Lock-up applies from the date of transfer into the plan." />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 14 }}>
-              <Field label={`Plan purchase price per share (${currency})`}>
-                <input type="number" min="0" step="0.01" value={form.buyPrice} onChange={(e) => setForm((c) => ({ ...c, buyPrice: e.target.value }))} placeholder={formatCurrencyAmount(0, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} style={inputStyle} />
-              </Field>
-              <Field label="Lock-up expiry date">
-                <input type="date" value={form.lockupExpiry || ""} onChange={(e) => setForm((c) => ({ ...c, lockupExpiry: e.target.value }))} style={inputStyle} />
-              </Field>
-            </div>
-          </>
-        )}
-
-        {/* ── Section: Sale & Net Worth ─────────────────── */}
-        <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={sectionLabelStyle}>Realisation & Net Worth</div>
-          <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginTop: 12 }}>
+        <SectionDivider label="Realisation & Net Worth" />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 14,
+          }}
+        >
           <Field label={`Sale price per share (${currency})`} sublabel="if sold">
-            <input type="number" min="0" step="0.01" value={form.salePrice || ""} onChange={(e) => setForm((c) => ({ ...c, salePrice: e.target.value }))} placeholder={formatCurrencyAmount(0, currency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} style={inputStyle} />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.salePrice || ""}
+              onChange={(e) =>
+                setForm((c) => ({ ...c, salePrice: e.target.value }))
+              }
+              placeholder="0.00"
+              style={inputStyle}
+            />
           </Field>
         </div>
-        <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginTop: 14 }}>
           <button
             type="button"
-            onClick={() => setForm((c) => ({ ...c, includeInNetWorth: !c.includeInNetWorth }))}
-            style={{ ...buttonReset, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "var(--text-primary)", fontSize: 13 }}
+            onClick={() =>
+              setForm((c) => ({
+                ...c,
+                includeInNetWorth: !c.includeInNetWorth,
+              }))
+            }
+            style={{
+              ...buttonReset,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              color: "var(--text-primary)",
+              fontSize: 13,
+            }}
           >
-            <span style={{ width: 18, height: 18, borderRadius: 4, border: "2px solid var(--text-secondary)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-              {form.includeInNetWorth && <span style={{ width: 10, height: 10, borderRadius: 2, background: "#111" }} />}
+            <span
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 4,
+                border: `2px solid ${
+                  form.includeInNetWorth
+                    ? "var(--text-primary)"
+                    : "var(--border-default)"
+                }`,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {form.includeInNetWorth && (
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 2,
+                    background: "var(--text-primary)",
+                  }}
+                />
+              )}
             </span>
             Include in net worth calculation
           </button>
         </div>
 
-        {/* ── Notes ─────────────────────────────────────── */}
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: 16 }}>
           <Field label="Notes">
-            <textarea value={form.notes} onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))} rows={2} placeholder="Any additional details..." style={{ ...inputStyle, padding: "10px 12px", resize: "vertical", minHeight: 64 }} />
+            <textarea
+              value={form.notes}
+              onChange={(e) =>
+                setForm((c) => ({ ...c, notes: e.target.value }))
+              }
+              rows={2}
+              placeholder="Any additional details..."
+              style={{
+                ...inputStyle,
+                resize: "vertical",
+                minHeight: 60,
+              }}
+            />
           </Field>
         </div>
       </div>
 
-      <ModalFooter onClose={onClose} onBack={onBack} showBack={!isEdit}>
-        <button type="button" disabled={saving} onClick={onSubmit} style={{ ...primaryButtonStyle, minWidth: 92, opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Saving..." : isEdit ? "Save changes" : "Add grant"}
+      <ModalFooter onClose={onClose} onBack={onBack} showBack>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onSubmit}
+          style={{ ...primaryButtonStyle, minWidth: 100, opacity: saving ? 0.7 : 1 }}
+        >
+          {saving ? "Saving..." : "Save changes"}
         </button>
       </ModalFooter>
     </ModalShell>
@@ -778,89 +2198,329 @@ function GrantDetailsModal({ title, form, setForm, onClose, onBack, onSubmit, sa
 // Value estimate sidebar
 // ---------------------------------------------------------------------------
 function ValueEstimateSidebar({ company, grants, currency, onClose }) {
-  const formatEquityAmount = (value, options = {}) => formatCurrencyAmount(value, currency, { maximumFractionDigits: 0, ...options });
+  const formatEquityAmount = (value, opts = {}) =>
+    formatCurrencyAmount(value, currency, { maximumFractionDigits: 0, ...opts });
 
   const groups = grantTypeOptions
-    .map((type) => ({ ...type, grants: grants.filter((g) => g.grantType === type.value) }))
+    .map((type) => ({
+      ...type,
+      grants: grants.filter((g) => g.grantType === type.value),
+    }))
     .filter((g) => g.grants.length > 0);
 
-  const totalEstimated = grants.reduce((sum, g) => sum + asNumber(g.currentValue), 0);
+  const totalEstimated = grants.reduce(
+    (sum, g) => sum + getGrantValuePerShare(g) * asNumber(g.quantity),
+    0
+  );
   const [openGroup, setOpenGroup] = useState(groups[0]?.value || null);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 240, background: "rgba(32,28,20,0.40)" }} onClick={onClose}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 240,
+        background: "rgba(0,0,0,0.45)",
+        backdropFilter: "blur(2px)",
+      }}
+      onClick={onClose}
+    >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
-          top: 12, right: 12, bottom: 12,
-          width: "min(440px, calc(100vw - 24px))",
+          top: 12,
+          right: 12,
+          bottom: 12,
+          width: "min(420px, calc(100vw - 24px))",
           background: "var(--bg-card)",
           border: "1px solid var(--border-default)",
-          borderRadius: 20,
-          boxShadow: "0 28px 80px rgba(0,0,0,0.22)",
-          overflow: "auto",
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
-        <div style={{ padding: "18px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={sectionLabelStyle}>Value Estimate</div>
-          <button type="button" onClick={onClose} style={{ ...buttonReset, color: "var(--text-secondary)", cursor: "pointer" }}><X size={18} /></button>
+        <div
+          style={{
+            padding: "16px 18px",
+            borderBottom: "1px solid var(--border-subtle)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+          }}
+        >
+          <span style={sectionLabelStyle}>Value Estimate</span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              ...buttonReset,
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={16} />
+          </button>
         </div>
-        <div style={{ padding: "16px 16px 22px", borderTop: "1px solid var(--border-subtle)", marginTop: 12 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Net equity value estimate (pre-IIT)</div>
+
+        <div
+          className="modal-scroll"
+          style={{ flex: 1, overflowY: "auto", padding: "16px 18px 22px" }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              fontWeight: 500,
+              color: "var(--text-primary)",
+            }}
+          >
+            Net equity value estimate (pre-IIT)
+          </p>
           <InfoBadge text="This estimate does not deduct IIT. Equity income is subject to IIT under SAT Circular 35. Consult a qualified tax advisor for post-tax figures." />
 
-          <div style={{ marginTop: 24, display: "grid", gap: 18 }}>
+          <div style={{ marginTop: 20, display: "grid", gap: 14 }}>
             {groups.map((group) => (
               <div key={group.value}>
-                <div style={sectionLabelStyle}>{group.badge}</div>
-                <div style={{ marginTop: 10, border: "1px solid var(--border-subtle)", borderRadius: 18, overflow: "hidden" }}>
+                <div
+                  style={{
+                    ...sectionLabelStyle,
+                    marginBottom: 8,
+                    color: group.badgeColor,
+                  }}
+                >
+                  {group.label}
+                </div>
+                <div
+                  style={{
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                  }}
+                >
                   <button
                     type="button"
-                    onClick={() => setOpenGroup((c) => (c === group.value ? null : group.value))}
-                    style={{ ...buttonReset, width: "100%", padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: "var(--text-primary)", fontSize: 14 }}
+                    onClick={() =>
+                      setOpenGroup((c) =>
+                        c === group.value ? null : group.value
+                      )
+                    }
+                    style={{
+                      ...buttonReset,
+                      width: "100%",
+                      padding: "13px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      cursor: "pointer",
+                      color: "var(--text-primary)",
+                      fontSize: 13,
+                      background: "transparent",
+                    }}
                   >
-                    <span>{company.name} {new Date(group.grants[0].buyDate || Date.now()).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-secondary)" }}>
-                      {formatEquityAmount(group.grants.reduce((s, g) => s + asNumber(g.currentValue), 0))}
-                      <ChevronDown size={16} style={{ transform: openGroup === group.value ? "rotate(180deg)" : "none" }} />
+                    <span>
+                      {company.name}{" "}
+                      {new Date(
+                        group.grants[0].buyDate || Date.now()
+                      ).toLocaleDateString("en-US", {
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>
+                        {formatEquityAmount(
+                          group.grants.reduce(
+                            (s, g) =>
+                              s +
+                              getGrantValuePerShare(g) * asNumber(g.quantity),
+                            0
+                          )
+                        )}
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        style={{
+                          transform:
+                            openGroup === group.value
+                              ? "rotate(180deg)"
+                              : "none",
+                          transition: "transform 0.2s",
+                        }}
+                      />
                     </span>
                   </button>
                   {openGroup === group.value && (
-                    <div style={{ padding: "0 18px 18px" }}>
+                    <div
+                      style={{
+                        padding: "0 16px 14px",
+                        borderTop: "1px solid var(--border-subtle)",
+                      }}
+                    >
                       {group.grants.map((grant) => (
-                        <div key={grant._id} style={{ marginTop: 10, background: "rgba(15,23,42,0.03)", borderRadius: 14, padding: "12px" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "0.7fr 16px 0.7fr 16px 0.7fr", gap: 6, alignItems: "center", fontSize: 12 }}>
+                        <div
+                          key={grant._id}
+                          style={{
+                            marginTop: 12,
+                            background:
+                              "var(--bg-secondary, rgba(0,0,0,0.02))",
+                            borderRadius: 10,
+                            padding: "11px 12px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "0.7fr 14px 0.7fr 14px 0.7fr",
+                              gap: 4,
+                              alignItems: "center",
+                            }}
+                          >
                             <div>
-                              <div style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)" }}>{grant.quantity}</div>
-                              <div style={{ marginTop: 2, fontSize: 10, color: "var(--text-secondary)" }}>Shares</div>
+                              <div
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: 500,
+                                  color: "var(--text-primary)",
+                                }}
+                              >
+                                {grant.quantity}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  fontSize: 10,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                Shares
+                              </div>
                             </div>
-                            <div style={{ fontSize: 14, color: "var(--text-primary)", textAlign: "center" }}>×</div>
-                            <div>
-                              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{formatEquityAmount(grant.currentPrice || company.latestSharePrice || 0)}</div>
-                              <div style={{ marginTop: 2, fontSize: 10, color: "var(--text-secondary)" }}>Price</div>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                color: "var(--text-muted)",
+                                textAlign: "center",
+                              }}
+                            >
+                              ×
                             </div>
-                            <div style={{ fontSize: 14, color: "var(--text-primary)", textAlign: "center" }}>−</div>
                             <div>
-                              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{formatEquityAmount(grant.buyPrice || 0)}</div>
-                              <div style={{ marginTop: 2, fontSize: 10, color: "var(--text-secondary)" }}>Strike</div>
+                              <div
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: 500,
+                                  color: "var(--text-primary)",
+                                }}
+                              >
+                                {formatEquityAmount(
+                                  grant.currentPrice ||
+                                    company.latestSharePrice ||
+                                    0
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  fontSize: 10,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                Price
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                color: "var(--text-muted)",
+                                textAlign: "center",
+                              }}
+                            >
+                              −
+                            </div>
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: 500,
+                                  color: "var(--text-primary)",
+                                }}
+                              >
+                                {formatEquityAmount(grant.buyPrice || 0)}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  fontSize: 10,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                Strike
+                              </div>
                             </div>
                           </div>
-                          {/* IIT estimate row */}
-                          {grant.grantType === "STOCK_OPTION" && asNumber(grant.fmvAtExercise) > 0 && (
-                            <div style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,100,70,0.07)", fontSize: 11, color: "var(--text-secondary)" }}>
-                              Est. IIT (SAT Circular 35): {formatEquityAmount(calcSATTax((asNumber(grant.fmvAtExercise) - asNumber(grant.buyPrice)) * asNumber(grant.quantity)))}
-                            </div>
-                          )}
-                          {/* SAFE filing warning */}
+                          {grant.grantType === "STOCK_OPTION" &&
+                            asNumber(grant.fmvAtExercise) > 0 && (
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  padding: "5px 9px",
+                                  borderRadius: 6,
+                                  background: "rgba(239,68,68,0.06)",
+                                  fontSize: 11,
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                Est. IIT (SAT Circular 35):{" "}
+                                {formatEquityAmount(
+                                  calcSATTax(
+                                    (asNumber(grant.fmvAtExercise) -
+                                      asNumber(grant.buyPrice)) *
+                                      asNumber(grant.exercised || 0)
+                                  )
+                                )}
+                              </div>
+                            )}
                           {grant.safeFilingStatus === "pending" && (
-                            <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#f59e0b" }}>
-                              <AlertCircle size={12} /> SAFE filing pending
+                            <div
+                              style={{
+                                marginTop: 6,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5,
+                                fontSize: 11,
+                                color: "#f59e0b",
+                              }}
+                            >
+                              <AlertCircle size={11} /> SAFE filing pending
                             </div>
                           )}
                           {grant.safeFilingStatus === "expired" && (
-                            <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#ef4444" }}>
-                              <AlertCircle size={12} /> SAFE registration expired — renewal required
+                            <div
+                              style={{
+                                marginTop: 6,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5,
+                                fontSize: 11,
+                                color: "#ef4444",
+                              }}
+                            >
+                              <AlertCircle size={11} /> SAFE registration
+                              expired
                             </div>
                           )}
                         </div>
@@ -872,12 +2532,44 @@ function ValueEstimateSidebar({ company, grants, currency, onClose }) {
             ))}
           </div>
 
-          <div style={{ marginTop: 20, padding: "14px 16px", borderRadius: 16, background: "rgba(128,208,255,0.30)", display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>Total equity (pre-IIT)</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>
+          {/* Total */}
+          <div
+            style={{
+              marginTop: 20,
+              padding: "14px 16px",
+              borderRadius: 12,
+              background:
+                "var(--bg-accent-subtle, rgba(33,150,243,0.06))",
+              border:
+                "1px solid var(--border-accent, rgba(33,150,243,0.15))",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <div
+              style={{
+                ...sectionLabelStyle,
+                color: "var(--text-muted)",
+              }}
+            >
+              Total equity (pre-IIT)
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
               {formatEquityAmount(totalEstimated)}
             </div>
-            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>IIT deducted separately per grant event under SAT Circular 35.</div>
+            <div
+              style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}
+            >
+              IIT deducted separately per grant event under SAT Circular 35.
+            </div>
           </div>
         </div>
       </div>
@@ -888,12 +2580,210 @@ function ValueEstimateSidebar({ company, grants, currency, onClose }) {
 // ---------------------------------------------------------------------------
 // Insight cards
 // ---------------------------------------------------------------------------
-function InsightCard({ title, value, detail, tint }) {
+function InsightCard({ title, value, detail, tint, icon: Icon = Info }) {
   return (
-    <div style={{ minWidth: 240, maxWidth: 260, border: "1px solid var(--border-subtle)", borderRadius: 18, padding: "18px 16px", background: "var(--bg-card)" }}>
-      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 999, background: tint.bg, color: tint.fg, fontSize: 12, fontWeight: 500 }}>{title}</div>
-      <div style={{ marginTop: 16, fontSize: 18, fontWeight: 500, color: "var(--text-primary)" }}>{value}</div>
-      <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55, color: "var(--text-secondary)" }}>{detail}</div>
+    <div
+      style={{
+        minWidth: 210,
+        maxWidth: 240,
+        border: "1px solid var(--border-subtle)",
+        borderRadius: 12,
+        padding: "14px",
+        background: "var(--bg-card)",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "4px 8px",
+          borderRadius: 999,
+          background: tint.bg,
+          color: tint.fg,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.02em",
+        }}
+      >
+        <Icon size={11} />
+        {title}
+      </div>
+      <div
+        style={{
+          marginTop: 12,
+          fontSize: 16,
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          lineHeight: 1.2,
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: "var(--text-secondary)",
+        }}
+      >
+        {detail}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Vesting chart tooltip
+// ---------------------------------------------------------------------------
+function EquityVestingTooltip({ active, payload, formatEquityAmount }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+
+  return (
+    <div
+      style={{
+        minWidth: 240,
+        borderRadius: 12,
+        border: "1px solid var(--border-default)",
+        background: "var(--bg-card)",
+        color: "var(--text-primary)",
+        padding: "12px 14px",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 500,
+          marginBottom: 8,
+          color: "var(--text-primary)",
+        }}
+      >
+        {row.date.toLocaleDateString("en-US", {
+          month: "long",
+          year: "numeric",
+        })}
+      </div>
+      <div style={{ display: "grid", gap: 6 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto",
+            gap: 8,
+            fontSize: 11,
+            color: "var(--text-muted)",
+            fontWeight: 500,
+          }}
+        >
+          <span>Grant</span>
+          <span>New</span>
+          <span>Value</span>
+        </div>
+        {row.rows
+          .filter((g) => g.newShares > 0)
+          .map((grant) => (
+            <div
+              key={grant.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto auto",
+                gap: 8,
+                alignItems: "start",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-primary)",
+                  lineHeight: 1.4,
+                }}
+              >
+                {grant.name}
+                <div
+                  style={{
+                    marginTop: 1,
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {formatShareCount(grant.vestedShares, 0)} total vested
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-primary)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                +{formatShareCount(grant.newShares, 0)}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-primary)",
+                  fontVariantNumeric: "tabular-nums",
+                  textAlign: "right",
+                }}
+              >
+                {formatEquityAmount(grant.newValue)}
+              </div>
+            </div>
+          ))}
+      </div>
+      <div
+        style={{
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: "1px solid var(--border-subtle)",
+          display: "grid",
+          gap: 4,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 8,
+            fontSize: 12,
+          }}
+        >
+          <span style={{ color: "var(--text-muted)" }}>Monthly total</span>
+          <span
+            style={{
+              color: "var(--text-primary)",
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 500,
+            }}
+          >
+            {formatEquityAmount(row.monthlyValue)}
+          </span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 8,
+            fontSize: 12,
+          }}
+        >
+          <span style={{ color: "var(--text-muted)" }}>Cumulative vested</span>
+          <span
+            style={{
+              color: "var(--text-primary)",
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 500,
+            }}
+          >
+            {formatEquityAmount(row.vestedValue)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -903,18 +2793,101 @@ function InsightCard({ title, value, detail, tint }) {
 // ---------------------------------------------------------------------------
 function DeleteConfirmModal({ onClose, onConfirm, deleting }) {
   return (
-    <ModalShell onClose={onClose} width={420}>
-      <div style={{ padding: "24px 20px" }}>
-        <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>Delete this grant?</div>
-        <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-secondary)" }}>This action cannot be undone. All data for this grant record will be permanently removed.</div>
-        <div style={{ marginTop: 20, display: "flex", gap: 12, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} style={secondaryButtonStyle}>Cancel</button>
-          <button type="button" disabled={deleting} onClick={onConfirm} style={{ ...primaryButtonStyle, background: "#dc2626", borderColor: "#dc2626", opacity: deleting ? 0.7 : 1 }}>
+    <ModalShell onClose={onClose} width={380}>
+      <div
+        className="modal-scroll"
+        style={{ padding: "20px 20px 16px", overflowY: "auto", flex: 1 }}
+      >
+        <div
+          style={{
+            fontSize: 15,
+            fontWeight: 500,
+            color: "var(--text-primary)",
+          }}
+        >
+          Delete this grant?
+        </div>
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            lineHeight: 1.5,
+          }}
+        >
+          This action cannot be undone. All data for this grant record will be
+          permanently removed.
+        </div>
+        <div
+          style={{
+            marginTop: 18,
+            display: "flex",
+            gap: 8,
+            justifyContent: "flex-end",
+          }}
+        >
+          <button type="button" onClick={onClose} style={secondaryButtonStyle}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onConfirm}
+            style={{
+              ...primaryButtonStyle,
+              background: "#dc2626",
+              borderColor: "#dc2626",
+              opacity: deleting ? 0.7 : 1,
+            }}
+          >
             {deleting ? "Deleting..." : "Delete grant"}
           </button>
         </div>
       </div>
     </ModalShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stat box component
+// ---------------------------------------------------------------------------
+function StatBox({ label, value, sub, highlight = false }) {
+  return (
+    <div
+      style={{
+        padding: "14px 16px",
+        borderRadius: 10,
+        background: highlight
+          ? "var(--bg-secondary, rgba(0,0,0,0.03))"
+          : "transparent",
+        border: highlight
+          ? "1px solid var(--border-subtle)"
+          : "none",
+      }}
+    >
+      <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
+        {label}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 18,
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          lineHeight: 1.1,
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -925,11 +2898,16 @@ export default function Equity() {
   const { assets = [], loading, refreshAssets } = usePortfolio();
   const { user } = useAuthContext();
   const currency = getUserCurrency(user);
-  const formatEquityAmount = (value, options = {}) => formatCurrencyAmount(value, currency, { maximumFractionDigits: 0, ...options });
+  const formatEquityAmount = (value, opts = {}) =>
+    formatCurrencyAmount(value, currency, { maximumFractionDigits: 0, ...opts });
 
   const insightsRef = useRef(null);
   const scrollInsights = (dir) => {
-    if (insightsRef.current) insightsRef.current.scrollBy({ left: dir === "left" ? -300 : 300, behavior: "smooth" });
+    if (insightsRef.current)
+      insightsRef.current.scrollBy({
+        left: dir === "left" ? -240 : 240,
+        behavior: "smooth",
+      });
   };
 
   const [activeSubTab, setActiveSubTab] = useState("overview");
@@ -942,7 +2920,10 @@ export default function Equity() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const equityAssets = useMemo(() => assets.filter((a) => a.assetType === "equity"), [assets]);
+  const equityAssets = useMemo(
+    () => assets.filter((a) => a.assetType === "equity"),
+    [assets]
+  );
 
   const companies = useMemo(() => {
     const grouped = new Map();
@@ -960,8 +2941,12 @@ export default function Equity() {
       cur.name = asset.name || cur.name;
       cur.ticker = asset.ticker || cur.ticker;
       cur.companyStructure = asset.companyStructure || cur.companyStructure;
-      cur.fairMarketValue = asNumber(asset.fairMarketValue || cur.fairMarketValue);
-      cur.latestSharePrice = asNumber(asset.currentPrice || asset.buyPrice || cur.latestSharePrice);
+      cur.fairMarketValue = asNumber(
+        asset.fairMarketValue || cur.fairMarketValue
+      );
+      cur.latestSharePrice = asNumber(
+        asset.currentPrice || asset.buyPrice || cur.latestSharePrice
+      );
       cur.lots.push(asset);
       grouped.set(id, cur);
     });
@@ -969,199 +2954,419 @@ export default function Equity() {
   }, [equityAssets]);
 
   useEffect(() => {
-    if (!companies.length) { setSelectedCompanyId(""); return; }
-    if (!companies.some((c) => c.id === selectedCompanyId)) setSelectedCompanyId(companies[0].id);
+    if (!companies.length) {
+      setSelectedCompanyId("");
+      return;
+    }
+    if (!companies.some((c) => c.id === selectedCompanyId))
+      setSelectedCompanyId(companies[0].id);
   }, [companies, selectedCompanyId]);
 
-  const selectedCompany = companies.find((c) => c.id === selectedCompanyId) || companies[0] || null;
+  const selectedCompany =
+    companies.find((c) => c.id === selectedCompanyId) || companies[0] || null;
   const companyGrants = selectedCompany?.lots || [];
-  const visibleCompanyGrants = companyGrants.filter((g) => g.includeInNetWorth !== false);
+  const visibleCompanyGrants = companyGrants.filter(
+    (g) => g.includeInNetWorth !== false
+  );
 
-  // ── Overview stats (Chinese context) ──────────────────────────────────────
+  // ── Overview stats ────────────────────────────────────────────────────────
   const overviewStats = useMemo(() => {
-    const totalShares = visibleCompanyGrants.reduce((s, g) => s + asNumber(g.quantity), 0);
-    const vestedShares = visibleCompanyGrants.reduce((s, g) => {
-      if (g.hasVestingSchedule === false) return s + asNumber(g.quantity);
-      return s + Math.min(asNumber(g.quantity), asNumber(g.vestedQuantity) || asNumber(g.quantity));
-    }, 0);
+    const totalShares = visibleCompanyGrants.reduce(
+      (s, g) => s + asNumber(g.quantity),
+      0
+    );
+    const vestedShares = visibleCompanyGrants.reduce(
+      (s, g) => s + getGrantVestedSharesAtDate(g, new Date()),
+      0
+    );
     const unvestedShares = Math.max(0, totalShares - vestedShares);
-    const estimatedGrantValue = visibleCompanyGrants.reduce((s, g) => s + asNumber(g.currentValue), 0);
-    const vestedValue = visibleCompanyGrants.reduce((s, g) => {
-      const price = asNumber(g.currentPrice) || asNumber(g.currentValue) / Math.max(1, asNumber(g.quantity));
-      const vested = g.hasVestingSchedule === false ? asNumber(g.quantity) : Math.min(asNumber(g.quantity), asNumber(g.vestedQuantity) || asNumber(g.quantity));
-      return s + price * vested;
-    }, 0);
+    const estimatedGrantValue = visibleCompanyGrants.reduce(
+      (s, g) => s + getGrantValuePerShare(g) * asNumber(g.quantity),
+      0
+    );
+    const vestedValue = visibleCompanyGrants.reduce(
+      (s, g) =>
+        s + getGrantValuePerShare(g) * getGrantVestedSharesAtDate(g, new Date()),
+      0
+    );
     const unvestedValue = Math.max(0, estimatedGrantValue - vestedValue);
-
-    // SAT Circular 35 IIT across all exercised grants
     const totalIIT = visibleCompanyGrants.reduce((s, g) => {
       if (g.grantType !== "STOCK_OPTION" || !g.fmvAtExercise) return s;
-      const spread = (asNumber(g.fmvAtExercise) - asNumber(g.buyPrice)) * asNumber(g.exercised || 0);
+      const spread =
+        (asNumber(g.fmvAtExercise) - asNumber(g.buyPrice)) *
+        asNumber(g.exercised || 0);
       return s + calcSATTax(spread);
     }, 0);
-
-    const exerciseCost = visibleCompanyGrants.reduce((s, g) => s + asNumber(g.exercised) * asNumber(g.buyPrice), 0);
+    const exerciseCost = visibleCompanyGrants.reduce(
+      (s, g) => s + asNumber(g.exercised) * asNumber(g.buyPrice),
+      0
+    );
     const exerciseGain = visibleCompanyGrants.reduce((s, g) => {
-      const price = asNumber(g.currentPrice) || asNumber(g.currentValue) / Math.max(1, asNumber(g.quantity));
-      return s + Math.max(0, price - asNumber(g.buyPrice)) * asNumber(g.exercised);
+      const price =
+        asNumber(g.currentPrice) ||
+        asNumber(g.currentValue) / Math.max(1, asNumber(g.quantity));
+      return (
+        s + Math.max(0, price - asNumber(g.buyPrice)) * asNumber(g.exercised)
+      );
     }, 0);
-
-    // SAFE / compliance flags
-    const safeIssues = visibleCompanyGrants.filter((g) => ["pending", "expired"].includes(g.safeFilingStatus)).length;
-    const lockedGrants = visibleCompanyGrants.filter((g) => g.lockupExpiry && new Date(g.lockupExpiry) > new Date()).length;
-
-    return { totalShares, estimatedGrantValue, vestedShares, unvestedShares, vestedValue, unvestedValue, exerciseCost, exerciseGain, totalIIT, safeIssues, lockedGrants };
+    const safeIssues = visibleCompanyGrants.filter((g) =>
+      ["pending", "expired"].includes(g.safeFilingStatus)
+    ).length;
+    const lockedGrants = visibleCompanyGrants.filter(
+      (g) => g.lockupExpiry && safeDate(g.lockupExpiry) > new Date()
+    ).length;
+    return {
+      totalShares,
+      estimatedGrantValue,
+      vestedShares,
+      unvestedShares,
+      vestedValue,
+      unvestedValue,
+      exerciseCost,
+      exerciseGain,
+      totalIIT,
+      safeIssues,
+      lockedGrants,
+    };
   }, [visibleCompanyGrants]);
 
   const chartData = useMemo(() => {
     if (!visibleCompanyGrants.length) return [];
-    
-    const grants = visibleCompanyGrants.slice().sort((a, b) => new Date(a.buyDate) - new Date(b.buyDate));
-    
-    // Find earliest buy date and today
-    const earliestDate = new Date(grants[0].buyDate || Date.now());
-    const today = new Date();
-    
-    // Create timeline from first grant to today
+    const today = startOfMonth(new Date());
     const timelineMap = new Map();
-    
-    // Generate monthly timeline
-    const currentDate = new Date(earliestDate);
-    while (currentDate <= today) {
-      const key = currentDate.toISOString().split('T')[0];
-      const label = currentDate.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-      timelineMap.set(key, { label, date: new Date(currentDate), vested: 0, total: 0 });
-      currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-    
-    // Add today if not already present
-    const todayKey = today.toISOString().split('T')[0];
-    if (!timelineMap.has(todayKey)) {
-      const label = today.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-      timelineMap.set(todayKey, { label, date: new Date(today), vested: 0, total: 0 });
-    }
-    
-    // Calculate vested/total for each grant at each timeline point
-    grants.forEach((g) => {
-      const quantity = asNumber(g.quantity);
-      const buyDate = new Date(g.buyDate || Date.now());
-      const vestStartDate = g.vestingStartDate ? new Date(g.vestingStartDate) : buyDate;
-      const hasVesting = g.hasVestingSchedule !== false;
-      
-      // Parse vesting schedule
-      const vestingSchedule = g.vestingSchedule || "monthly_48_12";
-      const scheduleMatch = vestingSchedule.match(/(\w+)_(\d+)_(\d+)/);
-      let monthlyRate = 1/48;
-      let cliffMonths = 12;
-      
-      if (scheduleMatch) {
-        const [, frequency, totalMonths, cliff] = scheduleMatch;
-        if (totalMonths) monthlyRate = 1 / parseInt(totalMonths);
-        if (cliff) cliffMonths = parseInt(cliff);
+    const addPoint = (value) => {
+      const point = startOfMonth(value);
+      timelineMap.set(point.toISOString(), point);
+    };
+
+    visibleCompanyGrants.forEach((grant) => {
+      const grantDate = safeDate(grant.buyDate || Date.now());
+      const vestingStart = safeDate(
+        grant.vestingStartDate || grant.buyDate || Date.now()
+      );
+      const fullyVestedDate =
+        getGrantFullyVestedDate(grant) || vestingStart;
+      const rangeStart = startOfMonth(
+        grant.hasVestingSchedule === false ? grantDate : vestingStart
+      );
+      const rangeEnd = startOfMonth(fullyVestedDate);
+      addPoint(grantDate);
+      addPoint(vestingStart);
+      addPoint(fullyVestedDate);
+      let limit = 240;
+      for (
+        let cursor = new Date(rangeStart);
+        cursor <= rangeEnd && limit > 0;
+        cursor = addMonths(cursor, 1), limit--
+      ) {
+        addPoint(cursor);
       }
-      
-      // For each date in timeline, calculate vesting
-      timelineMap.forEach((entry) => {
-        const entryDate = entry.date;
-        entry.total += quantity;
-        
-        if (!hasVesting) {
-          // No vesting - all shares immediately after buy date
-          if (entryDate >= buyDate) {
-            entry.vested += quantity;
-          }
-        } else {
-          // Calculate vested amount at this date
-          if (entryDate < vestStartDate) {
-            // Before vesting starts - 0 vested
-            entry.vested += 0;
-          } else {
-            // Calculate months since vesting start
-            let monthsSinceStart = 0;
-            const tempDate = new Date(vestStartDate);
-            while (tempDate <= entryDate) {
-              if (tempDate.getMonth() !== vestStartDate.getMonth() || tempDate.getFullYear() !== vestStartDate.getFullYear()) {
-                monthsSinceStart++;
-              }
-              tempDate.setMonth(tempDate.getMonth() + 1);
-            }
-            
-            if (monthsSinceStart < cliffMonths) {
-              // Before cliff - 0 vested
-              entry.vested += 0;
-            } else {
-              // After cliff - calculate progressive vesting
-              const vestedMonths = monthsSinceStart - cliffMonths + 1;
-              let vestedAmount = quantity * monthlyRate * vestedMonths;
-              vestedAmount = Math.min(vestedAmount, quantity);
-              entry.vested += vestedAmount;
-            }
-          }
-        }
-      });
     });
-    
-    // Convert to array, sort by date, remove duplicates by date key
-    const result = Array.from(timelineMap.values())
-      .sort((a, b) => a.date - b.date)
-      .map((entry) => ({ label: entry.label, vested: Math.round(entry.vested * 100) / 100, total: Math.round(entry.total * 100) / 100 }));
-    
-    return result;
+
+    addPoint(today);
+
+    const pointsBeforePadding = Array.from(timelineMap.values()).sort(
+      (a, b) => a - b
+    );
+    if (pointsBeforePadding.length < 4) {
+      const anchor = pointsBeforePadding[0] || today;
+      const paddedStart = startOfMonth(addMonths(anchor, -2));
+      for (let offset = 0; offset < 5; offset += 1) {
+        addPoint(addMonths(paddedStart, offset));
+      }
+    }
+
+    const timelineSnapshot = Array.from(timelineMap.values()).sort(
+      (a, b) => a - b
+    );
+    if (timelineSnapshot.length > 0) {
+      const paddedStart = startOfMonth(
+        addMonths(timelineSnapshot[0], -2)
+      );
+      const paddedEnd = startOfMonth(
+        addMonths(timelineSnapshot[timelineSnapshot.length - 1], 2)
+      );
+      for (
+        let cursor = new Date(paddedStart);
+        cursor <= paddedEnd;
+        cursor = addMonths(cursor, 1)
+      ) {
+        addPoint(cursor);
+      }
+    }
+
+    const timeline = Array.from(timelineMap.values()).sort((a, b) => a - b);
+    const totalShares = visibleCompanyGrants.reduce(
+      (sum, grant) => sum + asNumber(grant.quantity),
+      0
+    );
+    const previousTotals = new Map();
+
+    return timeline.map((pointDate) => {
+      const rows = visibleCompanyGrants.map((grant) => {
+        const vestedShares = getGrantVestedSharesAtDate(grant, pointDate);
+        const sharePrice = getGrantSharePrice(grant);
+        const shareValue = getGrantValuePerShare(grant, sharePrice);
+        const previousShares = previousTotals.get(grant._id) || 0;
+        const newShares = Math.max(0, vestedShares - previousShares);
+        const newValue = newShares * shareValue;
+        const vestedValue = vestedShares * shareValue;
+        previousTotals.set(grant._id, vestedShares);
+        return {
+          id: grant._id,
+          name: grant.name || grant.ticker || grant.grantId || "Grant",
+          vestedShares,
+          vestedValue,
+          newShares,
+          newValue,
+          sharePrice,
+        };
+      });
+      const vested = rows.reduce((sum, row) => sum + row.vestedShares, 0);
+      const vestedValue = rows.reduce((sum, row) => sum + row.vestedValue, 0);
+      const newVested = rows.reduce((sum, row) => sum + row.newShares, 0);
+      const monthlyValue = rows.reduce((sum, row) => sum + row.newValue, 0);
+      return {
+        key: pointDate.toISOString(),
+        date: pointDate,
+        label: pointDate.toLocaleDateString("en-US", {
+          month: "short",
+          year: "2-digit",
+        }),
+        vested: Math.round(vested * 100) / 100,
+        total: Math.round(totalShares * 100) / 100,
+        vestedValue,
+        newVested,
+        monthlyValue,
+        rows,
+        isToday: pointDate.toDateString() === today.toDateString(),
+      };
+    });
   }, [visibleCompanyGrants]);
 
+  const chartYAxisTop = useMemo(() => {
+    const chartMax = chartData.reduce(
+      (max, point) =>
+        Math.max(max, asNumber(point?.total), asNumber(point?.vested)),
+      0
+    );
+    if (chartMax <= 5) return 5;
+    if (chartMax <= 10) return 10;
+    if (chartMax <= 25) return 25;
+    if (chartMax <= 50) return 50;
+    if (chartMax <= 100) return 100;
+    return Math.ceil(chartMax / 10) * 10;
+  }, [chartData]);
+
+  const timelineInsights = useMemo(() => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const nextYear = currentYear + 1;
+    const completionEntry =
+      chartData.find(
+        (entry) => entry.total > 0 && entry.vested >= entry.total
+      ) || chartData[chartData.length - 1];
+    const aggregateRange = (year) =>
+      chartData
+        .filter((entry) => entry.date.getFullYear() === year)
+        .reduce(
+          (acc, entry) => ({
+            shares: acc.shares + entry.newVested,
+            value: acc.value + entry.monthlyValue,
+          }),
+          { shares: 0, value: 0 }
+        );
+    const optionGrants = visibleCompanyGrants.filter(
+      (grant) => grant.grantType === "STOCK_OPTION"
+    );
+    const vestedOptionShares = optionGrants.reduce(
+      (sum, grant) =>
+        sum +
+        Math.max(
+          0,
+          getGrantVestedSharesAtDate(grant, today) -
+            asNumber(grant.exercised)
+        ),
+      0
+    );
+    const doubledFmvDelta = optionGrants.reduce(
+      (sum, grant) =>
+        sum +
+        getGrantSharePrice(grant) *
+          Math.max(
+            0,
+            getGrantVestedSharesAtDate(grant, today) -
+              asNumber(grant.exercised)
+          ),
+      0
+    );
+    return {
+      completionDate:
+        overviewStats.unvestedShares > 0 ? completionEntry?.date : null,
+      thisYear: aggregateRange(currentYear),
+      nextYear: aggregateRange(nextYear),
+      vestedOptionShares,
+      doubledFmvDelta,
+    };
+  }, [chartData, overviewStats.unvestedShares, visibleCompanyGrants]);
+
   const insightCards = useMemo(() => {
-    const currentValue = overviewStats.estimatedGrantValue;
-    const postTaxEstimate = Math.max(0, currentValue - overviewStats.totalIIT);
-    return [
+    const completionLabel = timelineInsights.completionDate
+      ? timelineInsights.completionDate.toLocaleDateString("en-US", {
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+
+    const cards = [
       {
-        title: "Current equity value",
-        value: formatEquityAmount(currentValue),
-        detail: "Pre-IIT estimated value of all visible equity grants.",
-        tint: { bg: "rgba(242,182,255,0.18)", fg: "#d870ff" },
+        title: "Vesting time",
+        value: buildDurationLabel(timelineInsights.completionDate),
+        detail:
+          overviewStats.unvestedShares > 0
+            ? `${formatShareCount(overviewStats.unvestedShares)} unvested shares fully vest by ${completionLabel}.`
+            : "All visible shares are already vested.",
+        tint: { bg: "rgba(245,158,11,0.08)", fg: "#d97706" },
+        icon: Calendar,
       },
       {
-        title: "Estimated IIT (SAT Circular 35)",
-        value: formatEquityAmount(overviewStats.totalIIT),
-        detail: "Estimated IIT on exercised options using the 12-month spread method. Consult a tax advisor.",
-        tint: { bg: "rgba(255,146,110,0.14)", fg: "#ff6c47" },
+        title: "Vesting this year",
+        value: formatEquityAmount(timelineInsights.thisYear.value),
+        detail: `${formatShareCount(timelineInsights.thisYear.shares)} shares vest in ${new Date().getFullYear()}.`,
+        tint: { bg: "rgba(156,39,176,0.08)", fg: "#9c27b0" },
+        icon: Calendar,
       },
       {
-        title: "Post-IIT estimate",
-        value: formatEquityAmount(postTaxEstimate),
-        detail: "Rough post-tax value based on SAT Circular 35 calculation. Actual tax may vary.",
-        tint: { bg: "rgba(0,200,130,0.12)", fg: "#00a67d" },
-      },
-      {
-        title: "Unvested value",
+        title: "Opportunity cost",
         value: formatEquityAmount(overviewStats.unvestedValue),
-        detail: `Value tied to ${overviewStats.unvestedShares} unvested shares not yet accessible.`,
-        tint: { bg: "rgba(255,229,122,0.20)", fg: "#b69200" },
+        detail: `${formatShareCount(overviewStats.unvestedShares)} unvested shares left if you departed today.`,
+        tint: { bg: "rgba(239,68,68,0.08)", fg: "#dc2626" },
+        icon: AlertCircle,
       },
       {
-        title: "Compliance alerts",
-        value: `${overviewStats.safeIssues} SAFE · ${overviewStats.lockedGrants} locked`,
-        detail: "Grants with pending/expired SAFE filing or active CSRC lock-up periods.",
-        tint: { bg: "rgba(255,180,180,0.20)", fg: "#ff5c5c" },
+        title: "Vesting next year",
+        value: formatEquityAmount(timelineInsights.nextYear.value),
+        detail: `${formatShareCount(timelineInsights.nextYear.shares)} shares projected to vest in ${new Date().getFullYear() + 1}.`,
+        tint: { bg: "rgba(34,197,94,0.08)", fg: "#16a34a" },
+        icon: Calendar,
+      },
+      {
+        title: "FMV spread risk",
+        value: formatEquityAmount(timelineInsights.doubledFmvDelta),
+        detail:
+          timelineInsights.vestedOptionShares > 0
+            ? `If FMV doubles, spread on ${formatShareCount(timelineInsights.vestedOptionShares)} vested shares increases by this amount.`
+            : "No vested option shares exposed to FMV spread.",
+        tint: { bg: "rgba(239,68,68,0.08)", fg: "#dc2626" },
+        icon: Info,
       },
     ];
-  }, [overviewStats]);
 
-  // ── Flow helpers ───────────────────────────────────────────────────────────
-  const resetFlow = () => { setFlow(null); setForm(blankGrant); setEditingAssetId(null); };
+    const today = new Date();
+
+    if (
+      selectedCompany &&
+      ["us_listed", "hk_listed", "vie"].includes(
+        selectedCompany.companyStructure
+      )
+    ) {
+      const pendingSafe = visibleCompanyGrants.filter((g) =>
+        ["pending", "expired"].includes(g.safeFilingStatus)
+      );
+      if (pendingSafe.length > 0) {
+        const hasExpired = pendingSafe.some(
+          (g) => g.safeFilingStatus === "expired"
+        );
+        cards.push({
+          title: "SAFE Circular 7",
+          value: hasExpired ? "Action needed" : "Pending",
+          detail: `${pendingSafe.length} grant(s) need SAFE Circular 7 registration or renewal.`,
+          tint: hasExpired
+            ? { bg: "rgba(239,68,68,0.08)", fg: "#dc2626" }
+            : { bg: "rgba(245,158,11,0.08)", fg: "#d97706" },
+          icon: AlertCircle,
+        });
+      }
+    }
+
+    const activeLockups = visibleCompanyGrants.filter(
+      (g) => g.lockupExpiry && safeDate(g.lockupExpiry) > today
+    );
+    if (activeLockups.length > 0) {
+      const soonest = activeLockups.reduce((min, curr) =>
+        safeDate(curr.lockupExpiry) < safeDate(min.lockupExpiry) ? curr : min
+      );
+      const expiryStr = safeDate(soonest.lockupExpiry).toLocaleDateString(
+        "en-US",
+        { month: "short", day: "numeric", year: "numeric" }
+      );
+      cards.push({
+        title: "CSRC Lock-up",
+        value: "Locked",
+        detail: `${activeLockups.length} grant(s) under post-IPO lock-up. Soonest expiry: ${expiryStr}.`,
+        tint: { bg: "rgba(33,150,243,0.08)", fg: "#1976d2" },
+        icon: Lock,
+      });
+    }
+
+    const totalIITAmount = visibleCompanyGrants.reduce((sum, g) => {
+      if (g.grantType !== "STOCK_OPTION" || !g.iitPreferentialMethod)
+        return sum;
+      const sp =
+        (asNumber(g.fmvAtExercise) - asNumber(g.buyPrice)) *
+        asNumber(g.exercised || 0);
+      return sum + calcSATTax(sp);
+    }, 0);
+    if (totalIITAmount > 0) {
+      cards.push({
+        title: "Circular 35 IIT",
+        value: formatEquityAmount(totalIITAmount),
+        detail:
+          "Estimated IIT on options spread under the 12-month preferential method.",
+        tint: { bg: "rgba(156,39,176,0.08)", fg: "#9c27b0" },
+        icon: Info,
+      });
+    }
+
+    return cards;
+  }, [
+    formatEquityAmount,
+    overviewStats,
+    timelineInsights,
+    visibleCompanyGrants,
+    selectedCompany,
+  ]);
+
+  const resetFlow = () => {
+    setFlow(null);
+    setForm(blankGrant);
+    setEditingAssetId(null);
+  };
 
   const startAddGrant = () => {
+    if (!selectedCompany) {
+      startAddCompany();
+      return;
+    }
     setForm({
       ...blankGrant,
       name: selectedCompany?.name || "",
       ticker: selectedCompany?.ticker || "",
       companyStructure: selectedCompany?.companyStructure || "private",
-      fairMarketValue: selectedCompany?.fairMarketValue ? String(selectedCompany.fairMarketValue) : "",
-      currentPrice: selectedCompany?.latestSharePrice ? String(selectedCompany.latestSharePrice) : "",
+      fairMarketValue: selectedCompany?.fairMarketValue
+        ? String(selectedCompany.fairMarketValue)
+        : "",
+      currentPrice: selectedCompany?.latestSharePrice
+        ? String(selectedCompany.latestSharePrice)
+        : "",
     });
     setFlow("grant-type");
   };
 
-  const startAddCompany = () => { setForm(blankGrant); setFlow("company-structure"); };
+  const startAddCompany = () => {
+    setForm(blankGrant);
+    setFlow("company-structure");
+  };
 
   const startEdit = (grant) => {
     setEditingAssetId(grant._id);
@@ -1181,18 +3386,28 @@ export default function Equity() {
       vestedQuantity: String(grant.vestedQuantity ?? ""),
       buyPrice: String(grant.buyPrice ?? ""),
       fmvAtExercise: String(grant.fmvAtExercise ?? ""),
-      buyDate: grant.buyDate ? new Date(grant.buyDate).toISOString().slice(0, 10) : blankGrant.buyDate,
-      expirationDate: grant.expirationDate ? new Date(grant.expirationDate).toISOString().slice(0, 10) : "",
+      buyDate: grant.buyDate
+        ? new Date(grant.buyDate).toISOString().slice(0, 10)
+        : blankGrant.buyDate,
+      expirationDate: grant.expirationDate
+        ? new Date(grant.expirationDate).toISOString().slice(0, 10)
+        : "",
       postTerminationWindow: String(grant.postTerminationWindow ?? "90"),
       exercised: String(grant.exercised ?? ""),
       hasVestingSchedule: grant.hasVestingSchedule ?? true,
       vestingSchedule: grant.vestingSchedule || "monthly_48_12",
-      vestingStartDate: grant.vestingStartDate ? new Date(grant.vestingStartDate).toISOString().slice(0, 10) : "",
+      vestingStartDate: grant.vestingStartDate
+        ? new Date(grant.vestingStartDate).toISOString().slice(0, 10)
+        : "",
       cliffMonths: String(grant.cliffMonths ?? "12"),
       safeFilingStatus: grant.safeFilingStatus || "not_required",
-      safeFilingDeadline: grant.safeFilingDeadline ? new Date(grant.safeFilingDeadline).toISOString().slice(0, 10) : "",
+      safeFilingDeadline: grant.safeFilingDeadline
+        ? new Date(grant.safeFilingDeadline).toISOString().slice(0, 10)
+        : "",
       lockupPeriod: grant.lockupPeriod || "none",
-      lockupExpiry: grant.lockupExpiry ? new Date(grant.lockupExpiry).toISOString().slice(0, 10) : "",
+      lockupExpiry: grant.lockupExpiry
+        ? new Date(grant.lockupExpiry).toISOString().slice(0, 10)
+        : "",
       iitPreferentialMethod: grant.iitPreferentialMethod !== false,
       salePrice: String(grant.salePrice ?? ""),
       includeInNetWorth: grant.includeInNetWorth !== false,
@@ -1201,13 +3416,15 @@ export default function Equity() {
     setFlow("edit-grant");
   };
 
-  // ── Save grant ─────────────────────────────────────────────────────────────
   const saveGrant = async () => {
-    if (!form.name.trim() || !form.grantId.trim() || !String(form.quantity).trim()) {
-      toast.error("Company name, grant ID, and quantity are required.");
+    if (!form.name.trim() || !String(form.quantity).trim()) {
+      toast.error("Company name and quantity are required.");
       return;
     }
-    if (["a_share", "hk_listed", "us_listed"].includes(form.companyStructure) && !form.ticker.trim()) {
+    if (
+      ["a_share", "hk_listed", "us_listed"].includes(form.companyStructure) &&
+      !form.ticker.trim()
+    ) {
       toast.error("Stock ticker is required for listed companies.");
       return;
     }
@@ -1215,14 +3432,16 @@ export default function Equity() {
       toast.error("Exercised shares cannot exceed vested quantity.");
       return;
     }
-
     setSaving(true);
     try {
-      const inferredPrice = asNumber(form.currentPrice) || asNumber(form.fairMarketValue);
+      const inferredPrice =
+        asNumber(form.currentPrice) || asNumber(form.fairMarketValue);
       const payload = {
         assetType: "equity",
         name: form.name.trim(),
-        ticker: form.ticker.trim() ? form.ticker.trim().toUpperCase() : null,
+        ticker: form.ticker.trim()
+          ? form.ticker.trim().toUpperCase()
+          : null,
         companyStructure: form.companyStructure,
         fairMarketValue: asNumber(form.fairMarketValue),
         currentPrice: inferredPrice,
@@ -1230,7 +3449,7 @@ export default function Equity() {
         fxRateAtVest: asNumber(form.fxRateAtVest) || null,
         fxRateAtExercise: asNumber(form.fxRateAtExercise) || null,
         grantType: form.grantType,
-        grantId: form.grantId.trim(),
+        grantId: form.grantId.trim() || `${form.grantType}-${Date.now()}`,
         quantity: asNumber(form.quantity),
         vestedQuantity: asNumber(form.vestedQuantity),
         buyPrice: asNumber(form.buyPrice),
@@ -1252,7 +3471,6 @@ export default function Equity() {
         includeInNetWorth: Boolean(form.includeInNetWorth),
         notes: form.notes || "",
       };
-
       if (editingAssetId) {
         await cryptoService.update(editingAssetId, payload);
         toast.success("Grant updated.");
@@ -1271,18 +3489,18 @@ export default function Equity() {
 
   const updateCompany = async () => {
     if (!selectedCompany || !companyGrants.length) return;
-    if (!form.name.trim()) { toast.error("Company name is required."); return; }
-    setSaving(true);
+    if (!form.name.trim()) {
+      toast.error("Company name is required.");
+      return;
+    }
     try {
       await Promise.all(
         companyGrants.map((g) =>
           cryptoService.update(g._id, {
             name: form.name.trim(),
-            ticker: form.ticker.trim().toUpperCase(),
             companyStructure: form.companyStructure,
-            fairMarketValue: asNumber(form.fairMarketValue),
-            currentPrice: asNumber(form.currentPrice) || asNumber(form.fairMarketValue),
-            fxRateAtGrant: asNumber(form.fxRateAtGrant) || null,
+            currentPrice:
+              asNumber(form.currentPrice) || asNumber(form.fairMarketValue),
           })
         )
       );
@@ -1290,19 +3508,27 @@ export default function Equity() {
       toast.success("Company info updated.");
       resetFlow();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Unable to update company.");
-    } finally {
-      setSaving(false);
+      toast.error(
+        err?.response?.data?.message || "Unable to update company info."
+      );
     }
   };
 
   const toggleIncludeInNetWorth = async (grant) => {
     try {
-      await cryptoService.update(grant._id, { includeInNetWorth: grant.includeInNetWorth === false });
+      await cryptoService.update(grant._id, {
+        includeInNetWorth: grant.includeInNetWorth === false,
+      });
       await refreshAssets();
-      toast.success(grant.includeInNetWorth === false ? "Included in net worth." : "Excluded from net worth.");
+      toast.success(
+        grant.includeInNetWorth === false
+          ? "Included in net worth."
+          : "Excluded from net worth."
+      );
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Unable to update visibility.");
+      toast.error(
+        err?.response?.data?.message || "Unable to update visibility."
+      );
     }
   };
 
@@ -1321,191 +3547,623 @@ export default function Equity() {
     }
   };
 
+  // Chart tick selector
+  const chartTicks = useMemo(() => {
+    const maxTicks = 6;
+    const len = chartData.length;
+    if (len === 0) return [];
+    if (len <= maxTicks) return chartData.map((p) => p.label);
+    const step = Math.ceil(len / maxTicks);
+    return chartData.filter((_, i) => i % step === 0).map((p) => p.label);
+  }, [chartData]);
+
+  // Pie data — guard against all-zero
+  const pieData = useMemo(() => {
+    const exerciseCost = overviewStats.exerciseCost || 0;
+    const iit = overviewStats.totalIIT || 0;
+    if (exerciseCost === 0 && iit === 0) {
+      return [
+        { name: "No data", value: 1, isEmpty: true },
+      ];
+    }
+    return [
+      { name: "Cost of exercise", value: exerciseCost || 0.0001 },
+      { name: "IIT estimate", value: iit || 0.0001 },
+    ];
+  }, [overviewStats.exerciseCost, overviewStats.totalIIT]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <style>{`
-        .equity-tabs button:hover { background: rgba(0,0,0,0.04); }
-        .equity-card { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 16px; }
+        /* Tab hover */
+        .eq-tab:hover { background: var(--bg-hover, rgba(0,0,0,0.04)) !important; }
+        /* Card */
+        .eq-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border-default);
+          border-radius: 12px;
+        }
+        /* Scrollbar */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .equity-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 16px; }
-        .equity-summary-grid { display: grid; grid-template-columns: 1fr 160px 160px; gap: 16px; align-items: end; }
-        .equity-table { width: 100%; border-collapse: collapse; }
-        .equity-table th { text-align: left; font-size: 11px; color: var(--text-muted); font-weight: 600; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); letter-spacing: 0.04em; text-transform: uppercase; }
-        .equity-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; color: var(--text-primary); }
-        .safe-badge-pending { display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#d97706;background:rgba(251,191,36,0.12);border-radius:999px;padding:3px 8px; }
-        .safe-badge-expired { display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#dc2626;background:rgba(220,38,38,0.10);border-radius:999px;padding:3px 8px; }
-        .safe-badge-filed { display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#16a34a;background:rgba(22,163,74,0.10);border-radius:999px;padding:3px 8px; }
-        @media (max-width: 1100px) { .equity-grid { grid-template-columns: 1fr; } }
+        .modal-scroll::-webkit-scrollbar { width: 6px; }
+        .modal-scroll::-webkit-scrollbar-track { background: transparent; }
+        .modal-scroll::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 4px; }
+        .modal-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        /* Grid */
+        .eq-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 14px; }
+        @media (max-width: 1080px) { .eq-grid { grid-template-columns: 1fr; } }
+        /* Table */
+        .eq-table { width: 100%; border-collapse: collapse; }
+        .eq-table th {
+          text-align: left;
+          font-size: 10px;
+          color: var(--text-muted);
+          font-weight: 600;
+          padding: 10px 14px;
+          border-bottom: 1px solid var(--border-subtle);
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+        .eq-table td {
+          padding: 11px 14px;
+          border-bottom: 1px solid var(--border-subtle);
+          vertical-align: middle;
+          color: var(--text-primary);
+          font-size: 13px;
+        }
+        .eq-table tr:last-child td { border-bottom: none; }
+        .eq-table tr:hover td { background: var(--bg-hover, rgba(0,0,0,0.02)); }
+        /* Badges */
+        .safe-pending { display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#d97706;background:rgba(245,158,11,0.10);border-radius:999px;padding:2px 7px;font-weight:500; }
+        .safe-expired { display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#dc2626;background:rgba(239,68,68,0.10);border-radius:999px;padding:2px 7px;font-weight:500; }
+        .safe-filed  { display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#16a34a;background:rgba(34,197,94,0.10);border-radius:999px;padding:2px 7px;font-weight:500; }
+        /* recharts override: make tooltips respect theme */
+        .recharts-tooltip-wrapper { outline: none !important; }
+        /* Input focus */
+        input:focus, select:focus, textarea:focus {
+          outline: none;
+          border-color: var(--border-focus, var(--text-primary)) !important;
+        }
+        /* Table wrap */
         @media (max-width: 760px) {
-          .equity-summary-grid { grid-template-columns: 1fr; }
-          .equity-table-wrap { overflow-x: auto; }
-          .equity-table { min-width: 1060px; }
+          .eq-table-wrap { overflow-x: auto; }
+          .eq-table { min-width: 900px; }
         }
       `}</style>
 
-      {/* Tab bar */}
-      <div className="equity-tabs" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {[{ value: "overview", label: "Overview" }, { value: "portfolio", label: "Portfolio" }].map((tab) => (
+      {/* ── Tab bar ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {[
+          { value: "overview", label: "Overview" },
+          { value: "portfolio", label: "Portfolio" },
+        ].map((tab) => (
           <button
             key={tab.value}
             type="button"
+            className="eq-tab"
             onClick={() => setActiveSubTab(tab.value)}
-            style={{ ...buttonReset, padding: "10px 14px", borderRadius: 10, cursor: "pointer", color: "var(--text-primary)", fontSize: 15, background: activeSubTab === tab.value ? "rgba(0,0,0,0.04)" : "transparent" }}
+            style={{
+              ...buttonReset,
+              padding: "7px 13px",
+              borderRadius: 8,
+              cursor: "pointer",
+              color: "var(--text-primary)",
+              fontSize: 13,
+              fontWeight: activeSubTab === tab.value ? 500 : 400,
+              background:
+                activeSubTab === tab.value
+                  ? "var(--bg-hover, rgba(0,0,0,0.05))"
+                  : "transparent",
+              transition: "background 0.15s",
+            }}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Empty state */}
+      {/* ── Empty state ──────────────────────────────────────────────────────── */}
       {!loading && !selectedCompany && (
-        <div className="equity-card" style={{ padding: 24 }}>
+        <div className="eq-card" style={{ padding: 24 }}>
           <div style={sectionLabelStyle}>Equity</div>
-          <div style={{ marginTop: 10, fontSize: 16, fontWeight: 500, color: "var(--text-primary)" }}>No grants added yet.</div>
-          <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-secondary)" }}>Supports stock options, RSUs, restricted stock, and employee stock ownership plans.</div>
-          <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-            <button type="button" onClick={startAddCompany} style={secondaryButtonStyle}>Add company</button>
-            <button type="button" onClick={startAddGrant} style={primaryButtonStyle}>Add grant</button>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 15,
+              fontWeight: 500,
+              color: "var(--text-primary)",
+            }}
+          >
+            No grants added yet.
+          </div>
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              lineHeight: 1.5,
+            }}
+          >
+            Track stock options, RSUs, restricted stock, and employee stock
+            ownership plans.
+          </div>
+          <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={startAddCompany}
+              style={secondaryButtonStyle}
+            >
+              Add company
+            </button>
+            <button
+              type="button"
+              onClick={startAddGrant}
+              style={primaryButtonStyle}
+            >
+              Add grant
+            </button>
           </div>
         </div>
       )}
 
-      {/* Overview tab */}
+      {/* ── Overview tab ─────────────────────────────────────────────────────── */}
       {activeSubTab === "overview" && selectedCompany && (
-        <div className="equity-grid">
-          <div style={{ display: "grid", gap: 16 }}>
-            {/* Company card */}
-            <div className="equity-card">
-              <div style={{ padding: 18 }}>
-                <div style={{ width: "100%", maxWidth: 350 }}>
-                  <div style={sectionLabelStyle}>Company</div>
+        <div className="eq-grid">
+          {/* Left column */}
+          <div style={{ display: "grid", gap: 14 }}>
+            {/* Company header card */}
+            <div className="eq-card">
+              <div style={{ padding: "16px 18px" }}>
+                {/* Company selector */}
+                <div style={{ maxWidth: 320, marginBottom: 14 }}>
+                  <div
+                    style={{ ...sectionLabelStyle, marginBottom: 6 }}
+                  >
+                    Company
+                  </div>
                   <div style={{ position: "relative" }}>
-                    <select value={selectedCompany.id} onChange={(e) => setSelectedCompanyId(e.target.value)} style={{ ...inputStyle, appearance: "none", paddingRight: 36 }}>
-                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    <select
+                      value={selectedCompany.id}
+                      onChange={(e) => setSelectedCompanyId(e.target.value)}
+                      style={{
+                        ...inputStyle,
+                        appearance: "none",
+                        paddingRight: 32,
+                        fontSize: 13,
+                      }}
+                    >
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
                     </select>
-                    <ChevronDown size={18} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-secondary)" }} />
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        position: "absolute",
+                        right: 11,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "var(--text-muted)",
+                        pointerEvents: "none",
+                      }}
+                    />
                   </div>
                 </div>
-                <div style={{ marginTop: 16, fontSize: 18, fontWeight: 500, color: "var(--text-primary)" }}>{selectedCompany.name}</div>
-                <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-muted)" }}>{getStructureLabel(selectedCompany.companyStructure)}</div>
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 24, color: "var(--text-secondary)", fontSize: 13 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    Latest price: <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 600 }}>{formatEquityAmount(selectedCompany.latestSharePrice || 0, { maximumFractionDigits: 0 })}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    FMV / 409A: <span style={{ color: "var(--text-primary)", fontSize: 14 }}>{formatEquityAmount(selectedCompany.fairMarketValue || 0, { maximumFractionDigits: 0 })}</span>
-                  </div>
+
+                {/* Company name + structure */}
+                <div
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {selectedCompany.name}
                 </div>
-                {/* SAFE / compliance alerts */}
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {getStructureLabel(selectedCompany.companyStructure)}
+                  {selectedCompany.ticker && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        padding: "1px 6px",
+                        borderRadius: 4,
+                        background:
+                          "var(--bg-secondary, rgba(0,0,0,0.04))",
+                        border: "1px solid var(--border-subtle)",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: "var(--text-secondary)",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {selectedCompany.ticker}
+                    </span>
+                  )}
+                </div>
+
+                {/* Price row */}
+                <div
+                  style={{
+                    marginTop: 12,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 20,
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  <span>
+                    Latest price:{" "}
+                    <span
+                      style={{
+                        color: "var(--text-primary)",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatEquityAmount(
+                        selectedCompany.latestSharePrice || 0
+                      )}
+                    </span>
+                  </span>
+                  <span>
+                    FMV / 409A:{" "}
+                    <span
+                      style={{
+                        color: "var(--text-primary)",
+                        fontSize: 13,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatEquityAmount(
+                        selectedCompany.fairMarketValue || 0
+                      )}
+                    </span>
+                  </span>
+                </div>
+
+                {/* SAFE alert */}
                 {overviewStats.safeIssues > 0 && (
-                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                    <AlertCircle size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                      {overviewStats.safeIssues} grant{overviewStats.safeIssues > 1 ? "s" : ""} with SAFE filing issues
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "7px 10px",
+                      borderRadius: 8,
+                      background: "rgba(239,68,68,0.06)",
+                      border: "1px solid rgba(239,68,68,0.18)",
+                    }}
+                  >
+                    <AlertCircle
+                      size={13}
+                      style={{ color: "#ef4444", flexShrink: 0 }}
+                    />
+                    <span
+                      style={{ fontSize: 12, color: "var(--text-secondary)" }}
+                    >
+                      {overviewStats.safeIssues} grant
+                      {overviewStats.safeIssues > 1 ? "s" : ""} with SAFE
+                      filing issues
                     </span>
                   </div>
                 )}
               </div>
-              <div style={{ borderTop: "1px solid var(--border-subtle)", padding: "16px 18px" }}>
-                <div className="equity-summary-grid">
-                  <div>
-                    <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>Estimated net grant value (pre-IIT)</div>
-                    <div style={{ marginTop: 6, fontSize: 28, lineHeight: 1, fontWeight: 600, color: "var(--text-primary)" }}>
-                      {formatEquityAmount(overviewStats.estimatedGrantValue)}
-                    </div>
-                    <div style={{ marginTop: 6, color: "var(--text-secondary)", fontSize: 12 }}>{overviewStats.totalShares} shares</div>
+
+              {/* Stats row */}
+              <div
+                style={{
+                  borderTop: "1px solid var(--border-subtle)",
+                  padding: "14px 18px",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Est. grant value
                   </div>
-                  <div>
-                    <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>Vested</div>
-                    <div style={{ marginTop: 6, fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>
-                      {formatEquityAmount(overviewStats.vestedValue)}
-                    </div>
-                    <div style={{ marginTop: 6, color: "var(--text-secondary)", fontSize: 12 }}>{overviewStats.vestedShares} shares</div>
+                  <div
+                    style={{
+                      marginTop: 5,
+                      fontSize: 20,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      fontVariantNumeric: "tabular-nums",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {formatEquityAmount(overviewStats.estimatedGrantValue)}
                   </div>
-                  <div>
-                    <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>Unvested</div>
-                    <div style={{ marginTop: 6, fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>
-                      {formatEquityAmount(overviewStats.unvestedValue)}
-                    </div>
-                    <div style={{ marginTop: 6, color: "var(--text-secondary)", fontSize: 12 }}>{overviewStats.unvestedShares} shares</div>
+                  <div
+                    style={{
+                      marginTop: 3,
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    {formatShareCount(overviewStats.totalShares)} shares
+                    · pre-IIT
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background:
+                      "var(--bg-secondary, rgba(0,0,0,0.03))",
+                    border: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text-muted)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Vested
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 5,
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatEquityAmount(overviewStats.vestedValue)}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    {formatShareCount(overviewStats.vestedShares)} shares
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background:
+                      "var(--bg-secondary, rgba(0,0,0,0.03))",
+                    border: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text-muted)",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Unvested
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 5,
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatEquityAmount(overviewStats.unvestedValue)}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    {formatShareCount(overviewStats.unvestedShares)} shares
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Vesting chart */}
-            <div className="equity-card" style={{ overflow: "hidden" }}>
-              <div style={{ padding: "16px 18px 14px", borderBottom: "1px solid var(--border-subtle)" }}>
-                <div style={sectionLabelStyle}>Vesting Schedule</div>
+            <div className="eq-card" style={{ overflow: "hidden" }}>
+              <div
+                style={{
+                  padding: "14px 18px 12px",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    ...sectionLabelStyle,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Vesting Schedule
+                </span>
+                {/* Legend */}
+                <div style={{ display: "flex", gap: 14 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 24,
+                        height: 2,
+                        background: "#3b82f6",
+                        borderRadius: 1,
+                      }}
+                    />
+                    Vested
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 24,
+                        height: 2,
+                        borderTop: "2px dashed var(--text-muted)",
+                      }}
+                    />
+                    Total
+                  </div>
+                </div>
               </div>
-              <div style={{ padding: 16 }}>
-                <div style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 8 }}>Number of shares</div>
-                <div style={{ height: 340, minHeight: 0, minWidth: 0, width: "100%" }}>
+              <div style={{ padding: "12px 8px 8px" }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 12, marginBottom: 4, fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                  Shares
+                </div>
+                <div style={{ height: 280 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 20, right: 12, left: 0, bottom: 24 }}>
+                    <AreaChart
+                      data={chartData}
+                      margin={{ top: 8, right: 16, left: -10, bottom: 10 }}
+                    >
                       <defs>
-                        <linearGradient id="equityVestedFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#2892ff" stopOpacity={0.4} />
-                          <stop offset="100%" stopColor="#2892ff" stopOpacity={0.08} />
-                        </linearGradient>
-                        <linearGradient id="equityTotalFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#74b9ff" stopOpacity={0.15} />
-                          <stop offset="100%" stopColor="#74b9ff" stopOpacity={0.02} />
+                        <linearGradient
+                          id="vestGrad"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#3b82f6"
+                            stopOpacity={0.25}
+                          />
+                          <stop
+                            offset="85%"
+                            stopColor="#3b82f6"
+                            stopOpacity={0.02}
+                          />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid 
-                        stroke="var(--border-subtle)" 
-                        vertical={true}
-                        horizontalPoints={[0, 60, 120, 180, 240]}
+                      <CartesianGrid
+                        stroke="var(--border-subtle)"
+                        strokeDasharray="0"
+                        vertical={false}
                       />
-                      <XAxis 
-                        dataKey="label" 
-                        tick={{ fill: "var(--text-muted)", fontSize: 12 }} 
-                        axisLine={false} 
-                        tickLine={false}
-                        interval={Math.max(0, Math.floor(chartData.length / 6))}
-                      />
-                      <YAxis 
-                        tick={{ fill: "var(--text-muted)", fontSize: 12 }} 
-                        axisLine={false} 
-                        tickLine={false}
-                        allowDecimals={true}
-                        type="number"
-                        width={45}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          borderRadius: 12, 
-                          border: "1px solid var(--border-default)", 
-                          background: "var(--bg-card)", 
-                          color: "var(--text-primary)",
-                          padding: "12px 14px",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.08)"
+                      <XAxis
+                        dataKey="label"
+                        tick={{
+                          fill: "var(--text-muted)",
+                          fontSize: 10,
+                          fontWeight: 500,
                         }}
-                        formatter={(value) => [value.toFixed(1), '']}
-                        labelStyle={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 500 }}
+                        tickFormatter={(v) => String(v).toUpperCase()}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        ticks={chartTicks}
                       />
-                      <Area 
-                        type="natural" 
-                        dataKey="vested" 
-                        name="Vested" 
-                        stroke="#2892ff" 
-                        fill="url(#equityVestedFill)" 
-                        strokeWidth={3}
+                      <YAxis
+                        tick={{
+                          fill: "var(--text-muted)",
+                          fontSize: 10,
+                        }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                        width={40}
+                        domain={[0, chartYAxisTop]}
+                        tickCount={5}
+                      />
+                      <Tooltip
+                        content={
+                          <EquityVestingTooltip
+                            formatEquityAmount={formatEquityAmount}
+                          />
+                        }
+                        cursor={{
+                          stroke: "var(--border-default)",
+                          strokeWidth: 1,
+                          strokeDasharray: "4 2",
+                        }}
+                      />
+                      {chartData.find((p) => p.isToday) && (
+                        <ReferenceLine
+                          x={chartData.find((p) => p.isToday)?.label}
+                          stroke="var(--text-muted)"
+                          strokeDasharray="3 3"
+                          strokeWidth={1.5}
+                          label={{
+                            value: "Today",
+                            position: "insideTopRight",
+                            fill: "var(--text-muted)",
+                            fontSize: 10,
+                            fontWeight: 600,
+                          }}
+                        />
+                      )}
+                      <Area
+                        type="monotone"
+                        dataKey="vested"
+                        name="Vested"
+                        stroke="#3b82f6"
+                        fill="url(#vestGrad)"
+                        strokeWidth={2}
                         isAnimationActive={false}
                         dot={false}
-                        activeDot={{ r: 6, fill: "#2892ff", stroke: "var(--bg-card)", strokeWidth: 2 }}
+                        activeDot={{
+                          r: 4,
+                          fill: "#3b82f6",
+                          stroke: "var(--bg-card)",
+                          strokeWidth: 2,
+                        }}
                       />
-                      <Area 
-                        type="natural" 
-                        dataKey="total" 
-                        name="Total Shares" 
-                        stroke="#a8d4ff" 
-                        fill="url(#equityTotalFill)" 
-                        strokeDasharray="5 5"
-                        strokeWidth={2}
+                      <Area
+                        type="stepAfter"
+                        dataKey="total"
+                        name="Total shares"
+                        stroke="var(--text-muted)"
+                        fill="none"
+                        strokeDasharray="4 3"
+                        strokeWidth={1.5}
                         isAnimationActive={false}
                         dot={false}
                       />
@@ -1514,101 +4172,294 @@ export default function Equity() {
                 </div>
               </div>
             </div>
+
+            {/* Insights row */}
+            <div className="eq-card" style={{ overflow: "hidden" }}>
+              <div
+                style={{
+                  padding: "13px 16px",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span
+                  style={{
+                    ...sectionLabelStyle,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Insights
+                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => scrollInsights("left")}
+                    style={{
+                      ...buttonReset,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 26,
+                      height: 26,
+                      borderRadius: 6,
+                      background:
+                        "var(--bg-secondary, rgba(0,0,0,0.04))",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollInsights("right")}
+                    style={{
+                      ...buttonReset,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 26,
+                      height: 26,
+                      borderRadius: 6,
+                      background:
+                        "var(--bg-secondary, rgba(0,0,0,0.04))",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+              <div
+                ref={insightsRef}
+                className="hide-scrollbar"
+                style={{
+                  padding: "14px 16px",
+                  overflowX: "auto",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    minWidth: "max-content",
+                  }}
+                >
+                  {insightCards.map((card) => (
+                    <InsightCard
+                      key={card.title}
+                      title={card.title}
+                      value={card.value}
+                      detail={card.detail}
+                      tint={card.tint}
+                      icon={card.icon}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right column */}
-          <div style={{ display: "grid", gap: 16, alignSelf: "start" }}>
-            <div className="equity-card" style={{ padding: 16 }}>
+          <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
+            {/* Value breakdown */}
+            <div className="eq-card" style={{ padding: 16 }}>
               <div style={sectionLabelStyle}>How It's Calculated</div>
-              <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--text-primary)" }}>
-                View a breakdown of your equity estimate including SAT Circular 35 IIT calculations and SAFE filing status.
-              </div>
-              <button type="button" onClick={() => setShowValueEstimate(true)} style={{ ...secondaryButtonStyle, width: "100%", marginTop: 14 }}>View value breakdown</button>
+              <p
+                style={{
+                  margin: "8px 0 0",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: "var(--text-secondary)",
+                }}
+              >
+                View a breakdown of your equity estimate including SAT Circular
+                35 IIT calculations and SAFE filing status.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowValueEstimate(true)}
+                style={{
+                  ...secondaryButtonStyle,
+                  width: "100%",
+                  marginTop: 12,
+                  textAlign: "center",
+                }}
+              >
+                View value breakdown
+              </button>
             </div>
-            <div className="equity-card" style={{ padding: 16 }}>
-              <div style={sectionLabelStyle}>Exercise Cost & IIT Estimate</div>
-              <div style={{ height: 220, marginTop: 18, minHeight: 0, minWidth: 0, width: "100%" }}>
+
+            {/* Exercise cost & IIT pie */}
+            <div className="eq-card" style={{ padding: 16 }}>
+              <div style={sectionLabelStyle}>Exercise Cost & IIT</div>
+              <div style={{ height: 200, marginTop: 14 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={[
-                        { name: "Cost of exercise", value: overviewStats.exerciseCost || 0.0001 },
-                        { name: "IIT estimate", value: overviewStats.totalIIT || 0.0001 },
-                      ]}
-                      innerRadius={72} outerRadius={92} startAngle={90} endAngle={-270} dataKey="value" stroke="none"
+                      data={pieData}
+                      innerRadius={62}
+                      outerRadius={80}
+                      startAngle={90}
+                      endAngle={-270}
+                      dataKey="value"
+                      stroke="none"
+                      paddingAngle={pieData[0]?.isEmpty ? 0 : 2}
                     >
-                      <Cell fill="#8ac5ff" />
-                      <Cell fill="#f2b250" />
+                      {pieData[0]?.isEmpty ? (
+                        <Cell
+                          fill="var(--border-subtle)"
+                        />
+                      ) : (
+                        <>
+                          <Cell fill="#3b82f6" />
+                          <Cell fill="#f59e0b" />
+                        </>
+                      )}
                     </Pie>
-                    <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" fill="var(--text-primary)" style={{ fontSize: 16, fontWeight: 600 }}>
-                      {formatEquityAmount(overviewStats.exerciseCost + overviewStats.totalIIT)}
+                    <text
+                      x="50%"
+                      y="44%"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill="var(--text-primary)"
+                      style={{ fontSize: 15, fontWeight: 600 }}
+                    >
+                      {formatEquityAmount(
+                        overviewStats.exerciseCost + overviewStats.totalIIT
+                      )}
                     </text>
-                    <text x="50%" y="58%" textAnchor="middle" dominantBaseline="central" fill="var(--text-primary)" style={{ fontSize: 11 }}>Total exercise cost</text>
+                    <text
+                      x="50%"
+                      y="57%"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill="var(--text-muted)"
+                      style={{ fontSize: 10 }}
+                    >
+                      Total exercise cost
+                    </text>
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div style={{ marginTop: 2, display: "grid", gap: 12, fontSize: 13 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)" }}>
-                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: "#8ac5ff", display: "inline-block" }} />
+              <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: "#3b82f6",
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
                     Cost of exercise
                   </div>
-                  <div>{formatEquityAmount(overviewStats.exerciseCost)}</div>
+                  <span
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--text-primary)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formatEquityAmount(overviewStats.exerciseCost)}
+                  </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)" }}>
-                    <span style={{ width: 14, height: 14, borderRadius: "50%", background: "#f2b250", display: "inline-block" }} />
-                    IIT estimate · SAT Circular 35
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: "#f59e0b",
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
+                    IIT · SAT Circular 35
                   </div>
-                  <div>{formatEquityAmount(overviewStats.totalIIT)}</div>
+                  <span
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--text-primary)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formatEquityAmount(overviewStats.totalIIT)}
+                  </span>
                 </div>
               </div>
-              <div style={{ marginTop: 14, fontSize: 11, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                IIT estimated using the preferential 12-month spread method. Final liability depends on other income and deductions.
-              </div>
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  lineHeight: 1.5,
+                }}
+              >
+                IIT estimated using the preferential 12-month spread method.
+                Final liability depends on other income and deductions.
+              </p>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Insights row */}
-      {activeSubTab === "overview" && selectedCompany && (
-        <div className="equity-card" style={{ overflow: "hidden" }}>
-          <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={sectionLabelStyle}>Insights</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button type="button" onClick={() => scrollInsights("left")} style={{ ...buttonReset, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "var(--bg-secondary)", color: "var(--text-primary)" }}>
-                <ChevronLeft size={16} />
-              </button>
-              <button type="button" onClick={() => scrollInsights("right")} style={{ ...buttonReset, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: "50%", background: "var(--bg-secondary)", color: "var(--text-primary)" }}>
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-          <div ref={insightsRef} className="hide-scrollbar" style={{ padding: "16px 18px", overflowX: "auto" }}>
-            <div style={{ display: "flex", gap: 16, minWidth: "max-content" }}>
-              {insightCards.map((card) => (
-                <InsightCard key={card.title} title={card.title} value={card.value} detail={card.detail} tint={card.tint} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Portfolio tab */}
-      {activeSubTab === "portfolio" && selectedCompany && (
-        <div className="equity-card" style={{ overflow: "hidden" }}>
-          <div style={{ padding: "18px 16px 0" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text-primary)" }}>{selectedCompany.name}</div>
-                <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>{getStructureLabel(selectedCompany.companyStructure)}</div>
-                <div style={{ marginTop: 16, display: "flex", flexWrap: "wrap", gap: 28, color: "var(--text-secondary)", fontSize: 13 }}>
-                  <div>Latest price: <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{formatEquityAmount(selectedCompany.latestSharePrice || 0)}</span></div>
-                  <div>FMV (409A): <span style={{ color: "var(--text-primary)" }}>{formatEquityAmount(selectedCompany.fairMarketValue || 0)}</span></div>
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {/* Quick actions */}
+            <div className="eq-card" style={{ padding: 16 }}>
+              <div style={sectionLabelStyle}>Actions</div>
+              <div
+                style={{ marginTop: 10, display: "grid", gap: 8 }}
+              >
+                <button
+                  type="button"
+                  onClick={startAddGrant}
+                  style={{
+                    ...primaryButtonStyle,
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Plus size={14} /> Add grant
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1617,8 +4468,123 @@ export default function Equity() {
                       name: selectedCompany.name,
                       ticker: selectedCompany.ticker,
                       companyStructure: selectedCompany.companyStructure,
-                      fairMarketValue: String(selectedCompany.fairMarketValue || ""),
-                      currentPrice: String(selectedCompany.latestSharePrice || ""),
+                      fairMarketValue: String(
+                        selectedCompany.fairMarketValue || ""
+                      ),
+                      currentPrice: String(
+                        selectedCompany.latestSharePrice || ""
+                      ),
+                    }));
+                    setFlow("edit-company");
+                  }}
+                  style={{
+                    ...secondaryButtonStyle,
+                    width: "100%",
+                    textAlign: "center",
+                  }}
+                >
+                  Edit company info
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Portfolio tab ─────────────────────────────────────────────────────── */}
+      {activeSubTab === "portfolio" && selectedCompany && (
+        <div className="eq-card" style={{ overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{ padding: "16px 18px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {selectedCompany.name}
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 11,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {getStructureLabel(selectedCompany.companyStructure)}
+                </div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 16,
+                    color: "var(--text-muted)",
+                    fontSize: 12,
+                  }}
+                >
+                  <span>
+                    Latest price:{" "}
+                    <span
+                      style={{
+                        color: "var(--text-primary)",
+                        fontWeight: 500,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatEquityAmount(
+                        selectedCompany.latestSharePrice || 0
+                      )}
+                    </span>
+                  </span>
+                  <span>
+                    FMV (409A):{" "}
+                    <span
+                      style={{
+                        color: "var(--text-primary)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatEquityAmount(
+                        selectedCompany.fairMarketValue || 0
+                      )}
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm((c) => ({
+                      ...c,
+                      name: selectedCompany.name,
+                      ticker: selectedCompany.ticker,
+                      companyStructure: selectedCompany.companyStructure,
+                      fairMarketValue: String(
+                        selectedCompany.fairMarketValue || ""
+                      ),
+                      currentPrice: String(
+                        selectedCompany.latestSharePrice || ""
+                      ),
                     }));
                     setFlow("edit-company");
                   }}
@@ -1626,94 +4592,231 @@ export default function Equity() {
                 >
                   Edit info
                 </button>
-                <button type="button" onClick={startAddGrant} style={{ ...primaryButtonStyle, display: "flex", alignItems: "center", gap: 8 }}>
-                  <Plus size={18} /> Add grant
+                <button
+                  type="button"
+                  onClick={startAddGrant}
+                  style={{
+                    ...primaryButtonStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Plus size={14} /> Add grant
                 </button>
               </div>
             </div>
           </div>
 
-          <div style={{ marginTop: 22, borderTop: "1px solid var(--border-subtle)", padding: "22px 16px 0" }}>
-            <div className="equity-table-wrap">
-              <table className="equity-table">
+          {/* Table */}
+          <div
+            style={{
+              borderTop: "1px solid var(--border-subtle)",
+            }}
+          >
+            <div className="eq-table-wrap">
+              <table className="eq-table">
                 <thead>
                   <tr>
                     <th>Grant</th>
                     <th>Quantity</th>
-                    <th>Grant date</th>
-                    <th>Vesting</th>
-                    <th>Strike / price</th>
-                    <th>SAFE status</th>
-                    <th>Lock-up</th>
-                    <th />
+                    <th>Vesting start</th>
+                    <th>Schedule</th>
+                    <th>Exercised</th>
+                    <th>Price</th>
+                    <th style={{ width: 80 }} />
                   </tr>
                 </thead>
                 <tbody>
+                  {companyGrants.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        style={{
+                          textAlign: "center",
+                          color: "var(--text-muted)",
+                          padding: "24px 14px",
+                          fontSize: 13,
+                        }}
+                      >
+                        No grants yet. Add your first grant above.
+                      </td>
+                    </tr>
+                  )}
                   {companyGrants.map((grant) => {
                     const meta = getGrantTypeMeta(grant.grantType);
-                    const lockupActive = grant.lockupExpiry && new Date(grant.lockupExpiry) > new Date();
+                    const isHidden = grant.includeInNetWorth === false;
                     return (
-                      <tr key={grant._id} style={{ opacity: grant.includeInNetWorth === false ? 0.55 : 1 }}>
+                      <tr
+                        key={grant._id}
+                        style={{ opacity: isHidden ? 0.5 : 1 }}
+                      >
                         <td>
-                          <div style={{ fontSize: 13 }}>{selectedCompany.name}</div>
-                          <span style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: meta.badgeColor, background: meta.badgeBg, borderRadius: 999, padding: "4px 8px" }}>
-                            {meta.labelEn} · {meta.label}
-                          </span>
-                          {grant.grantId && <div style={{ marginTop: 4, fontSize: 11, color: "var(--text-muted)" }}>{grant.grantId}</div>}
-                        </td>
-                        <td>
-                          <div style={{ fontSize: 15 }}>{grant.quantity}</div>
-                          <div style={{ marginTop: 3, color: "var(--text-secondary)", fontSize: 12 }}>
-                            {grant.vestedQuantity ? `${grant.vestedQuantity} vested` : ""}
-                            {grant.exercised ? ` · ${grant.exercised} exercised` : ""}
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: "var(--text-primary)",
+                            }}
+                          >
+                            {selectedCompany.name}
                           </div>
-                        </td>
-                        <td style={{ fontSize: 14 }}>
-                          {grant.buyDate ? new Date(grant.buyDate).toLocaleDateString("en-US") : "—"}
-                          {grant.expirationDate && (
-                            <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-muted)" }}>
-                              Exp: {new Date(grant.expirationDate).toLocaleDateString("en-US")}
-                            </div>
+                          <div
+                            style={{
+                              marginTop: 4,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                color: meta.badgeColor,
+                                background: meta.badgeBg,
+                                padding: "2px 7px",
+                                borderRadius: 999,
+                              }}
+                            >
+                              {meta.labelEn}
+                            </span>
+                            {grant.grantId && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                {grant.grantId}
+                              </span>
+                            )}
+                          </div>
+                          {/* SAFE badge */}
+                          {grant.safeFilingStatus === "pending" && (
+                            <span
+                              className="safe-pending"
+                              style={{ marginTop: 4, display: "inline-flex" }}
+                            >
+                              <AlertCircle size={9} /> SAFE pending
+                            </span>
+                          )}
+                          {grant.safeFilingStatus === "expired" && (
+                            <span
+                              className="safe-expired"
+                              style={{ marginTop: 4, display: "inline-flex" }}
+                            >
+                              <AlertCircle size={9} /> SAFE expired
+                            </span>
+                          )}
+                          {grant.safeFilingStatus === "filed" && (
+                            <span
+                              className="safe-filed"
+                              style={{ marginTop: 4, display: "inline-flex" }}
+                            >
+                              SAFE filed
+                            </span>
                           )}
                         </td>
                         <td>
-                          <div style={{ fontSize: 13 }}>{grant.hasVestingSchedule === false ? "No schedule" : getScheduleLabel(grant.vestingSchedule)}</div>
-                          {grant.cliffMonths && grant.hasVestingSchedule && (
-                            <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-muted)" }}>{grant.cliffMonths}-month cliff</div>
-                          )}
+                          <span
+                            style={{
+                              fontVariantNumeric: "tabular-nums",
+                              fontSize: 13,
+                            }}
+                          >
+                            {formatShareCount(grant.quantity)}
+                          </span>
                         </td>
-                        <td style={{ fontSize: 14 }}>
+                        <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                          {grant.vestingStartDate
+                            ? new Date(
+                                grant.vestingStartDate
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : grant.buyDate
+                            ? new Date(grant.buyDate).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                }
+                              )
+                            : "—"}
+                        </td>
+                        <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                          {grant.hasVestingSchedule === false
+                            ? "No schedule"
+                            : getScheduleLabel(grant.vestingSchedule)}
+                        </td>
+                        <td style={{ fontVariantNumeric: "tabular-nums" }}>
+                          {formatShareCount(asNumber(grant.exercised) || 0)}
+                        </td>
+                        <td style={{ fontVariantNumeric: "tabular-nums" }}>
                           {formatEquityAmount(grant.buyPrice || 0)}
-                          {grant.fmvAtExercise && (
-                            <div style={{ marginTop: 3, fontSize: 11, color: "var(--text-muted)" }}>FMV at ex: {formatEquityAmount(grant.fmvAtExercise)}</div>
-                          )}
                         </td>
                         <td>
-                          {!grant.safeFilingStatus || grant.safeFilingStatus === "not_required"
-                            ? <span style={{ fontSize: 11, color: "var(--text-muted)" }}>N/A</span>
-                            : grant.safeFilingStatus === "filed"
-                              ? <span className="safe-badge-filed">Filed</span>
-                              : grant.safeFilingStatus === "pending"
-                                ? <span className="safe-badge-pending"><AlertCircle size={10} /> Pending</span>
-                                : <span className="safe-badge-expired"><AlertCircle size={10} /> Expired</span>
-                          }
-                        </td>
-                        <td>
-                          {lockupActive
-                            ? <div style={{ fontSize: 11, color: "#d97706" }}>Locked until {new Date(grant.lockupExpiry).toLocaleDateString("en-US")}</div>
-                            : <div style={{ fontSize: 11, color: "var(--text-muted)" }}>No lock-up</div>
-                          }
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <button type="button" onClick={() => toggleIncludeInNetWorth(grant)} style={{ ...buttonReset, cursor: "pointer", color: "var(--text-primary)" }}>
-                              {grant.includeInNetWorth === false ? <Eye size={16} /> : <EyeOff size={16} />}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              title={
+                                isHidden
+                                  ? "Include in net worth"
+                                  : "Exclude from net worth"
+                              }
+                              onClick={() => toggleIncludeInNetWorth(grant)}
+                              style={{
+                                ...buttonReset,
+                                cursor: "pointer",
+                                color: "var(--text-muted)",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              {isHidden ? (
+                                <Eye size={15} />
+                              ) : (
+                                <EyeOff size={15} />
+                              )}
                             </button>
-                            <button type="button" onClick={() => setDeleteTarget(grant)} style={{ ...buttonReset, cursor: "pointer", color: "var(--text-primary)" }}>
-                              <Trash2 size={16} />
+                            <button
+                              type="button"
+                              title="Edit grant"
+                              onClick={() => startEdit(grant)}
+                              style={{
+                                ...buttonReset,
+                                cursor: "pointer",
+                                color: "var(--text-muted)",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              <Pencil size={15} />
                             </button>
-                            <button type="button" onClick={() => startEdit(grant)} style={{ ...buttonReset, cursor: "pointer", color: "var(--text-primary)" }}>
-                              <Pencil size={16} />
+                            <button
+                              type="button"
+                              title="Delete grant"
+                              onClick={() => setDeleteTarget(grant)}
+                              style={{
+                                ...buttonReset,
+                                cursor: "pointer",
+                                color: "var(--text-muted)",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         </td>
@@ -1725,15 +4828,31 @@ export default function Equity() {
             </div>
           </div>
 
-          <div style={{ padding: "14px 16px 16px", display: "flex", justifyContent: "flex-end" }}>
-            <button type="button" onClick={startAddCompany} style={{ ...secondaryButtonStyle, display: "flex", alignItems: "center", gap: 8 }}>
-              <Plus size={18} /> Add company
+          <div
+            style={{
+              padding: "12px 18px",
+              borderTop: "1px solid var(--border-subtle)",
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <button
+              type="button"
+              onClick={startAddCompany}
+              style={{
+                ...secondaryButtonStyle,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Plus size={14} /> Add company
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Modals / flows ─────────────────────────────────────────────────── */}
+      {/* ── Modals ─────────────────────────────────────────────────────────── */}
       {flow === "grant-type" && (
         <GrantTypeModal
           selectedType={form.grantType}
@@ -1744,8 +4863,8 @@ export default function Equity() {
       )}
 
       {flow === "grant-details" && (
-        <GrantDetailsModal
-          title="Add Grant Details"
+        <AddGrantDetailsModal
+          title={`Add ${getGrantTypeMeta(form.grantType).label} Grant`}
           form={form}
           setForm={setForm}
           onClose={resetFlow}
@@ -1772,7 +4891,10 @@ export default function Equity() {
           onClose={resetFlow}
           onBack={() => setFlow("company-structure")}
           onNext={() => {
-            if (!form.name.trim()) { toast.error("Company name is required."); return; }
+            if (!form.name.trim()) {
+              toast.error("Company name is required.");
+              return;
+            }
             setFlow("grant-type");
           }}
           saving={saving}
@@ -1801,7 +4923,6 @@ export default function Equity() {
           onBack={resetFlow}
           onSubmit={saveGrant}
           saving={saving}
-          isEdit
           currency={currency}
         />
       )}

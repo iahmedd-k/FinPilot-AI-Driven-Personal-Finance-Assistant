@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid, Bar, PieChart, Pie, Cell, Line, BarChart } from "recharts";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, GitBranch, PenLine, Plus, Sparkles, Tag, X, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { catToIcon, getSpendingCategoryLabel, getSpendingCategoryMeta, ProGate, SPENDING_CATEGORY_META, getOccurrencesInMonth, getRecurringFrequency } from "../../dashboardShared.jsx";
+import { catToIcon, getSpendingCategoryMeta, ProGate, SPENDING_CATEGORY_META, getOccurrencesInMonth } from "../../dashboardShared.jsx";
 import api from "../../../../services/api";
 import { formatCurrencyAmount } from "../../../../utils/currency";
 
@@ -74,7 +74,6 @@ export default function OverviewTab({
   C,
   setSpendTab,
   setShowAdvisor,
-  transactionService,
   queryClient,
   pushNotif,
   isMobile,
@@ -454,7 +453,7 @@ export default function OverviewTab({
     try {
       setCategorySaving(true);
       await api.post("/dashboard/budget", { month: currentMonthKey, amount });
-      refreshQueries();
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       onBudgetSaved?.();
       pushNotif?.("success", "Budget saved for this month.");
     } catch {
@@ -524,10 +523,10 @@ export default function OverviewTab({
 
                   {/* Chart / Calendar toggle */}
                   <div style={{ display: "flex", background: "var(--surface-muted)", borderRadius: 10, padding: 2 }}>
-                    {[{ mode: "chart", Icon: ChartGlyph, isCustom: true }, { mode: "calendar", Icon: CalendarDays }].map(({ mode, Icon, isCustom }) => (
+                    {[{ mode: "chart", isCustom: true }, { mode: "calendar" }].map(({ mode, isCustom }) => (
                       <button key={mode} type="button" onClick={() => setSpendViewMode(mode)}
                         style={{ width: 36, height: 32, borderRadius: 8, border: "none", background: spendViewMode === mode ? "var(--bg-secondary)" : "transparent", color: spendViewMode === mode ? C.text : C.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s", boxShadow: spendViewMode === mode ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-                        {isCustom ? <Icon /> : <Icon size={16} />}
+                        {isCustom ? <ChartGlyph /> : <CalendarDays size={16} />}
                       </button>
                     ))}
                   </div>
@@ -905,28 +904,26 @@ export default function OverviewTab({
                 {/* Donut */}
                 <div style={{ padding: 18, borderRadius: 20, background: "var(--surface-muted)", display: "flex", justifyContent: "center", marginBottom: 18 }}>
                   <div style={{ position: "relative", width: 180, height: 180 }}>
-                    <ResponsiveContainer width="100%" height="100%" minHeight={0}>
-                      <PieChart>
-                        {(() => {
-                          const pieData = breakdownMode === "budget"
-                            ? [
-                              { value: activeSpent > 0 ? activeSpent : 0, fill: activeSpent > 0 ? donutColor : "var(--border-subtle)" },
-                              { value: Math.max(0, activeTotal - activeSpent), fill: "var(--border-subtle)", opacity: 0.5 },
-                            ]
-                            : activeRows.length > 0
-                              ? activeRows.map((r) => ({ value: r.amount, fill: r.color }))
-                              : [{ value: 1, fill: "var(--border-subtle)" }];
-                          const pAngle = breakdownMode === "budget"
-                            ? (activeSpent > 0 && activeTotal > activeSpent ? 1 : 0)
-                            : (activeRows.length > 1 ? 2 : 0);
-                          return (
-                            <Pie data={pieData} cx="50%" cy="50%" startAngle={90} endAngle={-270} innerRadius={68} outerRadius={84} paddingAngle={pAngle} dataKey="value" stroke="none">
-                              {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} opacity={entry.opacity ?? 1} />)}
-                            </Pie>
-                          );
-                        })()}
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <PieChart width={180} height={180}>
+                      {(() => {
+                        const pieData = breakdownMode === "budget"
+                          ? [
+                            { value: activeSpent > 0 ? activeSpent : 0, fill: activeSpent > 0 ? donutColor : "var(--border-subtle)" },
+                            { value: Math.max(0, activeTotal - activeSpent), fill: "var(--border-subtle)", opacity: 0.5 },
+                          ]
+                          : activeRows.length > 0
+                            ? activeRows.map((r) => ({ value: r.amount, fill: r.color }))
+                            : [{ value: 1, fill: "var(--border-subtle)" }];
+                        const pAngle = breakdownMode === "budget"
+                          ? (activeSpent > 0 && activeTotal > activeSpent ? 1 : 0)
+                          : (activeRows.length > 1 ? 2 : 0);
+                        return (
+                          <Pie data={pieData} cx="50%" cy="50%" startAngle={90} endAngle={-270} innerRadius={68} outerRadius={84} paddingAngle={pAngle} dataKey="value" stroke="none">
+                            {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} opacity={entry.opacity ?? 1} />)}
+                          </Pie>
+                        );
+                      })()}
+                    </PieChart>
                     <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", padding: "0 8px" }}>
                       <div style={{ fontSize: activeSpent > 999999 ? 16 : 22, fontWeight: 700, color: C.text, lineHeight: 1.1 }}>
                         {formatAmount(activeSpent, { maximumFractionDigits: 0 })}

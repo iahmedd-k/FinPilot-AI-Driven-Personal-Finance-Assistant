@@ -37,7 +37,7 @@ import api from "../../../services/api";
 
 // ── Constants (../../../constants/routes) ────────────────────
 import { ROUTES } from "../../../constants/routes";
-import { formatCurrencyAmount, getUserCurrency } from "../../../utils/currency";
+import { formatCurrencyAmount, getCurrencySymbol, getUserCurrency } from "../../../utils/currency";
 
 // ── Hooks (../../../hooks/) ──────────────────────────────────
 import { useAuthContext } from "../../../hooks/useAuthContext";
@@ -46,7 +46,6 @@ import SpendingBreakdownTab from "./spending/BreakdownTab";
 import SpendingTransactionsPage from "./spending/TransactionsPage";
 import SpendingReportsTab from "./spending/ReportsTab";
 import SpendingRecurringTab from "./spending/RecurringTab";
-import SpendingSettingsTab from "./spending/SettingsTab";
 
 // ── Mobile hook ───────────────────────────────────────────────
 function useIsMobile(breakpoint = 640) {
@@ -263,6 +262,8 @@ function SpendingPage({
   const { user } = useAuthContext();
   const location = useLocation();
   const preferredCurrency = getUserCurrency(user);
+  const currencySymbol = getCurrencySymbol(preferredCurrency);
+  const padLeft = Math.max(44, 24 + currencySymbol.length * 10);
   const [spendTab, setSpendTab] = useState("overview");
   const [breakdownMode, setBreakdownMode] = useState("expenses");
   const [addOpen, setAddOpen] = useState(false);
@@ -593,7 +594,6 @@ function SpendingPage({
     ["transactions", isMobileLocal ? "Transactions" : "Transactions"],
     ["recurring", isMobileLocal ? "Recurring" : "Recurring"],
     ["reports", "Reports"],
-    ["settings", "Settings"],
   ];
 
   return (
@@ -799,7 +799,7 @@ function SpendingPage({
                             color: C.muted,
                           }}
                         >
-                          {preferredCurrency}
+                          {getCurrencySymbol(preferredCurrency)}
                         </span>
                         <input
                           type="number"
@@ -815,7 +815,7 @@ function SpendingPage({
                           placeholder="0.00"
                           style={{
                             ...inputSx,
-                            paddingLeft: 58,
+                            paddingLeft: padLeft,
                             appearance: "textfield",
                             WebkitAppearance: "none",
                             MozAppearance: "textfield",
@@ -1256,24 +1256,6 @@ function SpendingPage({
           isMobile={isMobileLocal || isMobile}
         />
       )}
-
-      {spendTab === "settings" && (
-        <SpendingSettingsTab
-          C={C}
-          isMobile={isMobileLocal || isMobile}
-          preferredCurrency={preferredCurrency}
-          spendingSettings={resolvedSettings}
-          budget={budget}
-          apiTransactions={analyticsTransactions}
-          monthlyChart={analyticsMonthlyChart}
-          transactionService={transactionService}
-          queryClient={queryClient}
-          refreshUser={refreshUser}
-          pushNotif={pushNotif}
-          onBudgetSaved={onBudgetSaved}
-          setSpendTab={setSpendTab}
-        />
-      )}
     </div>
   );
 }
@@ -1335,10 +1317,10 @@ function CalendarPicker({ C, value, onChange, minDate }) {
       const rect = wrapperRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const width = Math.max(
-        220,
-        Math.min(Math.max(260, rect.width), viewportWidth - 24)
+        260,
+        Math.min(Math.max(280, rect.width), viewportWidth - 24)
       );
-      const estimatedHeight = 354;
+      const estimatedHeight = 332;
       const roomBelow = window.innerHeight - rect.bottom;
       const roomAbove = rect.top;
       const top =
@@ -1425,27 +1407,31 @@ function CalendarPicker({ C, value, onChange, minDate }) {
         onClick={() => setOpen((prev) => !prev)}
         style={{
           width: "100%",
+          minHeight: 42,
           border: `1px solid ${C.border}`,
           borderRadius: 12,
-          padding: "10px 12px",
+          padding: "0 12px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           gap: 10,
-          background: "var(--bg-secondary)",
+          background: "var(--bg-card)",
           color: C.text,
           cursor: "pointer",
           fontFamily: "inherit",
           boxSizing: "border-box",
-          transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+          transition: "border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease",
+          boxShadow: open ? "0 10px 24px rgba(0,0,0,0.08)" : "0 1px 0 rgba(0,0,0,0.02)",
         }}
       >
         <span
           style={{
-            fontSize: 12.5,
+            fontSize: 13,
+            fontWeight: 600,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            letterSpacing: "-0.01em",
           }}
         >
           {displayText}
@@ -1469,11 +1455,11 @@ function CalendarPicker({ C, value, onChange, minDate }) {
             onClick={(event) => event.stopPropagation()}
             style={{
               ...popupStyle,
-              padding: "18px 18px 16px",
-              borderRadius: 28,
+              padding: 14,
+              borderRadius: 20,
               border: `1px solid ${C.border}`,
-              boxShadow: "0 24px 64px rgba(0,0,0,0.26)",
-              background: "var(--bg-secondary)",
+              boxShadow: "0 28px 72px rgba(0,0,0,0.22)",
+              background: "var(--bg-card)",
               zIndex: 10001,
               boxSizing: "border-box",
               overflow: "hidden",
@@ -1482,28 +1468,35 @@ function CalendarPicker({ C, value, onChange, minDate }) {
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "space-between",
-                marginBottom: 16,
+                gap: 12,
+                marginBottom: 14,
               }}
             >
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: C.text,
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {monthLabel}
+              <div style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em" }}>Calendar</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>{monthLabel}</div>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setViewMonth(new Date(today.getFullYear(), today.getMonth(), 1))}
+                  style={{
+                    height: 28,
+                    borderRadius: 999,
+                    border: `1px solid ${C.border}`,
+                    background: "var(--bg-card)",
+                    padding: "0 10px",
+                    cursor: "pointer",
+                    color: C.text,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Today
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -1519,11 +1512,12 @@ function CalendarPicker({ C, value, onChange, minDate }) {
                   style={{
                     width: 30,
                     height: 30,
-                    border: "none",
-                    background: "transparent",
+                    border: `1px solid ${C.border}`,
+                    background: "var(--bg-card)",
+                    boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
                     padding: 0,
                     cursor: "pointer",
-                    color: C.muted,
+                    color: C.text,
                     borderRadius: 999,
                     display: "flex",
                     alignItems: "center",
@@ -1547,11 +1541,12 @@ function CalendarPicker({ C, value, onChange, minDate }) {
                   style={{
                     width: 30,
                     height: 30,
-                    border: "none",
-                    background: "transparent",
+                    border: `1px solid ${C.border}`,
+                    background: "var(--bg-card)",
+                    boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
                     padding: 0,
                     cursor: "pointer",
-                    color: C.muted,
+                    color: C.text,
                     borderRadius: 999,
                     display: "flex",
                     alignItems: "center",
@@ -1566,19 +1561,20 @@ function CalendarPicker({ C, value, onChange, minDate }) {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                fontSize: 11,
+                fontSize: 10.5,
                 color: C.muted,
                 textAlign: "center",
-                marginBottom: 10,
+                marginBottom: 8,
               }}
             >
               {WEEKDAYS.map((day) => (
                 <div
                   key={day}
                   style={{
-                    padding: "4px 0 8px",
-                    fontWeight: 500,
-                    letterSpacing: "0.02em",
+                    padding: "6px 0 10px",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
                   }}
                 >
                   {day[0]}
@@ -1589,7 +1585,7 @@ function CalendarPicker({ C, value, onChange, minDate }) {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                gap: 4,
+                gap: 6,
               }}
             >
               {cells.map((cell) => {
@@ -1612,44 +1608,59 @@ function CalendarPicker({ C, value, onChange, minDate }) {
                     onClick={() => handleSelect(dateForCell)}
                     disabled={isDisabled}
                     style={{
-                      height: 40,
+                      height: 38,
                       width: "100%",
-                      maxWidth: 40,
+                      maxWidth: 38,
                       margin: "0 auto",
-                      borderRadius: 999,
-                      border:
-                        isToday && !isSelected
+                      borderRadius: 12,
+                      border: isSelected
+                        ? `1px solid var(--surface-strong)`
+                        : isToday
                           ? `1px solid ${C.border}`
                           : "1px solid transparent",
                       background: isSelected
-                        ? "var(--surface-muted)"
-                        : "transparent",
+                        ? "var(--surface-strong)"
+                        : isToday
+                          ? `color-mix(in srgb, var(--surface-strong) 6%, transparent)`
+                          : "transparent",
                       color: isDisabled
                         ? C.muted
-                        : isOutsideMonth
-                          ? C.muted
-                          : C.text,
+                        : isSelected
+                          ? "var(--text-on-strong)"
+                          : isOutsideMonth
+                            ? C.muted
+                            : C.text,
                       cursor: isDisabled ? "default" : "pointer",
                       opacity: isDisabled
                         ? 0.35
-                        : isOutsideMonth
+                        : isOutsideMonth && !isSelected
                           ? 0.7
                           : 1,
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: isSelected ? 700 : 600,
                       lineHeight: 1,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       boxSizing: "border-box",
+                      boxShadow: isSelected ? "0 10px 24px rgba(17,17,17,0.18)" : isToday ? "inset 0 0 0 1px color-mix(in srgb, var(--surface-strong) 18%, transparent)" : "none",
                       transition:
-                        "background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease",
+                        "background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease",
+                      transform: isSelected ? "translateY(-1px)" : "none",
                     }}
                   >
                     {cell.day}
                   </button>
                 );
               })}
+            </div>
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div style={{ fontSize: 11.5, color: C.muted }}>
+                {selectedDate ? `Selected: ${displayText}` : "Pick a date to continue"}
+              </div>
+              {minimumDate && (
+                <div style={{ fontSize: 11.5, color: C.muted }}>Earliest allowed: {minimumDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+              )}
             </div>
           </div>,
           document.body

@@ -5,6 +5,7 @@ const ForecastCustomization = require("../models/ForecastCustomization");
 const SavedReport = require("../models/SavedReport");
 const calculateFinancialScore = require("../services/ai/financialScoreService");
 const calculateForecast = require("../services/ai/forecastService");
+const { applyTransactionRules } = require("../utils/rulesEngine");
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
@@ -73,6 +74,7 @@ const normalizeSpendingSettings = (input = {}) => {
   const recurringSettings = input?.recurringSettings || {};
   const transactionPreferences = input?.transactionPreferences || {};
   const reportPreferences = input?.reportPreferences || {};
+  const rules = input?.rules || [];
 
   return {
     budgetSettings: {
@@ -116,6 +118,19 @@ const normalizeSpendingSettings = (input = {}) => {
         : DEFAULT_SPENDING_SETTINGS.reportPreferences.defaultTab,
       defaultViewBy: reportPreferences.defaultViewBy === "Merchant" ? "Merchant" : "Category",
     },
+    rules: Array.isArray(rules) ? rules.map(r => ({
+      _id: r._id,
+      name: String(r.name || "").trim(),
+      conditions: Array.isArray(r.conditions) ? r.conditions.map(c => ({
+        field: String(c.field || "").trim(),
+        operator: String(c.operator || "").trim(),
+        value: String(c.value || "").trim(),
+      })) : [],
+      actions: Array.isArray(r.actions) ? r.actions.map(a => ({
+        field: String(a.field || "").trim(),
+        value: String(a.value || "").trim(),
+      })) : [],
+    })) : [],
   };
 };
 
@@ -267,9 +282,21 @@ const saveSpendingSettings = async (req, res, next) => {
       { new: false, runValidators: true }
     );
 
+    // Apply rules retroactively to existing transactions
+    const userTransactions = await Transaction.find({ userId: req.user._id });
+    let appliedCount = 0;
+    for (const tx of userTransactions) {
+      const isModified = applyTransactionRules(tx, spendingSettings.rules);
+      if (isModified) {
+        await tx.save();
+        appliedCount++;
+      }
+    }
+
     res.status(200).json({
       success: true,
       spendingSettings,
+      appliedCount,
     });
   } catch (err) {
     next(err);

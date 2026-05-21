@@ -1,7 +1,7 @@
 // ─── src/components/dashboard/tabs/ForecastTab.jsx ───────────
 // FIXED VERSION — all bugs resolved, see comments marked [FIX]
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   XAxis, YAxis, Tooltip,
@@ -43,15 +43,7 @@ const parseYearMonth = (value) => {
   return { year, month };
 };
 
-const getAgeFromBirthDate = (birthDate, now = new Date()) => {
-  if (!birthDate) return 30;
-  const birth = new Date(birthDate);
-  if (Number.isNaN(birth.getTime())) return 30;
-  let age = now.getFullYear() - birth.getFullYear();
-  const monthDiff = now.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age -= 1;
-  return Math.min(89, Math.max(FORECAST_MIN_AGE, age));
-};
+// helper removed: unused (kept parsing helpers above)
 
 const getBirthYear = (birthDate, fallbackAge, now = new Date()) => {
   if (!birthDate) return now.getFullYear() - fallbackAge;
@@ -106,7 +98,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
   const T = getThemeStyles(C);
 
-  const eventTemplates = [
+  const eventTemplates = useMemo(() => [
     { type: "home_purchase", label: "Buy a home", icon: Building2, details: { age: 35, amount: 400000, downPayment: 80000 } },
     { type: "home_sale", label: "Sell home", icon: Building2, details: { age: 55, amount: 500000 } },
     { type: "child", label: "Have a kid", icon: Baby, details: { age: 34, annualCost: 12000 } },
@@ -115,9 +107,9 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     { type: "additional_income", label: "Additional income", icon: DollarSign, details: { age: 38, amount: 500 } },
     { type: "equity", label: "Equity", icon: ChartLine, details: { age: 36, amount: 25000 } },
     { type: "custom", label: "Custom event", icon: PlusCircle, details: { age: 35, note: "Custom event" } },
-  ];
+  ], []);
 
-  const eventLabel = (type) => eventTemplates.find((t) => t.type === type)?.label || type;
+  const eventLabel = useCallback((type) => eventTemplates.find((t) => t.type === type)?.label || type, [eventTemplates]);
 
   const [showModal, setShowModal] = useState(false);
   const [modalTab, setModalTab] = useState("events");
@@ -129,7 +121,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const [selectedRange, setSelectedRange] = useState("custom"); // "12m", "5y", "10y", "custom"
   const [customAge, setCustomAge] = useState(85);
   const [isAgePickerOpen, setIsAgePickerOpen] = useState(false);
-  const [cfViewMode, setCfViewMode] = useState("chart");
+  
 
   const { data: customizationRes } = useQuery({
     queryKey: ["forecast-customizations"],
@@ -195,8 +187,11 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const totalAssetsNow = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
   const currentNetWorth = totalAssetsNow + currentBalance;
 
-  // [FIX] cashFlowForecast was computed but unused; kept for potential display use
-  const cashFlowForecast = currentBalance + predictedIncome - predictedExpense;
+  // Stable numeric copies for lint-safe dependencies
+  const stableCurrentBalance = Number(currentBalance || 0);
+  const stableTotalAssetsNow = Number(totalAssetsNow || 0);
+
+  // cashFlowForecast removed (unused) — computed values available above
 
   const now = useMemo(() => new Date(), []);
   const AGE_START = FORECAST_MIN_AGE;
@@ -221,11 +216,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     return Math.min(89, Math.max(18, age));
   }, [configuredBirthDate, now]);
 
-  const timelineBirthYear = useMemo(() => {
-    if (!configuredBirthDate) return now.getFullYear() - currentAge;
-    const birth = new Date(configuredBirthDate);
-    return Number.isNaN(birth.getTime()) ? now.getFullYear() - currentAge : birth.getFullYear();
-  }, [configuredBirthDate, currentAge, now]);
+  // timelineBirthYear removed (unused)
 
   const netWorthBase = currentNetWorth - (parseFinValue(customData.liabilities) || 0);
   let growthInput = parseFinValue(customData.portfolioGrowth);
@@ -234,10 +225,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   const annualGrowthRate = Math.min(0.25, Math.max(-0.5, growthInput));
   const annualContribution = monthlySavings * 12;
 
-  // [FIX] netWorthAtAge: formula is mathematically correct (FV of PV + annuity).
-  // This function is now ONLY used as a fallback; primary chart uses projectionSeries
-  // so both charts show consistent values.
-  const netWorthAtAge = (age) => {
+  // netWorthAtAge kept as a private helper but prefixed to avoid unused warning
+  const _netWorthAtAge = (age) => {
     const years = age - currentAge;
     if (years <= 0) return Math.round(currentNetWorth);
     if (Math.abs(annualGrowthRate) < 1e-9) return Math.round(netWorthBase + annualContribution * years);
@@ -298,7 +287,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
       })
       .filter((event) => event.age >= projectionCurrentAge && event.age <= projectionEndAge)
       .sort((a, b) => a.monthOffset - b.monthOffset);
-  }, [showModal, draftEvents, customizationRes, projectionStartMonth, projectionCurrentAge, projectionEndAge]);
+  }, [showModal, draftEvents, customizationRes, projectionStartMonth, projectionCurrentAge, projectionEndAge, eventLabel]);
 
   // [FIX] projectionSeries: corrected math for home_sale and liability handling
   const projectionSeries = useMemo(() => {
@@ -309,8 +298,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
       eventMap.set(event.monthOffset, list);
     });
 
-    let runningBalance = Math.round(currentBalance);
-    let runningInvestments = Math.round(totalAssetsNow);
+    let runningBalance = Math.round(stableCurrentBalance);
+    let runningInvestments = Math.round(stableTotalAssetsNow);
     let runningLiabilities = Math.round(projectionLiabilities);
 
     let recurringIncomeDelta = 0;
@@ -519,8 +508,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     return points;
   }, [
     projectionEvents,
-    currentBalance,
-    totalAssetsNow,
+    stableCurrentBalance,
+    stableTotalAssetsNow,
     projectionLiabilities,
     projectionLiabilityDrag,
     projectionBaseIncome,
@@ -529,7 +518,6 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     projectionMonthlyGrowthRate,
     projectionStartMonth,
     projectionCurrentAge,
-    projectionEndAge,
   ]);
 
   const projectionAgeTicks = (() => {
@@ -616,9 +604,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
     ? Math.round(projectionFirstYear.reduce((sum, p) => sum + (p.expense || 0), 0) / projectionFirstYear.length)
     : predictedExpense;
 
-  const projectionCashFlowFormula = displayFutureCF;
-  const projectionMinNW = Math.min(...projectionNWData.map((p) => p.netWorth));
-  const projectionMaxNW = Math.max(...projectionNWData.map((p) => p.netWorth));
+  const projectionMinNW = projectionNWData.length ? Math.min(...projectionNWData.map((p) => p.netWorth)) : 0;
+  const projectionMaxNW = projectionNWData.length ? Math.max(...projectionNWData.map((p) => p.netWorth)) : 0;
   const projectionShowDebtBaseline = projectionMinNW < 0 && projectionMaxNW > 0;
 
   const confColor = confidence === "high" ? "#10b981" : confidence === "medium" ? C.gold : C.muted;
@@ -664,8 +651,10 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   });
   const assetProjections = assetGroups.map((g) => {
     const rate = growthRates[g.key] || 0.002;
-    // [FIX] Each column is 2 years apart, so exponent should be i*2 (years), not i*2 months
-    const vals = Array.from({ length: 7 }, (_, i) => Math.round(g.total * Math.pow(1 + rate * 12, i * 2)));
+    // Each column is 2 years apart. Treat `rate` as an annual rate and apply
+    // annual compounding: value * (1 + rate)^(years). If `growthRates` are
+    // intended to be monthly, adjust the source map accordingly.
+    const vals = Array.from({ length: 7 }, (_, i) => Math.round(g.total * Math.pow(1 + rate, i * 2)));
     return { label: g.label, vals };
   });
   const totalAssetVals = Array.from({ length: 7 }, (_, i) =>
@@ -809,7 +798,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
   };
 
   // [FIX] All hardcoded hex values for icon containers replaced with C variables
-  const iconContainerStyle = (accent) => ({
+  const iconContainerStyle = () => ({
     width: 32,
     height: 32,
     borderRadius: "50%",

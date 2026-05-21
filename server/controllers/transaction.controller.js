@@ -2,6 +2,7 @@ const Transaction = require("../models/Transaction");
 const User = require("../models/User");
 const categorizeTransaction = require("../services/ai/categorizeTransaction");
 const { parseCSV } = require("../utils/csvParser");
+const { applyTransactionRules } = require("../utils/rulesEngine");
 
 const VALID_TRANSACTION_CATEGORIES = new Set([
   "Salary", "Freelance", "Investment", "Other Income",
@@ -33,20 +34,26 @@ const addTransaction = async (req, res, next) => {
       isCategorizedByAI = true;
     }
 
-    const transaction = await Transaction.create({
+    const txData = {
       userId: user._id,
       amount,
       type,
       category: finalCategory,
-      merchant,
+      merchant: merchant || "",
       date: date || Date.now(),
-      notes,
-      tag,
-      isRecurring,
-      isHidden,
-      reviewStatus,
+      notes: notes || "",
+      tag: tag || "",
+      isRecurring: !!isRecurring,
+      isHidden: !!isHidden,
+      reviewStatus: reviewStatus || user.spendingSettings?.transactionPreferences?.defaultReviewStatus || "needs_review",
       isCategorizedByAI,
-    });
+    };
+
+    // Apply rules
+    const rules = user.spendingSettings?.rules || [];
+    applyTransactionRules(txData, rules);
+
+    const transaction = await Transaction.create(txData);
 
     // Increment usage counter for free users
     await User.findByIdAndUpdate(user._id, { $inc: { transactionsUsed: 1 } });
@@ -215,13 +222,18 @@ const importCSV = async (req, res, next) => {
       }
     }
 
+    const defaultReviewStatus = user.spendingSettings?.transactionPreferences?.defaultReviewStatus || "needs_review";
+    const rules = user.spendingSettings?.rules || [];
+
     // Build transactions with AI categorization
     const transactions = await Promise.all(
       allowedRows.map(async (row) => {
-        const category = VALID_TRANSACTION_CATEGORIES.has(row.category)
+        const hasCategory = VALID_TRANSACTION_CATEGORIES.has(row.category);
+        const category = hasCategory
           ? row.category
           : await categorizeTransaction(row.merchant, row.type);
-        return {
+
+        const txData = {
           userId: user._id,
           amount: row.amount,
           type: row.type,
@@ -229,9 +241,18 @@ const importCSV = async (req, res, next) => {
           date: row.date || Date.now(),
           notes: row.notes || "",
           category,
-          isCategorizedByAI: true,
+          tag: row.tag || "",
+          isRecurring: false,
+          isHidden: false,
+          reviewStatus: defaultReviewStatus,
+          isCategorizedByAI: !hasCategory,
           isFromCSV: true,
         };
+
+        // Apply rules
+        applyTransactionRules(txData, rules);
+
+        return txData;
       })
     );
 

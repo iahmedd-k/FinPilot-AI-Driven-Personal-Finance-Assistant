@@ -23,8 +23,8 @@ function FieldRow({ label, value, last }) {
       borderBottom: last ? "none" : "1px solid var(--border-subtle)"
     }}>
       <span style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{label}</span>
-      <span style={{ fontSize: 13, color: C.text, fontWeight: 500, textAlign: "right", maxWidth: "60%" }}>
-        {value || <span style={{ color: C.muted }}>—</span>}
+      <span style={{ fontSize: 13, color: C.text, fontWeight: 500, textAlign: "right", maxWidth: "60%", fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>
+        {value || <span style={{ color: C.muted }}>�</span>}
       </span>
     </div>
   );
@@ -347,7 +347,7 @@ export default function TransactionDetailSidebar() {
 
           {/* amount */}
           <div style={{ textAlign: "center", marginBottom: 12 }}>
-            <div style={{ fontSize: 40, fontWeight: 600, color: C.text, letterSpacing: "-0.02em", fontFamily: "var(--font-sans)" }}>
+            <div style={{ fontSize: 40, fontWeight: 600, color: C.text, letterSpacing: "-0.02em", fontFamily: "var(--font-sans)", fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere", lineHeight: 1.05 }}>
               {fmt(tx.amount)}
             </div>
             <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
@@ -355,7 +355,7 @@ export default function TransactionDetailSidebar() {
             </div>
           </div>
 
-          {/* category pill — read only */}
+          {/* category pill � read only */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,
@@ -434,7 +434,7 @@ export default function TransactionDetailSidebar() {
               opacity: saving ? 0.6 : 1
             }}>
               <Check size={14} strokeWidth={3} />
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
 
@@ -547,7 +547,7 @@ export default function TransactionDetailSidebar() {
               style={inputStyle}
               value={draft.tag}
               onChange={e => setDraft(d => ({ ...d, tag: e.target.value }))}
-              placeholder="e.g. business, travel…"
+              placeholder="e.g. business, travel..."
               onFocus={e => e.target.style.borderColor = C.text}
               onBlur={e => e.target.style.borderColor = C.border}
             />
@@ -559,7 +559,7 @@ export default function TransactionDetailSidebar() {
               style={{ ...inputStyle, minHeight: 72, resize: "vertical" }}
               value={draft.notes}
               onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
-              placeholder="Add a note…"
+              placeholder="Add a note..."
               onFocus={e => e.target.style.borderColor = C.text}
               onBlur={e => e.target.style.borderColor = C.border}
             />
@@ -631,7 +631,7 @@ export default function TransactionDetailSidebar() {
               {[["Part 1", Number(splitAmount)], ["Part 2", Math.abs(tx.amount) - Number(splitAmount)]].map(([label, val]) => (
                 <div key={label} style={{ padding: "10px 14px", borderRadius: 12, background: "var(--bg-card)", border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>{fmt(val)}</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>{fmt(val)}</div>
                 </div>
               ))}
             </div>
@@ -648,7 +648,7 @@ export default function TransactionDetailSidebar() {
             }}
           >
             <Split size={16} />
-            {saving ? "Splitting…" : "Confirm split"}
+            {saving ? "Splitting..." : "Confirm split"}
           </button>
         </div>
 
@@ -674,3 +674,4 @@ const iconBtnStyle = {
   borderRadius: 8,
   transition: "background 0.15s"
 };
+

@@ -214,6 +214,7 @@ function ReportsTab({
   activeTab,
 }) {
   const { user } = useAuthContext();
+  const { setGlobalSelectedTxId } = useDashboard();
   const preferredCurrency = preferredCurrencyProp || getUserCurrency(user);
 
   // ── Core state ────────────────────────────────────────────────────────────
@@ -257,7 +258,7 @@ function ReportsTab({
 
   const queryClient = useQueryClient();
 
-  const { data: savedReportsRes, isLoading: isLoadingSaved } = useQuery({
+  const { data: savedReportsRes } = useQuery({
     queryKey: ["saved-reports"],
     queryFn: () => dashboardService.getSavedReports().then((res) => res.data),
   });
@@ -301,12 +302,6 @@ function ReportsTab({
     return ts.length ? new Date(Math.min(...ts)).toISOString().slice(0, 10) : null;
   }, [apiTransactions]);
 
-  const latestTxDate = useMemo(() => {
-    if (!apiTransactions.length) return todayStr;
-    const ts = apiTransactions.map((t) => new Date(t?.date).getTime()).filter(Number.isFinite);
-    return ts.length ? new Date(Math.max(...ts)).toISOString().slice(0, 10) : todayStr;
-  }, [apiTransactions, todayStr]);
-
   const defaultFrom = sixMonthsAgo;
   const defaultTo = todayStr;
 
@@ -314,7 +309,7 @@ function ReportsTab({
   useEffect(() => {
     if (!dateFrom) setDateFrom(defaultFrom);
     if (!dateTo) setDateTo(defaultTo);
-  }, [defaultFrom, defaultTo]);
+  }, [dateFrom, dateTo, defaultFrom, defaultTo]);
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -470,23 +465,6 @@ function ReportsTab({
   // ── Y-axis domain for cash flow chart ─────────────────────────────────────
   // FIX: use separate domains per data series so bars aren't crushed to invisible
   // when one value is orders of magnitude larger than another.
-  const cashFlowDomain = useMemo(() => {
-    if (!chartData.length) return [0, 100];
-    let min = 0, max = 0;
-    chartData.forEach((r) => {
-      if (showIncome) max = Math.max(max, r.income);
-      if (showExpense) max = Math.max(max, r.expense);
-      if (showNetTrend) {
-        min = Math.min(min, r.net);
-        max = Math.max(max, r.net);
-      }
-    });
-    if (max === 0 && min === 0) return [0, 100];
-    const absMax = Math.max(Math.abs(min), Math.abs(max));
-    const limit = Math.ceil((absMax * 1.15) / 1000) * 1000 || 100;
-    return [min < 0 ? -limit : 0, limit];
-  }, [chartData, showIncome, showExpense, showNetTrend]);
-
   // ── Drill-down: filter to selected month ──────────────────────────────────
   const filteredForBreakdown = useMemo(() => {
     if (!selectedMonthKey) return filtered;
@@ -599,11 +577,6 @@ function ReportsTab({
       : monthRows;
 
   // ── Date range label ───────────────────────────────────────────────────────
-  const dateRangeLabel = useMemo(() => {
-    const fmt = (s) => new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return `${fmt(dateFrom)} – ${fmt(dateTo)}`;
-  }, [dateFrom, dateTo]);
-
   // ── Formatter ──────────────────────────────────────────────────────────────
   const fmt = (n) => {
     const abs = Math.abs(n || 0);
@@ -687,7 +660,7 @@ function ReportsTab({
       });
     }
     
-    // Compute income, expense, and categories
+    // Compute income and expense for the selected detail panel.
     let income = 0, expense = 0;
     const catMap = {};
     relatedTxs.forEach((t) => {
@@ -696,13 +669,7 @@ function ReportsTab({
       const cat = t.category || "Other";
       catMap[cat] = (catMap[cat] || 0) + 1;
     });
-    
-    // Get largest transactions (top 5)
-    const largestTxs = [...relatedTxs].sort((a, b) => b._amount - a._amount).slice(0, 5);
-    
-    // Get most frequent categories
-    const freqCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    
+
     setSelectedDetail({
       type: viewBy,
       key: row.key,
@@ -755,7 +722,7 @@ function ReportsTab({
                 </div>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
-                {tx._type === 'expense' ? '-' : '+'}{fmt(Math.abs(tx._amount))}
+                {tx._type === "expense" ? "-" : "+"}{fmt(Math.abs(tx._amount))}
               </div>
             </div>
           );
@@ -1441,14 +1408,10 @@ function ReportsTab({
                const txs = selectedMonthSummary?.txs || [];
                if (!txs.length) return <div style={{ fontSize: 13, color: C.muted, textAlign: "center", padding: "40px 0" }}>No transactions found for this period.</div>;
                
-               const income = txs.filter(t => t._type === "income").reduce((s, t) => s + t._amount, 0);
-               const expense = txs.filter(t => t._type === "expense").reduce((s, t) => s + t._amount, 0);
-               
                const catGroups = {};
                txs.filter(t => t._type === "expense").forEach(t => {
                  catGroups[t.category || "Uncategorized"] = (catGroups[t.category || "Uncategorized"] || 0) + t._amount;
                });
-               const cats = Object.entries(catGroups).sort((a,b) => b[1]-a[1]).slice(0, 8);
 
                return renderTransactionList(txs);
             })()}

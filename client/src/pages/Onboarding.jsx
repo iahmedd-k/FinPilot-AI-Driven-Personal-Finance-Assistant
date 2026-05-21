@@ -293,7 +293,7 @@ export default function Onboarding() {
             style={{
               background: loading ? "#1c2030" : "#2dd4bf",
               color: loading ? "#6b7080" : "#0c0f18",
-              fontWeight: 800,
+              fontWeight: 600,
               letterSpacing: "-0.03em",
               cursor: loading ? "not-allowed" : "pointer",
               border: "none",
