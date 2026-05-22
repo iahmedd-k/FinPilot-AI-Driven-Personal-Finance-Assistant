@@ -1053,425 +1053,172 @@ function AddGrantDetailsModal({
   saving,
   currency,
 }) {
-  const meta = getGrantTypeMeta(form.grantType);
-  const isOption = form.grantType === "STOCK_OPTION";
-  const isRSU = form.grantType === "RSU";
+  const gt = form.grantType;
+
+  const GRANT_BADGE = {
+    STOCK_OPTION: { label: "ISO", badgeText: "Incentive Stock Option", color: "#0ea5e9" },
+    RSU: { label: "RSU", badgeText: "Restricted Stock Unit", color: "#d946ef" },
+    NSO: { label: "NSO", badgeText: "Non-Qualified Stock Option", color: "#a3a820" },
+    RESTRICTED_SHARE: { label: "SHARE", badgeText: "Generic Share", color: "#f59e0b" },
+    ESOP: { label: "SHARE", badgeText: "Generic Share", color: "#f59e0b" },
+  };
+
+  const badge = GRANT_BADGE[gt] || { label: gt || "", badgeText: "", color: "var(--text-muted)" };
+
+  const isOption = gt === "STOCK_OPTION" || gt === "NSO";
+  const isRSU = gt === "RSU";
+  const isRestricted = gt === "RESTRICTED_SHARE" || gt === "ESOP";
 
   const SectionDivider = ({ label }) => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        margin: "20px 0 14px",
-      }}
-    >
-      <span
-        style={{
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.07em",
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {label}
-      </span>
-      <div
-        style={{ height: 1, flex: 1, background: "var(--border-subtle)" }}
-      />
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "20px 0 14px" }}>
+      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", color: "var(--text-muted)", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</span>
+      <div style={{ height: 1, flex: 1, background: "var(--border-subtle)" }} />
     </div>
   );
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 220,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-        background: "rgba(0,0,0,0.5)",
-        backdropFilter: "blur(2px)",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(800px, calc(100vw - 24px))",
-          maxHeight: "min(90vh, 820px)",
-          display: "flex",
-          flexDirection: "column",
-          borderRadius: 16,
-          background: "var(--bg-card)",
-          border: "1px solid var(--border-default)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
-          overflow: "hidden",
-        }}
-      >
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 220, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "min(520px, calc(100vw - 32px))", maxHeight: "82vh", display: "flex", flexDirection: "column", borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--border-default)", boxShadow: "0 14px 40px rgba(0,0,0,0.12)", overflow: "hidden" }}>
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "16px 20px",
-            borderBottom: "1px solid var(--border-subtle)",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
           <div>
-            <div style={sectionLabelStyle}>Add Share Details</div>
-            <div
-              style={{
-                marginTop: 4,
-                fontSize: 15,
-                fontWeight: 500,
-                color: "var(--text-primary)",
-              }}
-            >
-              {title}
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.06em", textTransform: "uppercase" }}>ADD SHARE DETAILS</div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              ...buttonReset,
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-            }}
-          >
+          <button type="button" onClick={onClose} style={{ ...buttonReset, color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6 }}>
             <X size={16} />
           </button>
         </div>
 
-        <div
-          className="modal-scroll"
-          style={{ padding: "16px 20px 20px", overflowY: "auto", flex: 1 }}
-        >
-          {/* Grant type badge row */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 18,
-              padding: "10px 12px",
-              borderRadius: 8,
-              background: "var(--bg-secondary, rgba(0,0,0,0.03))",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                color: "var(--text-primary)",
-              }}
-            >
-              {meta.label}
-            </span>
-            <span
-              style={{
-                fontSize: 10,
-                padding: "2px 8px",
-                borderRadius: 999,
-                background: meta.badgeBg,
-                color: meta.badgeColor,
-                fontWeight: 600,
-              }}
-            >
-              {meta.labelEn}
-            </span>
+        <div className="modal-scroll" style={{ padding: "16px", overflowY: "auto", flex: 1 }}>
+          <div style={{ marginBottom: 12, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+            Adding your equity grant unlocks personalized data visualization, tax estimation, and equity strategizing
           </div>
 
-          <SectionDivider label="Grant details" />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 14,
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{badge.label}</div>
+            <div style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, background: badge.color, color: "#fff", fontWeight: 600 }}>{badge.badgeText}</div>
+          </div>
+
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Grant Details</div>
+
+          {/* Grant ID + Quantity */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <Field label="Grant ID">
-              <input
-                type="text"
-                value={form.grantId || ""}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, grantId: e.target.value }))
-                }
-                placeholder="EQ-2024-001"
-                style={inputStyle}
-              />
+              <input type="text" value={form.grantId || ""} onChange={(e) => setForm((c) => ({ ...c, grantId: e.target.value }))} placeholder="EQ-2024-001" style={inputStyle} />
             </Field>
-            <Field
-              label={isOption ? "Number of options" : "Number of shares"}
-            >
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.quantity}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, quantity: e.target.value }))
-                }
-                placeholder="e.g. 10000"
-                style={inputStyle}
-              />
+            <Field label="Quantity of shares">
+              <input type="number" min="0" step="1" value={form.quantity || ""} onChange={(e) => setForm((c) => ({ ...c, quantity: e.target.value }))} placeholder="e.g. 10000" style={inputStyle} />
             </Field>
           </div>
 
           {isOption && (
             <>
-              <SectionDivider label="Exercise" />
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: 14,
-                }}
-              >
-                <Field label={`Strike price (${currency})`}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.buyPrice}
-                    onChange={(e) =>
-                      setForm((c) => ({ ...c, buyPrice: e.target.value }))
-                    }
-                    placeholder="0.00"
-                    style={inputStyle}
-                  />
+              <SectionDivider label="EXERCISE" />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                <Field label={`Exercise (strike) price (${currency})`}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>$</span>
+                    <input type="number" min="0" step="0.01" value={form.buyPrice || ""} onChange={(e) => setForm((c) => ({ ...c, buyPrice: e.target.value }))} placeholder="0.00" style={inputStyle} />
+                  </div>
                 </Field>
-                <Field label="Options exercised">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={form.exercised}
-                    onChange={(e) =>
-                      setForm((c) => ({ ...c, exercised: e.target.value }))
-                    }
-                    placeholder="0"
-                    style={inputStyle}
-                  />
+                <Field label="Number of options exercised">
+                  <input type="number" min="0" step="1" value={form.exercised || ""} onChange={(e) => setForm((c) => ({ ...c, exercised: e.target.value }))} placeholder="0" style={inputStyle} />
+                </Field>
+              </div>
+
+              <SectionDivider label="VESTING SCHEDULE" />
+              <div style={{ marginBottom: 10 }}>
+                <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text-secondary)" }}>
+                  Is it early exercisable? <Info size={14} title="Whether this grant is early exercisable (can be exercised prior to vesting)" style={{ verticalAlign: "middle", marginLeft: 6 }} />
+                </p>
+                <div style={{ display: "flex", gap: 12 }}>
+                  {[{ value: true, label: "Yes" }, { value: false, label: "No" }].map((ch) => (
+                    <button key={String(ch.value)} type="button" onClick={() => setForm((c) => ({ ...c, earlyExercisable: ch.value }))} style={{ ...buttonReset, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: form.earlyExercisable === ch.value ? "var(--text-primary)" : "var(--text-primary)", fontSize: 13 }}>
+                      <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${form.earlyExercisable === ch.value ? "var(--text-primary)" : "var(--border-default)" }`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{form.earlyExercisable === ch.value && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--text-primary)" }} />}</span>
+                      {ch.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                <Field label="Vesting start date">
+                  <CalendarPicker C={C} value={form.vestingStartDate} onChange={(v) => setForm((c) => ({ ...c, vestingStartDate: v }))} />
+                </Field>
+                <Field label="Vesting schedule">
+                  <SelectField value={form.vestingSchedule} onChange={(e) => setForm((c) => ({ ...c, vestingSchedule: e.target.value }))} options={vestingScheduleOptions} placeholder="Select schedule" />
                 </Field>
               </div>
             </>
           )}
 
-          {!isOption && !isRSU && (
+          {isRSU && (
             <>
-              <SectionDivider label="Purchase" />
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: 14,
-                }}
-              >
-                <Field label="Grant / purchase date">
-                  <CalendarPicker
-                    C={C}
-                    value={form.buyDate}
-                    onChange={(value) =>
-                      setForm((c) => ({ ...c, buyDate: value }))
-                    }
-                  />
+              <SectionDivider label="VESTING SCHEDULE" />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                <Field label="Vesting start date">
+                  <CalendarPicker C={C} value={form.vestingStartDate} onChange={(v) => setForm((c) => ({ ...c, vestingStartDate: v }))} />
+                </Field>
+                <Field label="Vesting schedule">
+                  <SelectField value={form.vestingSchedule} onChange={(e) => setForm((c) => ({ ...c, vestingSchedule: e.target.value }))} options={vestingScheduleOptions} placeholder="Select schedule" />
+                </Field>
+              </div>
+            </>
+          )}
+
+          {isRestricted && (
+            <>
+              <SectionDivider label="PURCHASE" />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                <Field label="Purchase date">
+                  <CalendarPicker C={C} value={form.buyDate} onChange={(v) => setForm((c) => ({ ...c, buyDate: v }))} />
                 </Field>
                 <Field label={`Price (${currency})`}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.buyPrice}
-                    onChange={(e) =>
-                      setForm((c) => ({ ...c, buyPrice: e.target.value }))
-                    }
-                    placeholder="0.00"
-                    style={inputStyle}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>$</span>
+                    <input type="number" min="0" step="0.01" value={form.buyPrice || ""} onChange={(e) => setForm((c) => ({ ...c, buyPrice: e.target.value }))} placeholder="0.00" style={inputStyle} />
+                  </div>
                 </Field>
               </div>
+
+              <SectionDivider label="VESTING SCHEDULE" />
+              <div style={{ marginBottom: 10 }}>
+                <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text-secondary)" }}>
+                  Does it have a vesting schedule? <Info size={14} title="Whether this grant follows a vesting schedule" style={{ verticalAlign: "middle", marginLeft: 6 }} />
+                </p>
+                <div style={{ display: "flex", gap: 12 }}>
+                  {[{ value: true, label: "Yes" }, { value: false, label: "No" }].map((ch) => (
+                    <button key={String(ch.value)} type="button" onClick={() => setForm((c) => ({ ...c, hasVestingSchedule: ch.value }))} style={{ ...buttonReset, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: form.hasVestingSchedule === ch.value ? "var(--text-primary)" : "var(--text-primary)", fontSize: 13 }}>
+                      <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${form.hasVestingSchedule === ch.value ? "var(--text-primary)" : "var(--border-default)" }`, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{form.hasVestingSchedule === ch.value && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--text-primary)" }} />}</span>
+                      {ch.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {form.hasVestingSchedule && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                  <Field label="Vesting start date">
+                    <CalendarPicker C={C} value={form.vestingStartDate} onChange={(v) => setForm((c) => ({ ...c, vestingStartDate: v }))} />
+                  </Field>
+                  <Field label="Vesting schedule">
+                    <SelectField value={form.vestingSchedule} onChange={(e) => setForm((c) => ({ ...c, vestingSchedule: e.target.value }))} options={vestingScheduleOptions} placeholder="Select schedule" />
+                  </Field>
+                </div>
+              )}
             </>
           )}
-
-          <SectionDivider label="Vesting schedule" />
-
-          {!isRSU && (
-            <div style={{ marginBottom: 14 }}>
-              <p
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 12,
-                  color: "var(--text-secondary)",
-                }}
-              >
-                {isOption
-                  ? "Is it early exercisable?"
-                  : "Does it have a vesting schedule?"}
-              </p>
-              <div style={{ display: "flex", gap: 16 }}>
-                {[
-                  { value: true, label: "Yes" },
-                  { value: false, label: "No" },
-                ].map((choice) => (
-                  <button
-                    key={String(choice.value)}
-                    type="button"
-                    onClick={() =>
-                      setForm((c) => ({
-                        ...c,
-                        hasVestingSchedule: choice.value,
-                      }))
-                    }
-                    style={{
-                      ...buttonReset,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      color: "var(--text-primary)",
-                      fontSize: 13,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: "50%",
-                        border: `2px solid ${
-                          form.hasVestingSchedule === choice.value
-                            ? "var(--text-primary)"
-                            : "var(--border-default)"
-                        }`,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {form.hasVestingSchedule === choice.value && (
-                        <span
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: "50%",
-                            background: "var(--text-primary)",
-                          }}
-                        />
-                      )}
-                    </span>
-                    {choice.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {(form.hasVestingSchedule || isRSU) && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 14,
-              }}
-            >
-              <Field label="Vesting start date">
-                <CalendarPicker
-                  C={C}
-                  value={form.vestingStartDate}
-                  onChange={(value) =>
-                    setForm((c) => ({ ...c, vestingStartDate: value }))
-                  }
-                />
-              </Field>
-              <Field label="Vesting schedule">
-                <SelectField
-                  value={form.vestingSchedule}
-                  onChange={(e) =>
-                    setForm((c) => ({
-                      ...c,
-                      vestingSchedule: e.target.value,
-                    }))
-                  }
-                  options={vestingScheduleOptions}
-                  placeholder="Select schedule"
-                />
-              </Field>
-            </div>
-          )}
-
-          <div style={{ marginTop: 14 }}>
-            <Field label="Notes (optional)">
-              <input
-                type="text"
-                value={form.notes || ""}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, notes: e.target.value }))
-                }
-                placeholder="Add any context for this grant"
-                style={inputStyle}
-              />
-            </Field>
-          </div>
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: "12px 20px",
-            borderTop: "1px solid var(--border-subtle)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexShrink: 0,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              color: "var(--text-muted)",
-              fontSize: 11.5,
-            }}
-          >
-            <Lock size={13} style={{ flexShrink: 0 }} />
-            <span>Encrypted and secure.</span>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-muted)", fontSize: 12 }}>
+            <Lock size={14} />
+            <span>Your financial information is encrypted and secure. We'll never share or sell any of your personal data. See privacy policy.</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
-              onClick={onBack}
-              style={{ ...secondaryButtonStyle, minWidth: 70 }}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onSubmit}
-              style={{
-                ...primaryButtonStyle,
-                minWidth: 80,
-                opacity: saving ? 0.7 : 1,
-              }}
-            >
-              {saving ? "Saving..." : "Add grant"}
-            </button>
+            <button type="button" onClick={onBack} style={{ ...secondaryButtonStyle, minWidth: 70 }}>Back</button>
+            <button type="button" disabled={saving} onClick={onSubmit} style={{ ...primaryButtonStyle, minWidth: 96, opacity: saving ? 0.7 : 1 }}>{saving ? "Adding..." : "Add"}</button>
           </div>
         </div>
       </div>
@@ -3150,12 +2897,13 @@ export default function Equity() {
         Math.max(max, asNumber(point?.total), asNumber(point?.vested)),
       0
     );
-    if (chartMax <= 5) return 5;
-    if (chartMax <= 10) return 10;
-    if (chartMax <= 25) return 25;
-    if (chartMax <= 50) return 50;
-    if (chartMax <= 100) return 100;
-    return Math.ceil(chartMax / 10) * 10;
+    const paddedTop = Math.max(chartMax * 1.05, Math.ceil(chartMax / 10) * 10);
+    if (paddedTop <= 5) return 5;
+    if (paddedTop <= 10) return 10;
+    if (paddedTop <= 25) return 25;
+    if (paddedTop <= 50) return 50;
+    if (paddedTop <= 100) return 100;
+    return Math.ceil(paddedTop / 10) * 10;
   }, [chartData]);
 
   const timelineInsights = useMemo(() => {
@@ -4075,7 +3823,7 @@ export default function Equity() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
-                      margin={{ top: 10, right: 22, left: 6, bottom: 18 }}
+                      margin={{ top: 20, right: 24, left: 10, bottom: 22 }}
                     >
                       <defs>
                         <linearGradient
