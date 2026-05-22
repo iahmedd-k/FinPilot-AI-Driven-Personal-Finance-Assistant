@@ -638,14 +638,8 @@ export default function AccountsTab({ pushNotif, isMobile }) {
                       alignItems: "center",
                       gap: isMobile ? "8px 12px" : "0 16px",
                       transition: "background 0.15s ease",
-                      cursor: asset.assetType === "equity" ? "pointer" : "default"
+                      cursor: "default"
                     }}
-                      onClick={() => {
-                        if (asset.assetType === "equity") {
-                          if (!isPro) { navigate("/subscription"); return; }
-                          navigate("/dashboard?nav=equity");
-                        }
-                      }}
                       onMouseEnter={(e) => { if (!isMobile) e.currentTarget.style.background = SURFACE_MUTED; }}
                       onMouseLeave={(e) => { if (!isMobile) e.currentTarget.style.background = "none"; }}
                     >

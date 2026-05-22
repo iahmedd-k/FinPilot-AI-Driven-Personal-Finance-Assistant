@@ -126,20 +126,22 @@ const getMerchantMonogram = (merchant, category) => {
 };
 const getAssetCostBasis = (asset) => {
   if (!asset) return 0;
+  // For crypto, always calculate from buyPrice * quantity for accuracy
+  if (asset.assetType === "crypto") {
+    const cost = (Number(asset.buyPrice) || 0) * (Number(asset.quantity) || 0);
+    // Only use totalCost if crypto cost is 0 and totalCost is explicitly set
+    if (cost > 0) return cost;
+    if (Number(asset.totalCost) > 0) return Number(asset.totalCost);
+    return cost; // Return 0 if no cost data
+  }
   if (Number(asset.totalCost) > 0) return Number(asset.totalCost);
-  if (asset.assetType === "crypto") return (Number(asset.buyPrice) || 0) * (Number(asset.quantity) || 0);
   const unitCost = Number(asset.buyingPrice) || Number(asset.purchasePrice) || 0;
   const quantity = Number(asset.quantity);
   return unitCost * (Number.isFinite(quantity) && quantity > 0 ? quantity : 1);
 };
 
 
-// ── Dark mode helpers (no-op — theme is always dark via C tokens) ──
-function injectDarkSheet() { }
-function removeDarkSheet() { }
 
-// placeholder so the rest of the file still compiles
-const _darkSheetMarker = null; void _darkSheetMarker;
 
 
 
@@ -366,15 +368,7 @@ function DashboardShell() {
     } catch {
       void 0;
     }
-    if (themeDark) { injectDarkSheet(); }
-    else { removeDarkSheet(); }
   }, [themeDark]);
-
-  // inject on mount if already dark (e.g. after page reload)
-  useEffect(() => {
-    if (themeDark) injectDarkSheet();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const sideW = isMobile
     ? 0
@@ -885,7 +879,7 @@ html,body { height:100%; background:${C.bg}; }
             {activeNav === "dashboard" && (
               <div className="right-strip" style={{ width: 300, flexShrink: 0, background: "transparent", display: "flex", flexDirection: "column", gap: 10, paddingLeft: 10, paddingRight: 10, boxSizing: "border-box", alignSelf: "flex-start", paddingTop: 46, paddingBottom: 20 }}>
                 <HealthScoreWidget C={C} dashCalc={dashCalc} apiGoals={apiGoals} apiBudget={apiBudget} apiTransactions={apiTransactions} setActiveNav={goToNav} setShowAdvisor={setShowAdvisor} />
-                <MonthlyBudgetWidget C={C} budget={apiBudget} totalExpense={summary.totalExpense ?? 0} setActiveNav={goToNav} onBudgetSaved={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })} />
+                <MonthlyBudgetWidget C={C} budget={apiBudget} totalExpense={summary.totalExpense ?? 0} setActiveNav={goToNav} onBudgetSaved={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })} pushNotif={pushNotif} />
                 <SavingsGoalsWidget C={C} apiGoals={apiGoals} setActiveNav={goToNav} />
                 <CryptoHoldingsWidget C={C} setActiveNav={goToNav} />
               </div>
@@ -947,9 +941,9 @@ function HomeTabWrapper(props) {
 
     const addAssetsToAllPoints = (points) => {
       if (!points.length) return points;
-      return points.map((point) => ({
+      return points.map((point, idx) => ({
         ...point,
-        v: Math.round(point.v + totalAssetsNow),
+        v: Math.round(point.v + (idx === points.length - 1 ? totalAssetsNow : 0)),
       }));
     };
 
@@ -1022,7 +1016,7 @@ function HomeTabWrapper(props) {
 }
 
 /* ─── HomeTab ────────────────────────────────────────────── */
-function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, monthlyChart, setActiveNav, setShowAdvisor, handleExportData, isExporting, setGlobalSelectedTxId, dashboard }) {
+function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, monthlyChart, categoryBreakdown, setActiveNav, setShowAdvisor, handleExportData, isExporting, setGlobalSelectedTxId, dashboard }) {
   return (
     <>
       <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
@@ -1047,7 +1041,7 @@ function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, set
         <OverviewSubTab
           C={C} isPro={isPro} activeTab={activeTab} setActiveTab={setActiveTab}
           netWorthData={netWorthData} totalAssetsNow={totalAssetsNow} canonicalCurrentNetWorth={canonicalCurrentNetWorth} transactions={transactions}
-          summary={summary} apiTransactions={apiTransactions} dashboard={dashboard}
+          summary={summary} apiTransactions={apiTransactions} dashboard={dashboard} monthlyChart={monthlyChart} categoryBreakdown={categoryBreakdown}
           setActiveNav={setActiveNav} setShowAdvisor={setShowAdvisor}
           handleExportData={handleExportData} isExporting={isExporting}
           setDashSubTab={setDashSubTab}
@@ -1057,7 +1051,7 @@ function HomeTab({ C, isPro, isMobile, dashSubTab, setDashSubTab, activeTab, set
       )}
 
       {dashSubTab === "networth" && (
-        <NetWorthView C={C} netWorthData={netWorthData} summary={summary} monthlyChart={monthlyChart} isMobile={isMobile} apiTransactions={apiTransactions} canonicalCurrentNetWorth={canonicalCurrentNetWorth} />
+        <NetWorthView C={C} netWorthData={netWorthData} summary={summary} monthlyChart={monthlyChart} isMobile={isMobile} apiTransactions={apiTransactions} categoryBreakdown={categoryBreakdown} canonicalCurrentNetWorth={canonicalCurrentNetWorth} setActiveNav={setActiveNav} />
       )}
     </>
   );
@@ -1228,8 +1222,153 @@ function BenefitsTab({ isPro, navigate }) {
   );
 }
 
+/* ─── Overview Investments Card (simple single graph with visible axes) ─── */
+function OverviewInvestmentsCard({ C, isMobile, categoryBreakdown, canonicalCurrentNetWorth, formatSignedAmount, formatAmount, setActiveNav }) {
+  const { user: dashboardUser } = useAuthContext();
+  const preferredCurrency = getUserCurrency(dashboardUser);
+  const portfolio = usePortfolio() || {};
+  const { netWorthAssets: assets = [] } = portfolio;
+  const fmtNW = (n) => formatCurrencyAmount(Math.abs(n || 0), preferredCurrency, { maximumFractionDigits: 0 });
+
+  // Build investment chart data from assets
+  const investChartData = useMemo(() => {
+    if (!assets.length) return [];
+
+    const events = [];
+    assets.forEach(a => {
+      const invested = a.assetType === "crypto"
+        ? (a.buyPrice || 0) * (a.quantity || 0)
+        : (a.buyingPrice || a.purchasePrice || 0);
+      const dateStr = a.buyDate || a.createdAt || a.purchaseDate;
+      const d = dateStr ? new Date(dateStr) : null;
+      const monthKey = (d && !isNaN(d))
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+        : null;
+      events.push({ monthKey, invested, currentValue: a.currentValue || 0 });
+    });
+
+    const datedEvents = events.filter(e => e.monthKey);
+    const undatedEvents = events.filter(e => !e.monthKey);
+    const nowDate = new Date();
+    const nowKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`;
+
+    if (!datedEvents.length) {
+      const totalVal = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
+      return Array.from({ length: 12 }, (_, i) => {
+        const d2 = new Date(nowDate.getFullYear(), nowDate.getMonth() - 11 + i, 1);
+        const lbl = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+        return { d: lbl, ts: d2.getTime(), v: i === 11 ? totalVal : 0 };
+      });
+    }
+
+    const earliestKey = datedEvents.reduce((min, e) => e.monthKey < min ? e.monthKey : min, datedEvents[0].monthKey);
+    undatedEvents.forEach(e => { e.monthKey = earliestKey; });
+
+    const monthMap = {};
+    events.forEach(({ monthKey, invested, currentValue }) => {
+      if (!monthMap[monthKey]) monthMap[monthKey] = { invested: 0, currentValue: 0 };
+      monthMap[monthKey].invested += invested;
+      monthMap[monthKey].currentValue += currentValue;
+    });
+
+    const twelveAgo = new Date(nowDate.getFullYear(), nowDate.getMonth() - 11, 1);
+    const twelveKey = `${twelveAgo.getFullYear()}-${String(twelveAgo.getMonth() + 1).padStart(2, "0")}`;
+    const startKey = earliestKey < twelveKey ? earliestKey : twelveKey;
+    const [sy, sm] = startKey.split("-").map(Number);
+    const months = [];
+    let y = sy, m = sm;
+    while (true) {
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      months.push(key);
+      if (key >= nowKey) break;
+      m++; if (m > 12) { m = 1; y++; }
+    }
+
+    let cumCost = 0;
+    const totalCurrentValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
+    return months.map((key, idx) => {
+      cumCost += (monthMap[key]?.invested || 0);
+      const [ky, km] = key.split("-").map(Number);
+      const d2 = new Date(ky, km - 1, 1);
+      const lbl = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      const isLast = idx === months.length - 1;
+      const fraction = months.length > 1 ? idx / (months.length - 1) : 1;
+      const interpolatedValue = isLast ? totalCurrentValue : Math.round(totalCurrentValue * fraction);
+      return { d: lbl, ts: d2.getTime(), v: Math.round(cumCost) };
+    });
+  }, [assets]);
+
+  const totalValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
+  const totalInvested = assets.reduce((s, a) => {
+    const cost = a.assetType === "crypto"
+      ? (a.buyPrice || 0) * (a.quantity || 0)
+      : (a.buyingPrice || a.purchasePrice || 0);
+    return s + (cost > 0 ? cost : (a.currentValue || 0));
+  }, 0);
+  const totalGain = totalValue - totalInvested;
+  const gainPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : null;
+
+  return (
+    <Card style={{ padding: 0, overflow: "hidden", background: C.white, borderRadius: 18, marginTop: 16 }}>
+      {/* Header */}
+      <div style={{ padding: "18px 20px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.border2}` }}>
+        <div>
+          <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.text }}>
+            {fmtNW(totalValue)}
+          </div>
+          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>
+            Total portfolio value
+          </div>
+          {gainPct !== null && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: totalGain >= 0 ? C.greenMid : C.red, marginTop: 2 }}>
+              {totalGain >= 0 ? "+" : ""}{fmtNW(totalGain)} ({totalGain >= 0 ? "+" : ""}{gainPct}%)
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Chart with visible axes */}
+      <div style={{ width: "100%", height: isMobile ? 200 : 260 }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={isMobile ? 200 : 260}>
+          <AreaChart data={investChartData} margin={{ top: 10, right: isMobile ? 44 : 56, bottom: 18, left: 0 }}>
+            <defs>
+              <linearGradient id="overviewInvGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="d"
+              tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
+              axisLine={false} tickLine={false} interval="preserveStartEnd"
+            />
+            <YAxis orientation="right" axisLine={false} tickLine={false} width={isMobile ? 44 : 56}
+              tickFormatter={v => fmtNW(v)}
+              tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
+            />
+            <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="4 4" />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const row = payload[0]?.payload;
+              return (
+                <div style={{ background: C.white, border: `1px solid ${C.border2}`, borderRadius: 10, padding: "10px 13px", boxShadow: "0 4px 16px rgba(0,0,0,0.09)" }}>
+                  <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{row?.d}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtNW(row?.v)}</div>
+                </div>
+              );
+            }} />
+            <Area type="monotone" dataKey="v" stroke="#8b5cf6" strokeWidth={2.5}
+              fill="url(#overviewInvGrad)" dot={false}
+              activeDot={{ r: 5, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+}
+
 /* ─── OverviewSubTab ─────────────────────────────────────── */
-function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, setActiveNav, setShowAdvisor, handleExportData, isExporting, setDashSubTab, setGlobalSelectedTxId, dashboard, isMobile }) {
+function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, totalAssetsNow, canonicalCurrentNetWorth, transactions, summary, apiTransactions, monthlyChart, categoryBreakdown, setActiveNav, setShowAdvisor, handleExportData, isExporting, setDashSubTab, setGlobalSelectedTxId, dashboard, isMobile }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
   const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
@@ -1387,7 +1526,16 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
             </div>
 
             {/* Calendar Grid */}
-            <SpendingCalendarGrid C={C} apiTransactions={apiTransactions} />
+            <SpendingCalendarGrid C={C} apiTransactions={apiTransactions} onDayClick={(day) => {
+              const txsOnDay = apiTransactions?.filter(t => {
+                const d = new Date(t.date);
+                const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
+                return isExp && d.getFullYear() === new Date().getFullYear() && d.getMonth() === new Date().getMonth() && d.getDate() === day;
+              });
+              if (txsOnDay?.length > 0) {
+                setGlobalSelectedTxId?.(txsOnDay[0].id || txsOnDay[0]._id);
+              }
+            }} />
           </div>
 
           {/* RIGHT: Recent Transactions Section */}
@@ -1446,22 +1594,7 @@ function OverviewSubTab({ C, isPro, activeTab, setActiveTab, netWorthData, total
         </div>
       </Card>
 
-      {/* Investments Chart — full width below calendar + transactions */}
-      <Card className="anim-4" style={{ padding: 0, overflow: "hidden", background: C.white, borderRadius: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 12px", borderBottom: `1px solid ${C.border2}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} onClick={() => setActiveNav("portfolio")}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.10em" }}>INVESTMENTS</span>
-            <ChevronRight size={12} style={{ color: C.muted }} />
-          </div>
-          <button type="button" onClick={() => setActiveNav("portfolio")}
-            style={{ width: 28, height: 28, borderRadius: 7, background: C.bg, border: `1px solid ${C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 16, color: "var(--text-secondary)", fontWeight: 300, lineHeight: 1 }}>+</span>
-          </button>
-        </div>
-
-        <InvestmentsChartCard C={C} setActiveNav={setActiveNav} />
-      </Card>
-
+      <OverviewInvestmentsCard C={C} isMobile={isMobile} categoryBreakdown={categoryBreakdown} canonicalCurrentNetWorth={canonicalCurrentNetWorth} formatSignedAmount={formatSignedAmount} formatAmount={formatAmount} setActiveNav={setActiveNav} />
 
     </>
   );
@@ -1478,16 +1611,17 @@ function AddTransactionModal({ C, onClose, txLimitReached, txRemaining, resetLab
   const BLANK = { merchant: "", amount: "", type: "expense", category: "", date: formatDateInputValue(new Date()), notes: "" };
   const [form, setForm] = useState(BLANK);
 
-  const { data: customCategories = [] } = useQuery({
-    queryKey: ["custom-categories"],
-    queryFn: async () => {
-      const res = await transactionCategoryService.list();
-      return res.data?.categories || [];
-    }
+  const { data: categoryData } = useQuery({
+    queryKey: ["transaction-categories", dashboardUser?._id],
+    queryFn: () => transactionCategoryService.list().then((r) => r.data),
+    enabled: !!dashboardUser?._id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+  const categoryRecords = categoryData?.categories || [];
 
-  const customExpenses = customCategories.filter(c => c.type === "expense").map(c => c.name);
-  const customIncomes = customCategories.filter(c => c.type === "income").map(c => c.name);
+  const customExpenses = categoryRecords.filter(c => c.type === "expense").map(c => c.name);
+  const customIncomes = categoryRecords.filter(c => c.type === "income").map(c => c.name);
 
   const INCOME_CATS = ["Salary", "Freelance", "Investment", "Other Income", ...customIncomes];
   const EXPENSE_CATS = ["Dining", "Groceries", "Transport", "Subscriptions", "Shopping", "Health", "Education", "Utilities", "Rent", "Entertainment", "Travel", "Other Expense", ...customExpenses];
@@ -2237,7 +2371,7 @@ function GoalsPage({ C, aiService, pushNotif }) {
 /* ─── Transactions Page Component ──────────────────────── */
 /* ─── SpendingPage ───────────────────────────────────────── */
 
-function MonthlyBudgetWidget({ C, budget, totalExpense, setActiveNav, onBudgetSaved }) {
+function MonthlyBudgetWidget({ C, budget, totalExpense, setActiveNav, onBudgetSaved, pushNotif }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
   const [modalOpen, setModalOpen] = useState(false);
@@ -2380,8 +2514,8 @@ function PortfolioGlanceCard({ C, setActiveNav }) {
 
   const totalValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
   const totalCost = assets.reduce((s, a) => s + getAssetCostBasis(a), 0);
-  const totalGain = totalValue - totalCost;
-  const totalGainPct = totalCost > 0 ? ((totalGain / totalCost) * 100) : 0;
+  const portfolioTotalGain = totalValue - totalCost;
+  const portfolioTotalGainPct = totalCost > 0 ? ((portfolioTotalGain / totalCost) * 100) : 0;
 
   const fmt = (n) => {
     return formatCurrencyAmount(n || 0, preferredCurrency, { maximumFractionDigits: 0 });
@@ -2454,9 +2588,9 @@ function PortfolioGlanceCard({ C, setActiveNav }) {
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 9, color: C.muted, marginBottom: 1 }}>All time</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: totalGain >= 0 ? C.greenMid : C.red, display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
-              {totalGain >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-              {totalGain >= 0 ? "+" : ""}{fmt(totalGain)} ({totalGain >= 0 ? "+" : ""}{(Math.abs(totalGainPct) < 0.1 && totalGain !== 0 ? totalGainPct.toFixed(2) : totalGainPct.toFixed(1))}%)
+            <div style={{ fontSize: 11, fontWeight: 700, color: portfolioTotalGain >= 0 ? C.greenMid : C.red, display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>
+              {portfolioTotalGain >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+              {portfolioTotalGain >= 0 ? "+" : ""}{fmt(portfolioTotalGain)} ({portfolioTotalGain >= 0 ? "+" : ""}{(Math.abs(portfolioTotalGainPct) < 0.1 && portfolioTotalGain !== 0 ? portfolioTotalGainPct.toFixed(2) : portfolioTotalGainPct.toFixed(1))}%)
             </div>
           </div>
         </div>
@@ -2523,10 +2657,8 @@ function PortfolioGlanceCard({ C, setActiveNav }) {
 }
 
 /* ─── Spending Calendar Grid (inline version for combined card) ── */
-function SpendingCalendarGrid({ C, apiTransactions }) {
+function SpendingCalendarGrid({ C, apiTransactions, onDayClick, year = new Date().getFullYear(), month = new Date().getMonth() }) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
 
@@ -2577,9 +2709,9 @@ function SpendingCalendarGrid({ C, apiTransactions }) {
         {cells.map((day, i) => {
           if (!day) return <div key={`empty-${i}`} />;
           const amt = daySpend[day];
-          const isFuture = day > today;
+          const isFuture = (year > now.getFullYear()) || (year === now.getFullYear() && month > now.getMonth()) || (year === now.getFullYear() && month === now.getMonth() && day > now.getDate());
           return (
-            <div key={day} style={{
+            <div key={day} onClick={() => { if (amt > 0 && onDayClick) onDayClick(day); }} style={{
               borderRadius: 6,
               background: C.bg,
               border: `1px solid ${C.border2}`,
@@ -2587,6 +2719,7 @@ function SpendingCalendarGrid({ C, apiTransactions }) {
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               minHeight: 42,
               opacity: isFuture ? 0.45 : 1,
+              cursor: amt > 0 ? "pointer" : "default",
               transition: "all 0.15s"
             }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: C.text, lineHeight: 1 }}>{day}</div>
@@ -2913,6 +3046,7 @@ function AIAdvisorCard({
   const msgsEndRef = useRef(null);
   const inputRef = useRef(null);
   const { netWorthAssets: portfolioAssets = [] } = usePortfolio();
+  const { user } = useAuthContext();
 
   useEffect(() => { msgsEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typing]);
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 120); }, []);
@@ -3027,7 +3161,11 @@ function AIAdvisorCard({
       const lines = allAssets.map(a => {
         const cost = a.totalCost || (a.purchasePrice * (a.quantity || 1)) || 0;
         const gain = (a.currentValue || 0) - cost;
-        return `${a.name || a.symbol || "?"}[${a.assetType || "?"}]:$${f(a.currentValue)} gain$${f(gain)}${a.quantity ? ` x${a.quantity}` : ""}`;
+        let extra = "";
+        if (a.assetType === "equity") {
+           extra = ` tkr:${a.ticker || "?"} type:${a.grantType || "?"} vstd:${a.vestedQuantity || 0}`;
+        }
+        return `${a.name || a.symbol || "?"}[${a.assetType || "?"}]:$${f(a.currentValue)} gain$${f(gain)}${a.quantity ? ` x${a.quantity}` : ""}${extra}`;
       }).join("\n");
       assetsStr = `total$${f(totalVal)} cost$${f(totalCost)} gain$${f(totalVal - totalCost)}\n${lines}`;
     }
@@ -3038,6 +3176,7 @@ function AIAdvisorCard({
     const fcStr = fc ? `inc$${f(fc.predictedIncome)} exp$${f(fc.predictedExpense)} (${fc.confidence || "?"})` : "n/a";
 
     return `[FinPilot ${now.toISOString().slice(0, 7)}]
+USER:${user?.name || "?"} email:${user?.email || "?"} pro:${user?.isPro ? "yes" : "no"}
 SUM:inc$${f(inc)} exp$${f(exp)} net$${f(net)} sr${sr}% score:${score}
 NW:cash$${f(cumCash)} assets$${f(assetVal)} total$${f(cumCash + assetVal)}
 CATS:${catLines || "none"}
@@ -3087,10 +3226,10 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
         ];
       } else {
         // Subsequent messages: context already established in session.
-        // Only send the last 4 exchanges (8 messages) + the new message.
+        // Only send the last 4 exchanges (8 messages) including the new message.
         // This keeps payload tiny and avoids 413.
         const recentHistory = prevMessages
-          .slice(-8)
+          .slice(-7)
           .map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
         historyToSend = [
           ...recentHistory,
@@ -3520,7 +3659,7 @@ FinPilot AI: answer using ONLY the data above. Never invent figures.`;
 function MiniSparkline({ prices, up, width = 80, height = 36 }) {
   if (!prices || prices.length < 2) return (
     <div style={{ width, height, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: "80%", height: 1, background: C.border }} />
+      <div style={{ width: "80%", height: 1, background: "var(--border-subtle)" }} />
     </div>
   );
   const mn = Math.min(...prices), mx = Math.max(...prices);
@@ -3771,12 +3910,56 @@ function SavingsGoalsWidget({ C, apiGoals, setActiveNav }) {
 
 /* ─── Health Score Widget ────────────────────────────────── */
 /* ─── Net Worth View (Net Worth tab) ─────────────────────── */
-/* ─── Investments Chart Card (overview dashboard row) ───── */
+function NetWorthView({ C, netWorthData = [], summary = {}, monthlyChart = [], isMobile, apiTransactions = [], categoryBreakdown = [], canonicalCurrentNetWorth, setActiveNav }) {
+  return (
+    <>
+      <Card className="anim-4" style={{ padding: 0, overflow: "hidden", background: C.white, borderRadius: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px 12px", borderBottom: `1px solid ${C.border2}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} onClick={() => setActiveNav("portfolio")}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.10em" }}>INVESTMENTS</span>
+            <ChevronRight size={12} style={{ color: C.muted }} />
+          </div>
+          <button type="button" onClick={() => setActiveNav("portfolio")}
+            style={{ width: 28, height: 28, borderRadius: 7, background: C.bg, border: `1px solid ${C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 16, color: "var(--text-secondary)", fontWeight: 300, lineHeight: 1 }}>+</span>
+          </button>
+        </div>
 
-function InvestmentsChartCard({ C, setActiveNav }) {
+        <InvestmentsChartCard C={C} setActiveNav={setActiveNav} isMobile={isMobile}
+          summary={summary} monthlyChart={monthlyChart} apiTransactions={apiTransactions} categoryBreakdown={categoryBreakdown} canonicalCurrentNetWorth={canonicalCurrentNetWorth}
+          initialTab="investments" initialPeriod="YTD"
+        />
+      </Card>
+    </>
+  );
+}
+
+/* ─── Investments Chart Card (overview dashboard row) ───── */
+function InvestmentsChartCard({ C, setActiveNav, isMobile, summary, monthlyChart, apiTransactions, categoryBreakdown, canonicalCurrentNetWorth, initialTab = "all", initialPeriod = "ALL" }) {
   const { user: dashboardUser } = useAuthContext();
   const preferredCurrency = getUserCurrency(dashboardUser);
-  const { netWorthAssets: assets = [], loading } = usePortfolio();
+  const portfolio = usePortfolio() || {};
+  const { netWorthAssets: assets = [], loading } = portfolio;
+  const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
+  const fmtNW = (n) => formatCurrencyAmount(Math.abs(n || 0), preferredCurrency, { maximumFractionDigits: 0 });
+
+  const [nwTab, setNwTab] = useState(initialTab);
+  const [nwPeriod, setNwPeriod] = useState(initialPeriod);
+
+  const ASSET_COLORS = ["#0d9488", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4"];
+  const SPEND_COLORS = ["#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6", "#0d9488", "#ec4899"];
+
+  const totalSpend = (categoryBreakdown || []).reduce((s, c) => s + (c.amount || c.total || 0), 0);
+
+  const assetGroups = Object.values((Array.isArray(assets) ? assets : []).reduce((acc, a) => {
+    const key = a?.assetType || "Other";
+    acc[key] = acc[key] || { label: key, total: 0, items: [] };
+    acc[key].total += (a?.currentValue || 0);
+    acc[key].items.push(a);
+    return acc;
+  }, {}));
+
+  const spendGroups = (categoryBreakdown || []).map(c => ({ label: c.category || c.name || "Other", total: c.amount || c.total || 0 }));
   const chartRef = useRef(null);
   const [chartSize, setChartSize] = useState({ width: 0, height: 260 });
 
@@ -3806,12 +3989,13 @@ function InvestmentsChartCard({ C, setActiveNav }) {
 
   // ── Totals ────────────────────────────────────────────────
   const totalValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
+  const totalAssets = totalValue;
   const totalInvested = assets.reduce((s, a) => {
     if (a.assetType === "crypto") return s + (a.buyPrice || 0) * (a.quantity || 0);
     return s + (a.buyingPrice || a.purchasePrice || 0);
   }, 0);
-  const totalGain = totalValue - totalInvested;
-  const gainPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : null;
+  const investTotalGain = totalValue - totalInvested;
+  const investGainPct = totalInvested > 0 ? ((investTotalGain / totalInvested) * 100).toFixed(1) : null;
   const hasCostData = assets.some(a =>
     (a.assetType === "crypto" && (a.buyPrice || 0) > 0) ||
     (a.assetType !== "crypto" && ((a.buyingPrice || 0) > 0 || (a.purchasePrice || 0) > 0))
@@ -3839,14 +4023,14 @@ function InvestmentsChartCard({ C, setActiveNav }) {
     const now = new Date();
     const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    // If no dated events, show flat lines for 12 months
+    // If no dated events, show flat lines for 6 months
     if (!datedEvents.length) {
       const totalCost = events.reduce((s, e) => s + e.invested, 0);
       const totalCurr = events.reduce((s, e) => s + e.currentValue, 0);
-      return Array.from({ length: 12 }, (_, i) => {
-        const d2 = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+      return Array.from({ length: 6 }, (_, i) => {
+        const d2 = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
         const label = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-        const isNow = i === 11;
+        const isNow = i === 5;
         return { month: label, costBasis: isNow ? Math.round(totalCost) : 0, currentValue: isNow ? Math.round(totalCurr) : 0 };
       });
     }
@@ -3861,9 +4045,9 @@ function InvestmentsChartCard({ C, setActiveNav }) {
       monthMap[monthKey].currentValue += currentValue;
     });
 
-    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const twelveKey = `${twelveMonthsAgo.getFullYear()}-${String(twelveMonthsAgo.getMonth() + 1).padStart(2, "0")}`;
-    const startKey = earliestKey < twelveKey ? earliestKey : twelveKey;
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const sixKey = `${sixMonthsAgo.getFullYear()}-${String(sixMonthsAgo.getMonth() + 1).padStart(2, "0")}`;
+    const startKey = earliestKey < sixKey ? earliestKey : sixKey;
 
     const [sy, sm] = startKey.split("-").map(Number);
     const months = [];
@@ -3877,230 +4061,18 @@ function InvestmentsChartCard({ C, setActiveNav }) {
 
     // Cumulative cost basis; current value appears only on last point
     let cumCost = 0;
-    const totalCurrentValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
-    return months.map((key, idx) => {
+      const totalCurrentValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
+      const fullMap = months.map((key, idx) => {
       cumCost += (monthMap[key]?.invested || 0);
       const [ky, km] = key.split("-").map(Number);
-      const label = new Date(ky, km - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      const lbl = new Date(ky, km - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
       const isLast = idx === months.length - 1;
-      return {
-        month: label,
-        costBasis: Math.round(cumCost),
-        currentValue: isLast ? Math.round(totalCurrentValue) : Math.round(cumCost), // track value = cost until last point
-      };
+      const fraction = months.length > 1 ? idx / (months.length - 1) : 1;
+      const interpolatedValue = isLast ? totalCurrentValue : Math.round(totalCurrentValue * fraction);
+      return { d: lbl, v: Math.round(cumCost), costBasis: Math.round(cumCost), currentValue: interpolatedValue, cum: Math.round(cumCost) };
     });
+    return fullMap.slice(-12);
   }, [assets]);
-
-  const fmtV = (n) => {
-    const numeric = Number(n || 0);
-    const formatted = formatCurrencyAmount(Math.abs(numeric), preferredCurrency, { maximumFractionDigits: 0 });
-    return numeric < 0 ? `-${formatted}` : formatted;
-  };
-
-  const CHART_MARGIN = { top: 30, right: 35, bottom: 0, left: 0 };
-  const minRenderableWidth = CHART_MARGIN.left + CHART_MARGIN.right + 8;
-  const canRenderSizedChart = chartSize.width > minRenderableWidth && chartSize.height > 40;
-
-  return (
-    <div>
-      {/* Chart */}
-      {loading ? (
-        <div style={{ height: 260, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ fontSize: 11, color: C.muted }}>Loading…</div>
-        </div>
-      ) : assets.length === 0 ? (
-        <div style={{ height: 260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <TrendingUp size={22} style={{ color: C.muted }} />
-          <div style={{ fontSize: 11, color: C.muted }}>No assets added yet</div>
-        </div>
-      ) : chartData.length > 0 ? (
-        <div ref={chartRef} style={{ width: "100%", minWidth: 0, height: 260, minHeight: 260 }}>
-          {canRenderSizedChart ? (
-            <AreaChart width={chartSize.width} height={chartSize.height} data={chartData} margin={CHART_MARGIN}>
-              <defs>
-                <linearGradient id="investCostGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.22} />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: C.muted, fontSize: 10 }} tickLine={false} axisLine={false} width={55} allowDecimals={false} tickFormatter={(value) => {
-                const numeric = Number(value || 0);
-                return formatCurrencyAmount(numeric, preferredCurrency || "USD", {
-                  notation: "compact",
-                  compactDisplay: "short",
-                  maximumFractionDigits: 1,
-                });
-              }} />
-              <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="3 3" />
-              <Area
-                type="monotone"
-                dataKey="costBasis"
-                stroke="#8b5cf6"
-                strokeWidth={2.5}
-                fill="url(#investCostGrad)"
-                dot={false}
-                activeDot={{ r: 4, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
-              />
-              <ReferenceDot
-                x={chartData[chartData.length - 1]?.month}
-                y={chartData[chartData.length - 1]?.currentValue}
-                r={5}
-                fill="#0ea5e9"
-                stroke="#fff"
-                strokeWidth={2}
-                isFront
-                label={{ value: "Current value", position: "top", fill: C.muted, fontSize: 10 }}
-              />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const row = payload[0]?.payload;
-                  const gain = (row?.currentValue || 0) - (row?.costBasis || 0);
-                  return (
-                    <div style={{ background: C.white, border: `1px solid ${C.border2}`, borderRadius: 8, padding: "8px 12px", boxShadow: "0 4px 12px rgba(0,0,0,0.07)" }}>
-                      <div style={{ fontSize: 10, color: C.muted, marginBottom: 2 }}>{row?.month}</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>Invested: {fmtV(row?.costBasis)}</div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>Current: {fmtV(row?.currentValue)}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: gain >= 0 ? C.greenMid : C.red }}>Gain / loss: {gain >= 0 ? "+" : ""}{fmtV(gain)}</div>
-                    </div>
-                  );
-                }}
-              />
-            </AreaChart>
-          ) : (
-            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ fontSize: 11, color: C.muted }}>Preparing chart…</div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ height: 260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <TrendingUp size={22} style={{ color: C.muted }} />
-          <div style={{ fontSize: 11, color: C.muted }}>No investment cost data available</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTransactions = [], canonicalCurrentNetWorth }) {
-  const { user: dashboardUser } = useAuthContext();
-  const preferredCurrency = getUserCurrency(dashboardUser);
-  const { netWorthAssets: assets = [], loading } = usePortfolio();
-  const [nwTab, setNwTab] = useState("all");   // "all" | "investments" | "spending"
-  const [nwPeriod, setNwPeriod] = useState("YTD");
-  const formatAmount = (value, options = {}) => formatCurrencyAmount(value, preferredCurrency, options);
-
-  const ASSET_COLORS = ["#16a34a", "#0d9488", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899"];
-  const SPEND_COLORS = ["#ef4444", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#3b82f6"];
-
-  const fmtNW = n => {
-    const numeric = Number(n || 0);
-    const formatted = formatCurrencyAmount(Math.abs(numeric), preferredCurrency, { maximumFractionDigits: 0 });
-    return numeric < 0 ? `-${formatted}` : formatted;
-  };
-
-  // Asset grouping
-  const groupMap = {};
-  assets.forEach(a => {
-    const key = a.assetType || a.type || "Other";
-    if (!groupMap[key]) groupMap[key] = { label: key, total: 0, items: [] };
-    groupMap[key].total += a.currentValue || 0;
-    groupMap[key].items.push(a);
-  });
-  const assetGroups = Object.values(groupMap).sort((a, b) => b.total - a.total);
-  const totalAssets = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
-  const totalSpend = summary?.totalExpense ?? (monthlyChart?.reduce((s, m) => s + (m.expense || 0), 0) || 0);
-
-  // Spending by category
-  const spendGroups = (() => {
-    if (!monthlyChart?.length) return [];
-    const catMap = {};
-    monthlyChart.forEach(m => {
-      if (m.categories) Object.entries(m.categories).forEach(([cat, val]) => { catMap[cat] = (catMap[cat] || 0) + (val || 0); });
-    });
-    return Object.entries(catMap).map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total).slice(0, 6);
-  })();
-
-  // Chart data
-  const chartData = (() => {
-    if (nwTab !== "all") {
-      if (!monthlyChart?.length) return [{ d: "—", nw: 0, income: 0, expense: 0 }];
-      const sorted = [...monthlyChart].sort((a, b) => (a.month || "").localeCompare(b.month || ""));
-      let slice = sorted;
-      const now = new Date();
-      if (nwPeriod === "1W" || nwPeriod === "1M") slice = sorted.slice(-1);
-      else if (nwPeriod === "3M") slice = sorted.slice(-3);
-      else if (nwPeriod === "YTD") slice = sorted.filter(m => (m.month || "").startsWith(String(now.getFullYear())));
-      let cum = 0;
-      return slice.map(m => {
-        cum += (m.income || 0) - (m.expense || 0);
-        const [y, mo] = (m.month || "").split("-").map(Number);
-        const label = (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short" }) : "—";
-        return { d: label, nw: cum, income: m.income || 0, expense: m.expense || 0 };
-      });
-    }
-
-    const now = new Date();
-    const sortedMonthly = [...(monthlyChart || [])].sort((a, b) => (a.month || "").localeCompare(b.month || ""));
-
-    const dailyFromTransactions = (daysBack) => {
-      if (daysBack <= 0) return [{ d: "—", nw: Math.round(totalAssets) }];
-
-      const dayBuckets = [];
-      const dayMap = new Map();
-      for (let i = daysBack - 1; i >= 0; i -= 1) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const obj = { key, d: label, net: 0 };
-        dayBuckets.push(obj);
-        dayMap.set(key, obj);
-      }
-
-      (apiTransactions || []).forEach((t) => {
-        if (!t?.date) return;
-        const d = new Date(t.date);
-        if (Number.isNaN(d.getTime())) return;
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const bucket = dayMap.get(key);
-        if (!bucket) return;
-        const isInc = t.type === "income" || t.type === "deposit" || t.type === "credit";
-        const isExp = t.type === "expense" || t.type === "debit" || t.type === "withdrawal" || t.type === "payment";
-        if (isInc) bucket.net += Math.abs(t.amount || 0);
-        if (isExp) bucket.net -= Math.abs(t.amount || 0);
-      });
-
-      let cumulative = 0;
-      return dayBuckets.map((b) => {
-        cumulative += b.net;
-        return { d: b.d, nw: Math.round(totalAssets + cumulative), income: 0, expense: 0 };
-      });
-    };
-
-    if (nwPeriod === "1W") return dailyFromTransactions(7);
-    if (nwPeriod === "1M") return dailyFromTransactions(Math.max(1, now.getDate()));
-
-    let slice = sortedMonthly;
-    if (nwPeriod === "3M") {
-      slice = sortedMonthly.slice(-3);
-    } else if (nwPeriod === "YTD") {
-      slice = sortedMonthly.filter((m) => (m.month || "").startsWith(String(now.getFullYear())));
-    }
-
-    if (!slice.length) return [{ d: "—", nw: Math.round(totalAssets), income: 0, expense: 0 }];
-
-    let cumulative = 0;
-    return slice.map((m) => {
-      cumulative += (m.income || 0) - (m.expense || 0);
-      const [y, mo] = (m.month || "").split("-").map(Number);
-      const label = (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : "—";
-      return { d: label, nw: Math.round(totalAssets + cumulative), income: m.income || 0, expense: m.expense || 0 };
-    });
-  })();
 
   const latest = chartData.length ? chartData[chartData.length - 1].nw : 0;
   const first = chartData.length > 1 ? chartData[0].nw : 0;
@@ -4138,7 +4110,7 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
       return Array.from({ length: 12 }, (_, i) => {
         const d2 = new Date(nowDate.getFullYear(), nowDate.getMonth() - 11 + i, 1);
         const lbl = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-        return { d: lbl, v: i === 11 ? totalVal : 0, cum: totalVal };
+        return { d: lbl, ts: d2.getTime(), v: i === 11 ? totalVal : 0, cum: totalVal };
       });
     }
 
@@ -4174,22 +4146,46 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
     return months.map((key, idx) => {
       cumCost += (monthMap[key]?.invested || 0);
       const [ky, km] = key.split("-").map(Number);
-      const lbl = new Date(ky, km - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      const d2 = new Date(ky, km - 1, 1);
+      const lbl = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
       const isLast = idx === months.length - 1;
       // currentValue only known at last point; interpolate linearly between 0 and totalCurrentValue
       const fraction = months.length > 1 ? idx / (months.length - 1) : 1;
       const interpolatedValue = isLast ? totalCurrentValue : Math.round(totalCurrentValue * fraction);
-      return { d: lbl, v: Math.round(cumCost), costBasis: Math.round(cumCost), currentValue: interpolatedValue, cum: Math.round(cumCost) };
+      return { d: lbl, ts: d2.getTime(), v: Math.round(cumCost), costBasis: Math.round(cumCost), currentValue: interpolatedValue, cum: Math.round(cumCost) };
     });
   })();
+
+  const filteredInvestChartData = useMemo(() => {
+    if (!investChartData.length) return [];
+    const now = new Date();
+    const sorted = [...investChartData].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    if (nwPeriod === "1W" || nwPeriod === "1M") return sorted.slice(-3); // Show last 3 months minimum for better visualization
+    if (nwPeriod === "3M") return sorted.slice(-3);
+    if (nwPeriod === "YTD") {
+      const y = now.getFullYear();
+      const start = new Date(y, 0, 1).getTime();
+      return sorted.filter((p) => (p.ts || 0) >= start);
+    }
+    return sorted;
+  }, [investChartData, nwPeriod]);
+
+  // Filter chartData by period for "All" tab
+  const filteredChartData = useMemo(() => {
+    if (!chartData.length) return [];
+    if (nwPeriod === "1W" || nwPeriod === "1M") return chartData.slice(-3);
+    if (nwPeriod === "3M") return chartData.slice(-3);
+    if (nwPeriod === "YTD") return chartData.slice(-12);
+    return chartData;
+  }, [chartData, nwPeriod]);
 
   const totalCostAll = assets.reduce((s, a) => {
     const cost = getAssetCostBasis(a);
     return s + (cost > 0 ? cost : (a.currentValue || 0));
   }, 0);
   const hasCostDataNW = assets.some(a => getAssetCostBasis(a) > 0);
-  const totalGain = totalAssets - totalCostAll;
-  const gainPct = (hasCostDataNW && totalCostAll > 0) ? ((totalGain / totalCostAll) * 100).toFixed(1) : null;
+  const nwTotalGain = totalValue - totalCostAll;
+  const nwGainPct = (hasCostDataNW && totalCostAll > 0) ? ((nwTotalGain / totalCostAll) * 100).toFixed(1) : null;
 
   const ASSET_TYPE_ICONS = {
     Stock: TrendingUp, Crypto: TrendingUp, Cash: BadgeDollarSign, Bond: TrendingUp, "Real Estate": Building2, Other: Gem,
@@ -4200,16 +4196,18 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
   // Active chart config per tab
   const chartColor = nwTab === "spending" ? "#ef4444" : nwTab === "investments" ? "#8b5cf6" : "#0D9488";
   const activeGrad = `nwGrad_${nwTab}`;
-  const activeKey = nwTab === "spending" ? "expense" : "nw";
+  const activeKey = nwTab === "spending" ? "expense" : "v"; // Use "v" key which exists in both chartData and investChartData
   const mainValue = nwTab === "investments"
-    ? totalAssets
+    ? totalValue
     : nwTab === "spending"
       ? totalSpend
       : (Number.isFinite(canonicalCurrentNetWorth) ? canonicalCurrentNetWorth : latest);
-  // For investments: use our new investChartData directly (has d + v keys)
+  // For investments: use filteredInvestChartData with period applied
+  // For all: use filteredChartData with period applied
+  // For spending: use monthlyChart (filtered separately in spending section)
   const activeData = nwTab === "investments"
-    ? investChartData
-    : chartData;
+    ? filteredInvestChartData
+    : filteredChartData;
 
   const tabs = [["all", "All"], ["spending", "Income vs Expenses"], ["investments", "Investments"]];
 
@@ -4224,11 +4222,12 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
             {tabs.map(([id, label]) => (
               <button key={id} type="button" onClick={() => setNwTab(id)}
                 style={{
-                  padding: `6px ${isMobile ? "12px" : "18px"} 12px`, border: "none", background: nwTab === id ? C.bg : "transparent", cursor: "pointer",
+                  padding: `6px ${isMobile ? "12px" : "18px"} 12px`, border: "none", background: "transparent", cursor: "pointer",
                   fontFamily: "inherit", fontSize: isMobile ? 12 : 13, fontWeight: nwTab === id ? 600 : 400,
                   color: nwTab === id ? C.text : C.muted,
-                  borderBottom: nwTab === id ? `2px solid ${C.text}` : "2px solid transparent",
-                  transition: "all 0.15s"
+                  borderBottom: nwTab === id ? `2px solid ${C.greenMid}` : "2px solid transparent",
+                  transition: "all 0.15s",
+                  opacity: nwTab === id ? 1 : 0.7
                 }}
               >{label}</button>
             ))}
@@ -4256,18 +4255,19 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
               {change >= 0 ? "+" : ""}{fmtNW(change)} ({change >= 0 ? "+" : ""}{changePct}%)
             </div>
           )}
-          {nwTab === "investments" && gainPct !== null && (
-            <div style={{ fontSize: 12, fontWeight: 600, color: totalGain >= 0 ? C.greenMid : C.red, marginTop: 2 }}>
-              {totalGain >= 0 ? "+" : ""}{fmtNW(totalGain)} ({totalGain >= 0 ? "+" : ""}{gainPct}%)
+          {nwTab === "investments" && nwGainPct !== null && (
+            <div style={{ fontSize: 12, fontWeight: 600, color: nwTotalGain >= 0 ? C.greenMid : C.red, marginTop: 2 }}>
+              {nwTotalGain >= 0 ? "+" : ""}{fmtNW(nwTotalGain)} ({nwTotalGain >= 0 ? "+" : ""}{nwGainPct}%)
             </div>
           )}
         </div>
 
         {/* Chart — conditional per tab */}
+        <div ref={chartRef} style={{ width: "100%" }}>
         {nwTab === "investments" ? (
           <>
             <ResponsiveContainer width="100%" height={isMobile ? 170 : 220} minWidth={0} minHeight={isMobile ? 170 : 220}>
-              <AreaChart data={investChartData} margin={{ top: 10, right: isMobile ? 44 : 56, bottom: 18, left: 0 }}>
+              <AreaChart data={filteredInvestChartData} margin={{ top: 10, right: isMobile ? 44 : 56, bottom: 18, left: 0 }}>
                 <defs>
                   <linearGradient id="nwInvCostGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.22} />
@@ -4275,12 +4275,12 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="d"
-                  tick={{ fontSize: 10, fill: "#b0b8c8", fontFamily: "var(--font-sans)" }}
+                  tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
                   axisLine={false} tickLine={false} interval="preserveStartEnd"
                 />
                 <YAxis orientation="right" axisLine={false} tickLine={false} width={isMobile ? 44 : 56}
                   tickFormatter={v => fmtNW(v)}
-                  tick={{ fontSize: 10, fill: "#b0b8c8", fontFamily: "var(--font-sans)" }}
+                  tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
                 />
                 <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="4 4" />
                 <Tooltip content={({ active, payload }) => {
@@ -4342,12 +4342,12 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
               <ResponsiveContainer width="100%" height={isMobile ? 160 : 210} minWidth={0} minHeight={isMobile ? 160 : 210}>
                 <LineChart data={lineData} margin={{ top: 6, right: isMobile ? 44 : 56, bottom: 0, left: 0 }}>
                   <XAxis dataKey="d"
-                    tick={{ fontSize: 10, fill: "#b0b8c8", fontFamily: "var(--font-sans)" }}
+                    tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
                     axisLine={false} tickLine={false}
                   />
                   <YAxis orientation="right" axisLine={false} tickLine={false} width={isMobile ? 44 : 56}
                     tickFormatter={v => fmtNW(v)}
-                    tick={{ fontSize: 10, fill: "#b0b8c8", fontFamily: "var(--font-sans)" }}
+                    tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
                   />
                   <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="4 4" />
                   <Tooltip content={({ active, payload }) => {
@@ -4431,6 +4431,7 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
             </AreaChart>
           </ResponsiveContainer>
         )}
+        </div>
 
         {/* Period tabs */}
         <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "8px 0 14px" }}>
@@ -4463,7 +4464,7 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
                   <TrendingUp size={20} style={{ color: C.muted, marginBottom: 6 }} /><div>No assets yet.</div>
                 </div>
               )}
-              {!loading && assetGroups.map((group, gi) => {
+              {!loading && (assetGroups || []).map((group, gi) => {
                 const pct = totalAssets > 0 ? Math.round(clampPercent((group.total / totalAssets) * 100)) : 0;
                 return (
                   <div key={group.label}>
@@ -4471,11 +4472,13 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
                       <span style={{ fontSize: 11, fontWeight: 600, color: C.sub, textTransform: "uppercase", letterSpacing: "0.06em" }}>{group.label} ({pct}%)</span>
                       <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{fmtNW(group.total)}</span>
                     </div>
-                    {group.items.map(a => {
-                      const ItemIcon = ASSET_TYPE_ICONS[a.assetType || a.type] || Gem;
-                      const costRaw = getAssetCostBasis(a) || null;
-                      const gain = costRaw != null ? (a.currentValue || 0) - costRaw : null;
-                      const gPct = (gain != null && costRaw > 0) ? ((gain / costRaw) * 100).toFixed(1) : null;
+                    {(group.items || []).map(a => {
+                      const ItemIcon = ASSET_TYPE_ICONS[a?.assetType || a?.type] || Gem;
+                      const costRaw = getAssetCostBasis(a) || 0;
+                      const currentVal = Number(a?.currentValue) || 0;
+                      const gain = currentVal > 0 && costRaw > 0 ? (currentVal - costRaw) : (costRaw > 0 ? (currentVal - costRaw) : 0);
+                      const gPct = (costRaw > 0) ? ((gain / costRaw) * 100).toFixed(1) : null;
+                      const gainDisplay = a?.assetType === "crypto" && gain !== 0 ? fmtNW(gain) : (gain > 0 || gain < 0) ? fmtNW(gain) : "$0";
                       return (
                         <div key={a._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 18px", borderTop: `1px solid ${C.border2}` }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -4490,7 +4493,7 @@ function NetWorthView({ C, netWorthData, summary, monthlyChart, isMobile, apiTra
                               </div>
                             </div>
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{fmtNW(a.currentValue || 0)}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{fmtNW(currentVal || 0)}</span>
                         </div>
                       );
                     })}

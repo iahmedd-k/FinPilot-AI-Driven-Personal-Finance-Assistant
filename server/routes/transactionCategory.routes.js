@@ -4,6 +4,7 @@ const {
   listTransactionCategories,
   createTransactionCategory,
   updateTransactionCategory,
+  deleteTransactionCategory,
 } = require("../controllers/transactionCategory.controller");
 
 const router = express.Router();
@@ -13,5 +14,6 @@ router.use(protect);
 router.get("/", listTransactionCategories);
 router.post("/", createTransactionCategory);
 router.patch("/:id", updateTransactionCategory);
+router.delete("/:id", deleteTransactionCategory);
 
 module.exports = router;

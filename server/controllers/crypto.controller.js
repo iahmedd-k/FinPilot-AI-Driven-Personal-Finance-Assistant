@@ -8,6 +8,20 @@ const CACHE_TTL  = 5 * 60 * 1000;
 const COINGECKO_PUBLIC_API_KEY = "CG-FUFY2SsHBq25vAzUrR36RtBY";
 const VALID_TYPES = ["crypto", "equity", "cash", "vehicle", "property", "private_equity", "insurance", "valuables", "pension", "debt", "other"];
 
+const COINGECKO_COIN_MAPPING = {
+  btc: "bitcoin", eth: "ethereum", usdt: "tether", bnb: "binancecoin", sol: "solana",
+  usdc: "usd-coin", xrp: "ripple", ada: "cardano", avax: "avalanche-2", doge: "dogecoin",
+  dot: "polkadot", matic: "matic-network", shib: "shiba-inu", ltc: "litecoin", trx: "tron",
+  link: "chainlink", bch: "bitcoin-cash", ton: "the-open-network", xlm: "stellar",
+  atom: "cosmos", uni: "uniswap", xmr: "monero", etc: "ethereum-classic"
+};
+
+const getCoinGeckoId = (coin) => {
+  if (!coin) return "";
+  const lower = String(coin).trim().toLowerCase();
+  return COINGECKO_COIN_MAPPING[lower] || lower;
+};
+
 const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== "";
 const toNumber = (value) => Number(value);
 const normalizeGrantType = (value, fallback = "STOCK_OPTION") => {
@@ -203,7 +217,13 @@ exports.getCryptoAssets = async (req, res, next) => {
         priceData = priceCache.data;
       } else {
         try {
-          const ids = [...new Set(cryptoAssets.map(a => a.coin.toLowerCase()))].join(",");
+          const coinIdMap = cryptoAssets.reduce((acc, a) => {
+            const coinLower = String(a.coin || "").trim().toLowerCase();
+            if (coinLower) acc[coinLower] = getCoinGeckoId(coinLower);
+            return acc;
+          }, {});
+
+          const ids = [...new Set(Object.values(coinIdMap).filter(Boolean))].join(",");
           priceData = await fetchPrices(ids);
           priceCache.data = priceData;
           priceCache.timestamp = now;
@@ -213,11 +233,19 @@ exports.getCryptoAssets = async (req, res, next) => {
         }
       }
       enrichedCrypto = cryptoAssets.map(a => {
-        const priceUsd = priceData[a.coin.toLowerCase()]?.usd || null;
-        const price = priceUsd != null ? priceUsd * usdToPreferredRate : null;
-        const currentValue = price != null ? price * a.quantity : null;
+        const coinLower = String(a.coin || "").trim().toLowerCase();
+        const coinId = getCoinGeckoId(coinLower);
+        const priceUsd = priceData[coinId]?.usd ?? null;
+        let price = priceUsd != null ? priceUsd * usdToPreferredRate : null;
+
+        // Fallback to buyPrice if live price is unavailable
+        if (price == null) {
+          price = a.buyPrice;
+        }
+
+        const currentValue = price * a.quantity;
         const totalCost = a.buyPrice * a.quantity;
-        const gainLoss = price != null ? (price - a.buyPrice) * a.quantity : null;
+        const gainLoss = (price - a.buyPrice) * a.quantity;
         return { ...a.toObject(), currentPrice: price, currentValue, gainLoss, totalCost };
       });
     }

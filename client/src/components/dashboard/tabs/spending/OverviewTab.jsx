@@ -673,7 +673,7 @@ export default function OverviewTab({
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
                     {spendCalendarRows.flat().map(({ day, amount, active }) => (
                       <div key={day} 
-                        onClick={() => handleCalendarDayClick(day)}
+                        onClick={() => { if (amount > 0) handleCalendarDayClick(day); }}
                         style={{ height: 36, borderRadius: 8, border: `1px solid ${active ? "transparent" : C.border}`, background: active ? "#ffb95a" : "transparent", color: active ? "#fff" : C.text, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, cursor: amount > 0 ? "pointer" : "default", transition: "all 0.15s" }}
                         onMouseEnter={(e) => amount > 0 && (e.currentTarget.style.background = active ? "#f59e0b" : C.white)}
                         onMouseLeave={(e) => (e.currentTarget.style.background = active ? "#ffb95a" : "transparent")}

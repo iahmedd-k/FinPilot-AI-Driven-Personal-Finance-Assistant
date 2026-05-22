@@ -84,7 +84,6 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [showInferred, setShowInferred] = useState(() => recurringSettings?.showInferredRecurring ?? false);
   const [showSummaryDetails, setShowSummaryDetails] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
   const categoryRef = useRef(null);
@@ -102,31 +101,10 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
 
   const recurringItems = useMemo(() => {
     const explicit = apiTransactions.filter((tx) => tx.isRecurring);
-    let inferred = [];
-    
-    if (showInferred) {
-      const candidates = new Map();
-      apiTransactions.forEach(tx => {
-        if (tx.isRecurring || !tx.merchant) return;
-        const amountRound = Math.round(Math.abs(tx.amount));
-        const key = `${tx.type}:${tx.merchant}:${amountRound}`;
-        if (!candidates.has(key)) candidates.set(key, []);
-        candidates.get(key).push(tx);
-      });
-      
-      candidates.forEach(txs => {
-        if (txs.length >= 3) {
-          const recent = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-          inferred.push({ ...recent, isInferred: true });
-        }
-      });
-    }
-
-    const allRecurring = [...explicit, ...inferred];
     
     // Merge by key to avoid duplicates in the list display
     const merged = new Map();
-    allRecurring.forEach(tx => {
+    explicit.forEach(tx => {
       const merchant = tx.merchant || tx.category || "Transaction";
       const key = `${tx.type}:${merchant}:${tx.category || "Other"}:${Math.abs(tx.amount).toFixed(2)}`;
       if (!merged.has(key) || new Date(tx.date) > new Date(merged.get(key).date)) {
@@ -141,7 +119,7 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
         recurringFrequency: getRecurringFrequency(tx)
       };
     });
-  }, [apiTransactions, showInferred]);
+  }, [apiTransactions]);
 
   const monthData = useMemo(() => {
     const start = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
@@ -461,18 +439,15 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
               gap: isMobile ? 12 : 0
             }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Upcoming this month</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>Show inferred</span>
-                <Toggle checked={showInferred} onClick={() => setShowInferred(!showInferred)} C={C} />
-              </div>
+              
             </div>
             <div style={{ maxHeight: 300, overflowY: "auto" }}>
-              {monthData.occurrences.length === 0 ? (
+              {monthData.occurrences.filter(o => o.date >= new Date(new Date().setHours(0,0,0,0))).length === 0 ? (
                 <div style={{ padding: "32px 20px", textAlign: "center", color: C.muted, fontSize: 13 }}>
                   No upcoming items
                 </div>
               ) : (
-                monthData.occurrences.map((occ, idx) => (
+                monthData.occurrences.filter(o => o.date >= new Date(new Date().setHours(0,0,0,0))).map((occ, idx) => (
                   <div key={idx} style={{ 
                     padding: "12px 20px", 
                     display: "flex", 

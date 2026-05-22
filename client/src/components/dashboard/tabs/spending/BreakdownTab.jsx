@@ -6,7 +6,7 @@ import { dedupToast, getSpendingCategoryMeta, SPENDING_CATEGORY_META } from "../
 import { useAuthContext } from "../../../../hooks/useAuthContext";
 import { formatCurrencyAmount, getUserCurrency } from "../../../../utils/currency";
 
-function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isMobile, preferredCurrency: preferredCurrencyProp, setSpendTab, initialTab = "expenses" }) {
+function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isMobile, preferredCurrency: preferredCurrencyProp, setSpendTab, openSpendingSettings, initialTab = "expenses" }) {
   const { user } = useAuthContext();
   const preferredCurrency = preferredCurrencyProp || getUserCurrency(user);
   const latestTransactionDate = useMemo(() => {
@@ -318,9 +318,10 @@ function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isM
   if (selectedCategoryPrev > 0) {
     const rawPct = ((selectedCategorySpent - selectedCategoryPrev) / selectedCategoryPrev) * 100;
     const isUp = rawPct > 0;
-    const absPct = Math.abs(Math.round(rawPct));
-    const displayPct = absPct > 999 ? ">999%" : `${absPct}%`;
-    selectedCategoryChangeDisplay = `${isUp ? "+" : ""}${rawPct < 0 ? "-" : ""}${displayPct} vs last month`;
+    const clampedPct = Math.min(Math.max(rawPct, -100), 100); // Cap between -100% and +100%
+    const absPct = Math.abs(Math.round(clampedPct));
+    const displayPct = `${absPct}%`;
+    selectedCategoryChangeDisplay = `${isUp ? "+" : ""}${clampedPct < 0 ? "-" : ""}${displayPct} vs last month`;
   }
 
   const selectedIncomeCategoryTransactions = useMemo(() => {
@@ -337,9 +338,10 @@ function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isM
   if (selectedIncomeCategoryPrev > 0) {
     const rawPct = ((selectedIncomeCategoryTotal - selectedIncomeCategoryPrev) / selectedIncomeCategoryPrev) * 100;
     const isUp = rawPct > 0;
-    const absPct = Math.abs(Math.round(rawPct));
-    const displayPct = absPct > 999 ? ">999%" : `${absPct}%`;
-    selectedIncomeCategoryChangeDisplay = `${isUp ? "+" : ""}${rawPct < 0 ? "-" : ""}${displayPct} vs last month`;
+    const clampedPct = Math.min(Math.max(rawPct, -100), 100); // Cap between -100% and +100%
+    const absPct = Math.abs(Math.round(clampedPct));
+    const displayPct = `${absPct}%`;
+    selectedIncomeCategoryChangeDisplay = `${isUp ? "+" : ""}${clampedPct < 0 ? "-" : ""}${displayPct} vs last month`;
   }
 
   const R = 90;
@@ -593,7 +595,8 @@ function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isM
     const amt   = row.amount;
     const pct   = activeTotal > 0 ? ((amt/activeTotal)*100).toFixed(0) : "0";
     const prev  = prevTotals[cat] || 0;
-    const change = prev > 0 ? (((amt-prev)/prev)*100).toFixed(0) : null;
+    const changeRaw = prev > 0 ? (((amt-prev)/prev)*100) : null;
+    const change = changeRaw !== null ? Math.min(Math.max(changeRaw, -100), 100).toFixed(0) : null; // Cap between -100% and +100%
     const color = row.color;
     const Icon  = row.icon || BadgeDollarSign;
     const isIncome = breakdownTab === "income";
@@ -603,7 +606,7 @@ function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isM
     let displayChange = "—";
     if (change !== null) {
       const absChange = Math.abs(parseFloat(change));
-      displayChange = absChange > 999 ? ">999%" : `${absChange}%`;
+      displayChange = `${absChange}%`;
     }
 
     if (isMobile) {
@@ -749,7 +752,7 @@ function BreakdownTab({ C, apiTransactions = [], budget = {}, onBudgetSaved, isM
                 By {viewBy}
               </button>
             )}
-            <button type="button" onClick={() => setSpendTab?.("settings")} style={{ display:"flex", alignItems:"center", gap:8, height:40, border: `1px solid ${C.border}`, background: C.white, color: C.text, borderRadius: 12, padding: "0 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            <button type="button" onClick={() => openSpendingSettings ? openSpendingSettings() : setSpendTab?.("settings")} style={{ display:"flex", alignItems:"center", gap:8, height:40, border: `1px solid ${C.border}`, background: C.white, color: C.text, borderRadius: 12, padding: "0 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               <Settings2 size={15} />
               Setup
             </button>

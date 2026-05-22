@@ -9,7 +9,7 @@
 //   api              →  ../../../services/api
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -267,6 +267,13 @@ function SpendingPage({
   const [spendTab, setSpendTab] = useState("overview");
   const [breakdownMode, setBreakdownMode] = useState("expenses");
   const [addOpen, setAddOpen] = useState(false);
+  const openSpendingSettings = useCallback(() => {
+    const params = new URLSearchParams(location.search);
+    params.set("nav", "spending");
+    params.set("spend", "settings");
+    const nextSearch = params.toString();
+    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
+  }, [location.pathname, location.search, navigate]);
   const [addMode, setAddMode] = useState("manual");
   const isMobileLocal = useIsMobile();
   const ROUTES_SP = ROUTES;
@@ -1225,6 +1232,7 @@ function SpendingPage({
           isMobile={isMobileLocal || isMobile}
           preferredCurrency={preferredCurrency}
           setSpendTab={setSpendTab}
+          openSpendingSettings={openSpendingSettings}
           initialTab={breakdownMode}
         />
       )}

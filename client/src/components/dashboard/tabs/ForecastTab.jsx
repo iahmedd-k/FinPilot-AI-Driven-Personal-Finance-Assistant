@@ -881,7 +881,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                 <div style={{ ...iconContainerStyle(), borderColor: "transparent", flexShrink: 0 }}>
                   <TrendingUp size={16} style={{ color: C.indigo }} />
                 </div>
-                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>Net Worth Forecast</div>
+                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, color: C.text, whiteSpace: "nowrap" }}>Net Worth Forecast</div>
               </div>
 
               <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}`, order: isMobile ? 3 : 0, width: isMobile ? "100%" : "auto", gap: isMobile ? 1 : 0, flexWrap: isMobile ? "wrap" : "nowrap" }}>
@@ -902,7 +902,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       padding: isMobile ? "5px 10px" : "6px 12px",
                       borderRadius: 8,
                       fontSize: isMobile ? 11 : 11,
-                      fontWeight: 700,
+                      fontWeight: 500,
                       border: "none",
                       background: selectedRange === r.id ? C.white : "transparent",
                       color: selectedRange === r.id ? C.text : C.muted,
@@ -931,12 +931,12 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Current net worth</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: displayCurrentNW < 0 ? C.red : C.text }}>{fmt(displayCurrentNW)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 500, letterSpacing: "-0.5px", color: displayCurrentNW < 0 ? C.red : C.text }}>{fmt(displayCurrentNW)}</div>
                   {displayCurrentNW < 0 && <div style={{ fontSize: 10.5, color: C.red, marginTop: 2, fontWeight: 600 }}>In debt</div>}
                 </div>
                 <div style={{ padding: "9px 11px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Forecast ({rangeLabel})</div>
-                  <div style={{ fontSize: secondaryValueSize, fontWeight: 700, letterSpacing: "-0.4px", color: C.text }}>{fmt(displayFutureNW)}</div>
+                  <div style={{ fontSize: secondaryValueSize, fontWeight: 500, letterSpacing: "-0.4px", color: C.text }}>{fmt(displayFutureNW)}</div>
                   {displayNWGain !== 0 && (
                     <div style={{ fontSize: 11, fontWeight: 600, color: displayNWGain >= 0 ? "#10b981" : C.red, marginTop: 3 }}>
                       {displayNWGain >= 0 ? "+" : ""}{fmt(displayNWGain)}{displayNWGainPct != null ? ` (${displayNWGain >= 0 ? "+" : ""}${displayNWGainPct.toFixed(1)}%)` : ""}
@@ -948,12 +948,12 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, flexWrap: "wrap", gap: 14 }}>
                 <div>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Current net worth</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayCurrentNW < 0 ? C.red : C.text }}>{fmt(displayCurrentNW)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 500, letterSpacing: "-0.7px", color: displayCurrentNW < 0 ? C.red : C.text }}>{fmt(displayCurrentNW)}</div>
                   {displayCurrentNW < 0 && <div style={{ fontSize: 11, color: C.red, marginTop: 4, fontWeight: 600 }}>In debt</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecast ({rangeLabel})</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: C.text }}>{fmt(displayFutureNW)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 500, letterSpacing: "-0.7px", color: C.text }}>{fmt(displayFutureNW)}</div>
                   {displayNWGain !== 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: displayNWGain >= 0 ? "#10b981" : C.red, marginTop: 4 }}>
                       {displayNWGain >= 0 ? "+" : ""}{fmt(displayNWGain)}{displayNWGainPct != null ? ` (${displayNWGain >= 0 ? "+" : ""}${displayNWGainPct.toFixed(1)}%)` : ""}
@@ -964,7 +964,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             )}
 
             {/* Chart */}
-            <div style={{ padding: isMobile ? "8px 0 0" : "14px 0 0", position: "relative" }}>
+            <div style={{ padding: isMobile ? "8px 0 0" : "14px 0 0", position: "relative", minWidth: 0, minHeight: chartHeight }}>
               <ResponsiveContainer width="100%" height={chartHeight}>
                 <ComposedChart
                   key={`nw-${projectionNWData.length}-${projectionEvents.length}`}
@@ -1008,8 +1008,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       const d = payload[0]?.payload;
                       return (
                         <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", fontSize: 11, minWidth: 130 }}>
-                          <div style={{ fontWeight: 700, color: C.text, marginBottom: 6 }}>{d?.label}</div>
-                          <div style={{ color: C.muted }}>Net worth: <span style={{ fontWeight: 700, color: d?.netWorth >= 0 ? "#10B981" : "#EF4444" }}>{fmt(d?.netWorth)}</span></div>
+                          <div style={{ fontWeight: 500, color: C.text, marginBottom: 6 }}>{d?.label}</div>
+                          <div style={{ color: C.muted }}>Net worth: <span style={{ fontWeight: 500, color: d?.netWorth >= 0 ? "#10B981" : "#EF4444" }}>{fmt(d?.netWorth)}</span></div>
                         </div>
                       );
                     }}
@@ -1079,9 +1079,9 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   minWidth: 150,
                   zIndex: 5,
                 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 3 }}>{activeMilestoneHint.title}</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: C.text, marginBottom: 3 }}>{activeMilestoneHint.title}</div>
                   <div style={{ fontSize: 10, color: C.sub }}>Age {activeMilestoneHint.age} · {activeMilestoneHint.year}</div>
-                  <div style={{ fontSize: 10, color: C.sub }}>NW: <span style={{ fontWeight: 700, color: C.text }}>{fmt(activeMilestoneHint.netWorth)}</span></div>
+                  <div style={{ fontSize: 10, color: C.sub }}>NW: <span style={{ fontWeight: 500, color: C.text }}>{fmt(activeMilestoneHint.netWorth)}</span></div>
                 </div>
               )}
 
@@ -1113,7 +1113,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                 <TrendingUp size={12} style={{ color: "#10b981" }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
+                <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
                 <div style={{ fontSize: bodyTextSize, color: C.sub, lineHeight: 1.5 }}>
                   Net worth moves from {fmt(displayCurrentNW)} → {fmt(displayFutureNW)} over {rangeLabel} ({fmt(displayNWGain)} change).
                 </div>
@@ -1131,7 +1131,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                 <div style={{ ...iconContainerStyle(), borderColor: "transparent", flexShrink: 0 }}>
                   <TrendingUp size={16} style={{ color: "#10b981" }} />
                 </div>
-                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>Cash Flow Forecast</div>
+                <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, color: C.text, whiteSpace: "nowrap" }}>Cash Flow Forecast</div>
               </div>
               <div style={{ display: "flex", background: C.bg, borderRadius: 10, padding: 2, border: `1px solid ${C.border}`, order: isMobile ? 1 : 0, width: isMobile ? "100%" : "auto", gap: isMobile ? 1 : 0, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                 {[
@@ -1151,7 +1151,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       padding: isMobile ? "5px 10px" : "6px 12px",
                       borderRadius: 8,
                       fontSize: isMobile ? 11 : 11,
-                      fontWeight: 700,
+                      fontWeight: 500,
                       border: "none",
                       background: selectedRange === r.id ? C.white : "transparent",
                       color: selectedRange === r.id ? C.text : C.muted,
@@ -1173,11 +1173,11 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Current balance</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.5px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 500, letterSpacing: "-0.5px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
                 </div>
                 <div style={{ padding: "9px 11px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
                   <div style={{ fontSize: sectionLabelSize, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Forecast ({rangeLabel})</div>
-                  <div style={{ fontSize: secondaryValueSize, fontWeight: 700, letterSpacing: "-0.4px", color: displayFutureCF < 0 ? C.red : C.text }}>{fmt(displayFutureCF)}</div>
+                  <div style={{ fontSize: secondaryValueSize, fontWeight: 500, letterSpacing: "-0.4px", color: displayFutureCF < 0 ? C.red : C.text }}>{fmt(displayFutureCF)}</div>
                   {displayCFGain !== 0 && (
                     <div style={{ fontSize: 11, fontWeight: 600, color: displayCFGain >= 0 ? "#10b981" : C.red, marginTop: 3 }}>
                       {displayCFGain >= 0 ? "+" : ""}{fmt(displayCFGain)}
@@ -1189,11 +1189,11 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: `${cardPad.split(" ")[0]} ${cardPad.split(" ")[1]} 0`, flexWrap: "wrap", gap: 14 }}>
                 <div>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Current cash balance</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 500, letterSpacing: "-0.7px", color: displayCurrentCF < 0 ? C.red : C.text }}>{fmt(displayCurrentCF)}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>Forecasted in {rangeLabel}</div>
-                  <div style={{ fontSize: primaryValueSize, fontWeight: 700, letterSpacing: "-0.7px", color: displayFutureCF < 0 ? C.red : C.text }}>{fmt(displayFutureCF)}</div>
+                  <div style={{ fontSize: primaryValueSize, fontWeight: 500, letterSpacing: "-0.7px", color: displayFutureCF < 0 ? C.red : C.text }}>{fmt(displayFutureCF)}</div>
                   {displayCFGain !== 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: displayCFGain >= 0 ? "#10b981" : C.red, marginTop: 4 }}>
                       {displayCFGain >= 0 ? "+" : ""}{fmt(displayCFGain)} over {rangeLabel}
@@ -1212,7 +1212,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             </div>
 
             {/* Chart */}
-            <div style={{ padding: isMobile ? "8px 0 0" : "14px 0 0", position: "relative" }}>
+            <div style={{ padding: isMobile ? "8px 0 0" : "14px 0 0", position: "relative", minWidth: 0, minHeight: chartHeight }}>
               <ResponsiveContainer width="100%" height={chartHeight}>
                 <ComposedChart
                   key={`cf-${projectionCFData.length}-${projectionEvents.length}`}
@@ -1251,8 +1251,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       const d = payload[0]?.payload;
                       return (
                         <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", fontSize: 11, minWidth: 130 }}>
-                          <div style={{ fontWeight: 700, color: C.text, marginBottom: 5 }}>{d?.label}</div>
-                          <div style={{ color: C.muted }}>Balance: <span style={{ fontWeight: 700, color: C.text }}>{fmt(d?.balance)}</span></div>
+                          <div style={{ fontWeight: 500, color: C.text, marginBottom: 5 }}>{d?.label}</div>
+                          <div style={{ color: C.muted }}>Balance: <span style={{ fontWeight: 500, color: C.text }}>{fmt(d?.balance)}</span></div>
                           {d && <div style={{ color: "#10b981" }}>Inc: {fmt(d.income)}</div>}
                           {d && <div style={{ color: C.red }}>Exp: {fmt(d.expense)}</div>}
                         </div>
@@ -1294,7 +1294,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                 <TrendingUp size={12} style={{ color: "#10b981" }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
+                <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>SUMMARY</div>
                 <div style={{ fontSize: bodyTextSize, color: C.sub, lineHeight: 1.5 }}>
                   Cash balance moves from {fmt(displayCurrentCF)} → {fmt(displayFutureCF)} over {rangeLabel}.
                 </div>
@@ -1306,7 +1306,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
             <div style={{ padding: isMobile ? "12px 10px" : "16px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
               <CalendarDays size={16} style={{ color: C.muted }} />
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Monthly Breakdown</div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Monthly Breakdown</div>
             </div>
             <div style={{ maxHeight: 350, overflowY: "auto", overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: 12 }}>
@@ -1325,7 +1325,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.text, fontWeight: 500, whiteSpace: "nowrap", fontSize: isMobile ? 11 : 12 }}>{row.label}</td>
                       <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: "#10b981", textAlign: "right", fontWeight: 500, fontSize: isMobile ? 11 : 12 }}>{fmt(row.income)}</td>
                       <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.red, textAlign: "right", fontWeight: 500, fontSize: isMobile ? 11 : 12 }}>{fmt(row.expense)}</td>
-                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.text, textAlign: "right", fontWeight: 700, fontSize: isMobile ? 11 : 12 }}>{fmt(row.balance)}</td>
+                      <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.text, textAlign: "right", fontWeight: 500, fontSize: isMobile ? 11 : 12 }}>{fmt(row.balance)}</td>
                       <td style={{ padding: isMobile ? "8px 12px" : "10px 16px", color: C.sub, fontSize: isMobile ? 10 : 11 }}>
                         {row.events?.length > 0 ? row.events.join(", ") : "—"}
                       </td>
@@ -1339,9 +1339,10 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
           {/* ════ CATEGORY BREAKDOWN & MONTHLY AVG ════ */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 24 }}>
             <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: isMobile ? "16px 14px" : "20px 22px" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Monthly Avg (Last 3 Mo)</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Monthly Avg (Last 3 Mo)</div>
               {recent3.length === 0 ? <div style={{ color: C.muted, fontSize: 12 }}>Not enough data</div> : (
-                <ResponsiveContainer width="100%" height={180}>
+                <div style={{ minWidth: 0, minHeight: 180, width: "100%" }}>
+                  <ResponsiveContainer width="100%" height={180}>
                   <BarChart
                     data={recent3.map((m) => {
                       const [y, mo] = (m.month || "").split("-").map(Number);
@@ -1363,7 +1364,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                         if (!active || !payload?.length) return null;
                         return (
                           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", fontSize: 11, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
-                            <div style={{ fontWeight: 700, color: C.text, marginBottom: 4 }}>{payload[0].payload.label}</div>
+                            <div style={{ fontWeight: 500, color: C.text, marginBottom: 4 }}>{payload[0].payload.label}</div>
                             {payload.map((p, i) => (
                               <div key={i} style={{ color: p.fill, fontWeight: 600, display: "flex", justifyContent: "space-between", gap: 12 }}>
                                 <span>{p.name}:</span>
@@ -1377,12 +1378,13 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                     <Bar dataKey="income" name="Income" fill={"#10b981"} radius={[4, 4, 0, 0]} maxBarSize={32} />
                     <Bar dataKey="expense" name="Expense" fill={C.red} radius={[4, 4, 0, 0]} maxBarSize={32} />
                   </BarChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                </div>
               )}
             </div>
             
             <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: isMobile ? "16px 14px" : "20px 22px" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Next Month — by Category</div>
+              <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Next Month — by Category</div>
               {catBreakdown.length === 0 ? <div style={{ color: C.muted, fontSize: 12 }}>No expense data yet</div> : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {catBreakdown.map((c, i) => {
@@ -1418,7 +1420,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
               <>
                 <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden" }}>
                   <div style={{ padding: isMobile ? "10px" : "12px 18px 9px", borderBottom: `1px solid ${C.border}` }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.09em" }}>ASSETS FORECAST</div>
+                    <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.09em" }}>ASSETS FORECAST</div>
                   </div>
                   <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: isMobile ? 10.5 : 11.5, minWidth: isMobile ? 520 : 560 }}>
@@ -1433,9 +1435,9 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                       </thead>
                       <tbody>
                         <tr style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
-                          <td style={{ padding: isMobile ? "9px 10px" : "10px 16px", fontWeight: 700, color: C.text, fontSize: 11, position: "sticky", left: 0, background: C.bg, zIndex: 1 }}>↑ Assets</td>
+                          <td style={{ padding: isMobile ? "9px 10px" : "10px 16px", fontWeight: 500, color: C.text, fontSize: 11, position: "sticky", left: 0, background: C.bg, zIndex: 1 }}>↑ Assets</td>
                           {totalAssetVals.map((v, i) => (
-                            <td key={i} style={{ textAlign: "right", padding: isMobile ? "9px 8px" : "10px 12px", fontWeight: 700, color: "#10b981" }}>
+                            <td key={i} style={{ textAlign: "right", padding: isMobile ? "9px 8px" : "10px 12px", fontWeight: 500, color: "#10b981" }}>
                               {fmt(v)}{i > 0 && <span style={{ marginLeft: 2, fontSize: 9 }}>↗</span>}
                             </td>
                           ))}
@@ -1476,8 +1478,8 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                     const gain = projected12 - g.total;
                     return (
                       <div key={g.label} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: isMobile ? "10px" : "12px 14px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>{g.label}</div>
-                        <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: C.text, marginBottom: 2, letterSpacing: "-0.3px" }}>{fmt(g.total)}</div>
+                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>{g.label}</div>
+                        <div style={{ fontSize: isMobile ? 14 : 16, fontWeight: 500, color: C.text, marginBottom: 2, letterSpacing: "-0.3px" }}>{fmt(g.total)}</div>
                         <div style={{ fontSize: 10.5, color: "#10b981", fontWeight: 600 }}>→ {fmt(projected12)} in 12mo</div>
                         <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>+{fmt(gain)} ({(rate * 12 * 100).toFixed(1)}%/yr)</div>
                       </div>
@@ -1504,10 +1506,10 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
             {/* Modal header */}
             <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", background: C.white, borderBottom: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>
                   {modalTab === "events" ? "Financial events" : "Forecast assumptions"}
                 </span>
-                <div style={{ fontSize: 18, fontWeight: 700, color: C.text, letterSpacing: "-0.01em" }}>
+                <div style={{ fontSize: 18, fontWeight: 500, color: C.text, letterSpacing: "-0.01em" }}>
                   Add events or customize
                 </div>
               </div>
@@ -1546,7 +1548,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
                   {/* Your Events */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>Your events</p>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: C.text, margin: 0 }}>Your events</p>
                     <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
                       {draftEvents.length === 0 ? (
                         <div style={{ padding: "16px", fontSize: 12, color: C.muted, textAlign: "center", background: C.bg }}>
@@ -1683,7 +1685,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
                   {/* Add Event */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>Add event</p>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: C.text, margin: 0 }}>Add event</p>
                     <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
                       {eventTemplates.map((tpl, i) => (
                         <div
@@ -1755,14 +1757,14 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   <button
                     type="button"
                     onClick={() => { resetCustomizationsMutation.mutate(); setShowConfirmReset(false); }}
-                    style={{ padding: "4px 8px", background: C.red, color: "#fff", border: "none", borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                    style={{ padding: "4px 8px", background: C.red, color: "#fff", border: "none", borderRadius: 4, fontSize: 10, fontWeight: 500, cursor: "pointer" }}
                   >
                     Yes, reset
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowConfirmReset(false)}
-                    style={{ padding: "4px 8px", background: C.white, color: C.sub, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 10, fontWeight: 700, cursor: "pointer" }}
+                    style={{ padding: "4px 8px", background: C.white, color: C.sub, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 10, fontWeight: 500, cursor: "pointer" }}
                   >
                     Cancel
                   </button>
@@ -1789,7 +1791,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   type="button"
                   onClick={handleSaveSettings}
                   disabled={saveCustomizationsMutation.isPending}
-                  style={{ border: "none", background: C.strong, color: C.onStrong, borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                  style={{ border: "none", background: C.strong, color: C.onStrong, borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
                 >
                   {saveCustomizationsMutation.isPending ? "Saving..." : "Save"}
                 </button>
@@ -1804,7 +1806,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
           <div onClick={() => setIsAgePickerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />
           <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: C.white, border: `1px solid ${C.border}`, borderRadius: 20, padding: 24, width: "90%", maxWidth: 340, zIndex: 201, boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Forecast to Age</div>
+              <div style={{ fontSize: 16, fontWeight: 500, color: C.text }}>Forecast to Age</div>
               <button onClick={() => setIsAgePickerOpen(false)} style={{ border: "none", background: "none", cursor: "pointer", color: C.muted }}><X size={18} /></button>
             </div>
             
@@ -1818,7 +1820,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
                   onChange={(e) => setCustomAge(Math.max(1, Math.min(120, Number(e.target.value))))}
                   onKeyDown={(e) => { if (e.key === "Enter") setIsAgePickerOpen(false); }}
                   autoFocus
-                  style={{ width: "100%", border: "none", background: "transparent", fontSize: 18, fontWeight: 700, color: C.text, outline: "none" }}
+                  style={{ width: "100%", border: "none", background: "transparent", fontSize: 18, fontWeight: 500, color: C.text, outline: "none" }}
                 />
                 <span style={{ fontSize: 14, fontWeight: 600, color: C.muted }}>Years</span>
               </div>
@@ -1826,7 +1828,7 @@ function ForecastPage({ C, monthlyChart, apiTransactions, effectiveForecast, isM
 
             <button 
               onClick={() => setIsAgePickerOpen(false)}
-              style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: C.strong, color: C.onStrong, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+              style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: C.strong, color: C.onStrong, fontSize: 14, fontWeight: 500, cursor: "pointer" }}
             >
               Update Forecast
             </button>

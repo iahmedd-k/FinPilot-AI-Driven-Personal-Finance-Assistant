@@ -92,8 +92,47 @@ const updateTransactionCategory = async (req, res, next) => {
   }
 };
 
+const deleteTransactionCategory = async (req, res, next) => {
+  try {
+    const category = await TransactionCategory.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+
+    if (!category) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    const previousName = category.name;
+    const fallbackCategory = category.type === "income" ? "Other Income" : "Other Expense";
+
+    await Transaction.updateMany(
+      {
+        userId: req.user._id,
+        type: category.type,
+        category: previousName,
+      },
+      {
+        $set: { category: fallbackCategory },
+      }
+    );
+
+    await category.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      deletedId: String(req.params.id),
+      previousName,
+      fallbackCategory,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   listTransactionCategories,
   createTransactionCategory,
   updateTransactionCategory,
+  deleteTransactionCategory,
 };

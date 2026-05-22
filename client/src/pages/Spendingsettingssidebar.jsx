@@ -507,16 +507,17 @@ const MainScreen = ({ nav }) => {
 // 2. Manage Categories
 const CategoriesScreen = ({ nav }) => {
   const [search, setSearch] = useState("");
-  const { spendingSettings } = useDashboard();
+  const { spendingSettings, user } = useDashboard();
   const hiddenCategoryIds = spendingSettings?.categorySettings?.hiddenCategoryIds || [];
 
-  const { data: customCategories = [], isLoading: catLoading } = useQuery({
-    queryKey: ["custom-categories"],
-    queryFn: async () => {
-      const res = await transactionCategoryService.list();
-      return res.data?.categories || [];
-    },
+  const { data: categoryData, isLoading: catLoading } = useQuery({
+    queryKey: ["transaction-categories", user?._id],
+    queryFn: () => transactionCategoryService.list().then((r) => r.data),
+    enabled: !!user?._id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+  const customCategories = categoryData?.categories || [];
 
   const customExpenses = customCategories.filter((c) => c.type === "expense").map((c) => c.name);
   const customIncomes = customCategories.filter((c) => c.type === "income").map((c) => c.name);
@@ -534,7 +535,7 @@ const CategoriesScreen = ({ nav }) => {
         onMouseLeave={() => setHovered(false)}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "11px 16px", borderBottom: "1px solid var(--border-subtle)",
+          padding: "11px 16px",
           width: "100%", background: "none", border: "none", borderBottom: "1px solid var(--border-subtle)",
           cursor: "pointer", textAlign: "left", opacity: isHidden ? 0.5 : 1,
           backgroundColor: hovered ? "rgba(124,108,242,0.04)" : "transparent",
@@ -618,7 +619,7 @@ const NewCategoryScreen = ({ type, back }) => {
     setLoading(true);
     try {
       await transactionCategoryService.create({ name: catName.trim(), type });
-      queryClient.invalidateQueries({ queryKey: ["custom-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["transaction-categories"] });
       pushNotif("success", "Category created");
       back();
     } catch (err) {
@@ -654,9 +655,10 @@ const NewCategoryScreen = ({ type, back }) => {
 
 // 4. Edit Category
 const EditCategoryScreen = ({ category, back }) => {
-  const { spendingSettings, queryClient, pushNotif } = useDashboard();
+  const { spendingSettings, queryClient, pushNotif, user } = useDashboard();
   const info = getCategoryMeta(category);
-  const customCategories = queryClient.getQueryData(["custom-categories"]) || [];
+  const categoryData = queryClient.getQueryData(["transaction-categories", user?._id]);
+  const customCategories = categoryData?.categories || [];
   const customCat = customCategories.find((c) => c.name === category);
   const isCustom = !!customCat;
 
@@ -689,7 +691,9 @@ const EditCategoryScreen = ({ category, back }) => {
         categorySettings: { ...(spendingSettings.categorySettings || {}), hiddenCategoryIds: hiddenIds },
       });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["custom-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions-page"] });
+      queryClient.invalidateQueries({ queryKey: ["transaction-categories"] });
       pushNotif("success", "Category updated");
       back();
     } catch (err) {
@@ -703,7 +707,17 @@ const EditCategoryScreen = ({ category, back }) => {
     setDeleting(true);
     try {
       await transactionCategoryService.delete(customCat._id);
-      queryClient.invalidateQueries({ queryKey: ["custom-categories"] });
+      const currentHidden = spendingSettings?.categorySettings?.hiddenCategoryIds || [];
+      const nextHidden = currentHidden.filter((id) => id !== category);
+      if (spendingSettings && nextHidden.length !== currentHidden.length) {
+        await dashboardService.saveSpendingSettings({
+          ...spendingSettings,
+          categorySettings: { ...(spendingSettings.categorySettings || {}), hiddenCategoryIds: nextHidden },
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["transaction-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions-page"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       pushNotif("success", "Category deleted");
       back();
@@ -939,7 +953,7 @@ const ActionValueInput = ({ actionField, actionValue, setActionValue, saving, me
 };
 
 const CreateRuleScreen = ({ back }) => {
-  const { spendingSettings, queryClient, pushNotif, apiTransactions = [] } = useDashboard();
+  const { spendingSettings, queryClient, pushNotif, apiTransactions = [], user } = useDashboard();
   const [ruleName, setRuleName] = useState("");
   const [condField, setCondField] = useState("merchant");
   const [condOperator, setCondOperator] = useState("contains");
@@ -953,10 +967,14 @@ const CreateRuleScreen = ({ back }) => {
     [apiTransactions]
   );
 
-  const { data: customCategories = [] } = useQuery({
-    queryKey: ["custom-categories"],
-    queryFn: () => transactionCategoryService.list().then((r) => r.data?.categories || []),
+  const { data: categoryData } = useQuery({
+    queryKey: ["transaction-categories", user?._id],
+    queryFn: () => transactionCategoryService.list().then((r) => r.data),
+    enabled: !!user?._id,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+  const customCategories = categoryData?.categories || [];
 
   const mergedCategories = useMemo(
     () => [...EXPENSE_CATS, ...INCOME_CATS, ...customCategories.map((c) => c.name)],

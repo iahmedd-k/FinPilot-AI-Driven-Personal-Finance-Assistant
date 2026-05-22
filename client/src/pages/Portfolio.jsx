@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { ROUTES } from "../constants/routes";
 import { usePortfolio } from "../context/PortfolioContext";
 import { useAuthContext } from "../hooks/useAuthContext";
 import { cryptoService } from "../services/cryptoService";
@@ -80,81 +81,61 @@ const isCryptoAsset  = (a) => a?.assetType === "crypto";
 const isEquityAsset  = (a) => a?.assetType === "equity";
 const getAssetName   = (a) => isCryptoAsset(a) ? (a.coin?.charAt(0).toUpperCase() + a.coin?.slice(1)) : a.name;
 const getAssetCost   = (a) => {
-  if (isCryptoAsset(a) || isEquityAsset(a)) return a.totalCost ?? ((a.buyPrice || 0) * (a.quantity || 0));
-  return a.buyingPrice || 0;
+  if (isCryptoAsset(a) || isEquityAsset(a)) {
+    // For crypto/equity, calculate from buyPrice * quantity for accuracy
+    const calc = (Number(a.buyPrice) || 0) * (Number(a.quantity) || 0);
+    // Only use totalCost as fallback if calculated cost is 0
+    return calc > 0 ? calc : (Number(a.totalCost) || 0);
+  }
+  return Number(a.buyingPrice) || 0;
 };
-const getAssetValue  = (a) => a.currentValue || 0;
+const getAssetValue  = (a) => {
+  // For crypto: the API already calculates currentValue with real prices from CoinGecko
+  // Just use that value directly - don't recalculate
+  if (isCryptoAsset(a)) {
+    return Number(a.currentValue) || 0;
+  }
+  // For equity: also trust the API's currentValue calculation
+  if (isEquityAsset(a)) {
+    const cvSet = Number(a.currentValue) || 0;
+    if (cvSet > 0) return cvSet;
+    // If not set, calculate from currentPrice if available
+    if (a.currentPrice != null && Number(a.currentPrice) > 0) {
+      return (Number(a.currentPrice) || 0) * (Number(a.quantity) || 0);
+    }
+    return 0;
+  }
+  // For other assets, use currentValue if available
+  const val = Number(a.currentValue) || 0;
+  if (val > 0) return val;
+  return 0;
+};
 const getAssetGain   = (a) => {
-  if (a.gainLoss !== undefined && a.gainLoss !== null) return a.gainLoss;
-  return getAssetValue(a) - getAssetCost(a);
+  const val = getAssetValue(a);
+  const cost = getAssetCost(a);
+  if (val === 0 && (Number(a.currentPrice) || 0) === 0) return null; // API missing data
+  if (a.gainLoss != null && Number(a.gainLoss) !== 0) return Number(a.gainLoss);
+  return val - cost;
 };
 const getAssetGainPct = (a) => {
   const cost = getAssetCost(a);
   const gain = getAssetGain(a);
+  if (gain == null) return null;
   return cost > 0 ? (gain / cost) * 100 : null;
 };
 const getUnitLabel = (a) => isEquityAsset(a) ? "share" : "coin";
 
 /* ── Currency formatter — baseline-aligned symbol ──────────── */
 const makeFmt = (code) => {
-  const renderParts = (value, opts = {}) => {
-    const amount = Number(value ?? 0);
+  const fmt = (n, d = 2) => {
+    const amount = Number(n ?? 0);
     const safeAmount = Number.isFinite(amount) ? amount : 0;
-    try {
-      const nf = new Intl.NumberFormat("en-US", {
-        style: "currency", currency: code,
-        currencyDisplay: "narrowSymbol", ...opts,
-      });
-      const parts = nf.formatToParts(safeAmount);
-      return (
-        <span style={{ whiteSpace: "nowrap", display: "inline-flex", alignItems: "baseline", gap: "1px" }}>
-          {parts.map((p, i) => {
-            if (p.type === "currency") {
-              return (
-                <span
-                  key={i}
-                  className="currency-symbol"
-                  style={{
-                    fontSize: "0.78em",
-                    lineHeight: 1,
-                    color: "var(--text-secondary)",
-                    display: "inline",
-                    verticalAlign: "baseline",
-                    marginRight: "1px",
-                  }}
-                >
-                  {p.value}
-                </span>
-              );
-            }
-            if (p.type === "literal") return <span key={i}>{p.value}</span>;
-            return (
-              <span
-                key={i}
-                className="currency-number"
-                style={{ fontVariantNumeric: "tabular-nums", lineHeight: 1 }}
-              >
-                {p.value}
-              </span>
-            );
-          })}
-        </span>
-      );
-    } catch {
-      return formatCurrencyAmount(safeAmount, code, opts);
-    }
+    return formatCurrencyAmount(safeAmount, code, { minimumFractionDigits: d, maximumFractionDigits: d });
   };
-
-  const fmt = (n, d = 2) =>
-    renderParts(Number(n ?? 0), { minimumFractionDigits: d, maximumFractionDigits: d });
-
   const fmtC = (n) => {
-    const abs = Math.abs(n ?? 0);
-    if (abs >= 1_000_000)
-      return <>{renderParts(abs / 1_000_000, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M</>;
-    if (abs >= 1_000)
-      return <>{renderParts(abs / 1_000, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k</>;
-    return fmt(abs);
+    const amount = Number(n ?? 0);
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    return formatCurrencyAmount(safeAmount, code, { notation: "compact", compactDisplay: "short", maximumFractionDigits: 1 });
   };
   return { fmt, fmtC };
 };
@@ -447,7 +428,7 @@ function AssetModal({ initial, onSave, onClose, loading, isEdit, currencyCode })
         onClick={() => !assetSaving && onClose()}
       >
         <div
-          style={{ background: C.white, borderRadius: 20, border: `0.5px solid ${C.border}`, boxShadow: "0 24px 60px rgba(0,0,0,0.20)", maxWidth: 560, width: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}
+          style={{ background: C.white, borderRadius: 20, border: `0.5px solid ${C.border}`, boxShadow: "0 24px 60px rgba(0,0,0,0.20)", maxWidth: 560, width: "100%", maxHeight: "60vh", overflow: "hidden", display: "flex", flexDirection: "column" }}
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ padding: "20px 24px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid ${C.border2}` }}>
@@ -466,7 +447,7 @@ function AssetModal({ initial, onSave, onClose, loading, isEdit, currencyCode })
 
           <div style={{ padding: "18px 20px 20px", flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             {step === "type" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, overflowY: "auto", paddingRight: 4 }}>
                 <p style={{ fontSize: 12, fontWeight: 500, color: C.sub, marginBottom: 6 }}>Choose an asset type</p>
                 {CREATABLE_ASSET_TYPES.map((t) => {
                   const Icon = t.icon;
@@ -585,8 +566,7 @@ function AssetCard({ a, onEdit, onDelete, fmt, fmtC, navigate, user }) {
 
   return (
     <div
-      onClick={() => { if (isEquity) { if (!user?.isPro) { navigate(ROUTES.SUBSCRIPTION); return; } navigate("/dashboard?nav=equity"); } }}
-      style={{ background: C.white, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, cursor: isEquity ? "pointer" : "default" }}
+      style={{ background: C.white, border: `0.5px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, cursor: "default" }}
     >
       {/* Top row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -1014,8 +994,7 @@ export default function Portfolio({ isMobile: isMobileProp }) {
                     const cfg      = getTC(a.assetType);
                     return (
                       <tr key={a._id} className="pf-tr"
-                        style={{ borderBottom: `0.5px solid ${C.border2}`, transition: "background 0.1s", cursor: isEquity ? "pointer" : "default" }}
-                        onClick={() => { if (isEquity) { if (!user?.isPro) { navigate(ROUTES.SUBSCRIPTION); return; } navigate("/dashboard?nav=equity"); } }}
+                        style={{ borderBottom: `0.5px solid ${C.border2}`, transition: "background 0.1s", cursor: "default" }}
                       >
                         {/* Asset name */}
                         <td style={{ padding: "13px 16px" }}>
