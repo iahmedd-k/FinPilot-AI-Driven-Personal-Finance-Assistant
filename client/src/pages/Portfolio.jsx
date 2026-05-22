@@ -723,6 +723,7 @@ export default function Portfolio({ isMobile: isMobileProp }) {
       const valueIdx = getIdx("currentvalue", "current_value", "value");
       const symIdx   = getIdx("symbol", "ticker");
       const qtyIdx   = getIdx("quantity", "qty", "shares");
+      const includeIdx = getIdx("includeinnetworth", "include_in_net_worth", "showinnetworth", "show_in_net_worth", "includeinnetworth");
       if (typeIdx == null || nameIdx == null || priceIdx == null) { toast.error("CSV needs assetType, name, and buyingPrice columns."); return; }
       setSaving(true);
       let imported = 0;
@@ -732,12 +733,14 @@ export default function Portfolio({ isMobile: isMobileProp }) {
           const assetType = (cols[typeIdx] || "cash").toLowerCase();
           const buyingPrice = Number(cols[priceIdx]);
           const currentValue = valueIdx != null && cols[valueIdx] ? Number(cols[valueIdx]) : buyingPrice;
+          const includeValue = includeIdx != null ? String(cols[includeIdx] || "").trim().toLowerCase() : "";
+          const includeInNetWorth = includeIdx == null ? true : !["false", "0", "no", "off"].includes(includeValue);
           if (!assetType || !cols[nameIdx] || !Number.isFinite(buyingPrice)) continue;
           const payload = assetType === "crypto"
-            ? { assetType, coin: cols[nameIdx].toLowerCase(), symbol: (cols[symIdx] || cols[nameIdx]).toUpperCase(), quantity: Number(cols[qtyIdx] || 1), buyPrice: buyingPrice, currentValue }
+            ? { assetType, coin: cols[nameIdx].toLowerCase(), symbol: (cols[symIdx] || cols[nameIdx]).toUpperCase(), quantity: Number(cols[qtyIdx] || 1), buyPrice: buyingPrice, currentValue, includeInNetWorth }
             : assetType === "equity"
-              ? { assetType, name: cols[nameIdx], ticker: (cols[symIdx] || "").toUpperCase(), quantity: Number(cols[qtyIdx] || 1), buyPrice: buyingPrice, currentValue }
-              : { assetType, name: cols[nameIdx], buyingPrice, currentValue };
+              ? { assetType, name: cols[nameIdx], ticker: (cols[symIdx] || "").toUpperCase(), quantity: Number(cols[qtyIdx] || 1), buyPrice: buyingPrice, currentValue, includeInNetWorth }
+              : { assetType, name: cols[nameIdx], buyingPrice, currentValue, includeInNetWorth };
           await cryptoService.add(payload);
           imported += 1;
         }

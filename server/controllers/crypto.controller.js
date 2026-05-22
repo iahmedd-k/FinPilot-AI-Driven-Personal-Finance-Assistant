@@ -143,6 +143,7 @@ exports.addCryptoAsset = async (req, res, next) => {
         quantity: Number(quantity),
         buyPrice: Number(buyPrice),
         buyDate: buyDate || new Date(),
+        includeInNetWorth: req.body.includeInNetWorth !== undefined ? Boolean(req.body.includeInNetWorth) : true,
         notes: notes || "",
       });
     } else if (assetType === "equity") {
@@ -171,6 +172,7 @@ exports.addCryptoAsset = async (req, res, next) => {
         assetType,
         name: String(name).trim(),
         buyingPrice: toNumber(buyingPrice),
+        includeInNetWorth: req.body.includeInNetWorth !== undefined ? Boolean(req.body.includeInNetWorth) : true,
         currentValue: hasValue(req.body.currentValue) ? toNumber(req.body.currentValue) : toNumber(buyingPrice),
         notes: notes || "",
       });
@@ -267,22 +269,24 @@ exports.updateCryptoAsset = async (req, res, next) => {
     if (existing.assetType === "crypto") {
       const { coin, symbol, quantity, buyPrice, buyDate, notes } = req.body;
       updateFields = {
-        coin:     coin     ? String(coin).trim().toLowerCase()   : existing.coin,
-        symbol:   symbol   ? String(symbol).trim().toUpperCase() : existing.symbol,
-        quantity: hasValue(quantity) ? toNumber(quantity) : existing.quantity,
-        buyPrice: hasValue(buyPrice) ? toNumber(buyPrice) : existing.buyPrice,
-        buyDate:  buyDate  || existing.buyDate,
-        notes:    notes !== undefined ? notes : existing.notes,
+        coin:             coin     ? String(coin).trim().toLowerCase()   : existing.coin,
+        symbol:           symbol   ? String(symbol).trim().toUpperCase() : existing.symbol,
+        quantity:         hasValue(quantity) ? toNumber(quantity) : existing.quantity,
+        buyPrice:         hasValue(buyPrice) ? toNumber(buyPrice) : existing.buyPrice,
+        buyDate:          buyDate  || existing.buyDate,
+        includeInNetWorth: req.body.includeInNetWorth !== undefined ? Boolean(req.body.includeInNetWorth) : existing.includeInNetWorth,
+        notes:            notes !== undefined ? notes : existing.notes,
       };
     } else if (existing.assetType === "equity") {
       updateFields = buildEquityPayload(req.body, existing);
     } else {
       const { name, buyingPrice, currentValue, notes } = req.body;
       updateFields = {
-        name:         name         ? String(name).trim()    : existing.name,
-        buyingPrice:  hasValue(buyingPrice) ? toNumber(buyingPrice) : existing.buyingPrice,
-        currentValue: currentValue !== undefined ? toNumber(currentValue) : existing.currentValue,
-        notes:        notes !== undefined ? notes : existing.notes,
+        name:             name         ? String(name).trim() : existing.name,
+        buyingPrice:      hasValue(buyingPrice) ? toNumber(buyingPrice) : existing.buyingPrice,
+        currentValue:     currentValue !== undefined ? toNumber(currentValue) : existing.currentValue,
+        includeInNetWorth: req.body.includeInNetWorth !== undefined ? Boolean(req.body.includeInNetWorth) : existing.includeInNetWorth,
+        notes:            notes !== undefined ? notes : existing.notes,
       };
     }
 

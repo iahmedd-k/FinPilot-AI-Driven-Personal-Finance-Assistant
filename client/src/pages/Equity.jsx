@@ -3583,6 +3583,20 @@ export default function Equity() {
           background: var(--bg-card);
           border: 1px solid var(--border-default);
           border-radius: 12px;
+          overflow: hidden;
+          min-width: 0;
+        }
+        .eq-card > * {
+          min-width: 0;
+        }
+        .eq-card p,
+        .eq-card span,
+        .eq-card div,
+        .eq-card button,
+        .eq-card input,
+        .eq-card select {
+          overflow-wrap: break-word;
+          word-break: break-word;
         }
         /* Scrollbar */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -3994,7 +4008,7 @@ export default function Equity() {
             </div>
 
             {/* Vesting chart */}
-            <div className="eq-card" style={{ overflow: "hidden" }}>
+            <div className="eq-card" style={{ overflow: "visible" }}>
               <div
                 style={{
                   padding: "14px 18px 12px",
@@ -4053,7 +4067,7 @@ export default function Equity() {
                   </div>
                 </div>
               </div>
-              <div style={{ padding: "12px 8px 8px" }}>
+              <div style={{ padding: "12px 8px 8px", overflow: "visible" }}>
                 <div style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 12, marginBottom: 4, fontWeight: 500, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   Shares
                 </div>
@@ -4061,7 +4075,7 @@ export default function Equity() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
-                      margin={{ top: 8, right: 16, left: -10, bottom: 10 }}
+                      margin={{ top: 10, right: 22, left: 6, bottom: 18 }}
                     >
                       <defs>
                         <linearGradient
