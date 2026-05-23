@@ -428,7 +428,7 @@ function AssetModal({ initial, onSave, onClose, loading, isEdit, currencyCode })
         onClick={() => !assetSaving && onClose()}
       >
         <div
-          style={{ background: C.white, borderRadius: 20, border: `0.5px solid ${C.border}`, boxShadow: "0 24px 60px rgba(0,0,0,0.20)", maxWidth: 560, width: "100%", maxHeight: "60vh", overflow: "hidden", display: "flex", flexDirection: "column" }}
+          style={{ background: C.white, borderRadius: 20, border: `0.5px solid ${C.border}`, boxShadow: "0 24px 60px rgba(0,0,0,0.20)", maxWidth: 560, width: "100%", maxHeight: "72vh", overflow: "hidden", display: "flex", flexDirection: "column" }}
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ padding: "20px 24px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid ${C.border2}` }}>

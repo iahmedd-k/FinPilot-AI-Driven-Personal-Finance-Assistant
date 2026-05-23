@@ -46,6 +46,7 @@ import SpendingBreakdownTab from "./spending/BreakdownTab";
 import SpendingTransactionsPage from "./spending/TransactionsPage";
 import SpendingReportsTab from "./spending/ReportsTab";
 import SpendingRecurringTab from "./spending/RecurringTab";
+import CalendarPicker from "../../common/CalendarPicker";
 
 // ── Mobile hook ───────────────────────────────────────────────
 function useIsMobile(breakpoint = 640) {
@@ -413,9 +414,7 @@ function SpendingPage({
       closeAdd();
       setSpendTab("transactions");
     } catch (e) {
-      dedupToast.error(
-        e?.response?.data?.message || "Failed to add transaction"
-      );
+      dedupToast.error(e?.response?.data?.message || "Failed to add transaction");
     } finally {
       setFormLoading(false);
     }
@@ -430,7 +429,9 @@ function SpendingPage({
     const rows = lines
       .slice(1)
       .map((line) => {
-        const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+        const cols = line
+          .split(",")
+          .map((c) => c.trim().replace(/^"|"$/g, ""));
         const obj = {};
         headers.forEach((h, i) => {
           obj[h] = cols[i] || "";
@@ -458,14 +459,7 @@ function SpendingPage({
       const autoMap = {};
       const fieldAliases = {
         date: ["date", "time", "datetime", "transaction date", "trans date"],
-        merchant: [
-          "merchant",
-          "description",
-          "name",
-          "payee",
-          "vendor",
-          "memo",
-        ],
+        merchant: ["merchant", "description", "name", "payee", "vendor", "memo"],
         amount: ["amount", "sum", "total", "value", "debit", "credit"],
         type: ["type", "transaction type", "kind"],
         category: ["category", "cat", "label", "tag"],
@@ -474,8 +468,9 @@ function SpendingPage({
       headers.forEach((h) => {
         const hl = h.toLowerCase();
         Object.entries(fieldAliases).forEach(([field, aliases]) => {
-          if (!autoMap[field] && aliases.some((a) => hl.includes(a)))
+          if (!autoMap[field] && aliases.some((a) => hl.includes(a))) {
             autoMap[field] = h;
+          }
         });
       });
       setCsvMapping(autoMap);
@@ -1290,397 +1285,5 @@ function formatDateInputValue(date) {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
-
-function CalendarPicker({ C, value, onChange, minDate }) {
-  const [open, setOpen] = useState(false);
-  const [popupStyle, setPopupStyle] = useState(null);
-  const [viewMonth, setViewMonth] = useState(() => {
-    const date = parseDateInputValue(value) || new Date();
-    return new Date(date.getFullYear(), date.getMonth(), 1);
-  });
-  const wrapperRef = useRef(null);
-  const popupRef = useRef(null);
-
-  useEffect(() => {
-    const date = parseDateInputValue(value) || new Date();
-    date.setDate(1);
-    setViewMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-  }, [value]);
-
-  useEffect(() => {
-    const handle = (event) => {
-      if (!open) return;
-      const target = event.target;
-      const insideTrigger = wrapperRef.current?.contains(target);
-      const insidePopup = popupRef.current?.contains(target);
-      if (!insideTrigger && !insidePopup) setOpen(false);
-    };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const updatePopupPosition = () => {
-      if (!wrapperRef.current) return;
-      const rect = wrapperRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const width = Math.max(
-        260,
-        Math.min(Math.max(280, rect.width), viewportWidth - 24)
-      );
-      const estimatedHeight = 332;
-      const roomBelow = window.innerHeight - rect.bottom;
-      const roomAbove = rect.top;
-      const top =
-        roomBelow >= estimatedHeight || roomBelow >= roomAbove
-          ? rect.bottom + 8
-          : rect.top - estimatedHeight - 8;
-      const left = Math.min(
-        window.innerWidth - width - 12,
-        Math.max(12, rect.left)
-      );
-      setPopupStyle({
-        position: "fixed",
-        top: Math.max(12, top),
-        left,
-        width,
-      });
-    };
-    updatePopupPosition();
-    window.addEventListener("resize", updatePopupPosition);
-    window.addEventListener("scroll", updatePopupPosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePopupPosition);
-      window.removeEventListener("scroll", updatePopupPosition, true);
-    };
-  }, [open]);
-
-  const monthLabel = viewMonth.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-  const selectedDate = parseDateInputValue(value);
-  const minimumDate = parseDateInputValue(minDate);
-  if (minimumDate) minimumDate.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const displayText = selectedDate
-    ? selectedDate.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-    : "Select date";
-
-  const startDay = new Date(
-    viewMonth.getFullYear(),
-    viewMonth.getMonth(),
-    1
-  ).getDay();
-  const calendarStart = new Date(
-    viewMonth.getFullYear(),
-    viewMonth.getMonth(),
-    1 - startDay
-  );
-  const cells = Array.from({ length: 42 }, (_, index) => {
-    const cellDate = new Date(calendarStart);
-    cellDate.setDate(calendarStart.getDate() + index);
-    return {
-      key: formatDateInputValue(cellDate),
-      date: cellDate,
-      day: cellDate.getDate(),
-      isCurrentMonth:
-        cellDate.getMonth() === viewMonth.getMonth() &&
-        cellDate.getFullYear() === viewMonth.getFullYear(),
-    };
-  });
-
-  const handleSelect = (next) => {
-    if (!next) return;
-    if (minimumDate && next < minimumDate) return;
-    onChange(formatDateInputValue(next));
-    if (
-      next.getMonth() !== viewMonth.getMonth() ||
-      next.getFullYear() !== viewMonth.getFullYear()
-    ) {
-      setViewMonth(new Date(next.getFullYear(), next.getMonth(), 1));
-    }
-    setOpen(false);
-  };
-
-  return (
-    <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        style={{
-          width: "100%",
-          minHeight: 42,
-          border: `1px solid ${C.border}`,
-          borderRadius: 12,
-          padding: "0 12px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-          background: "var(--bg-card)",
-          color: C.text,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          boxSizing: "border-box",
-          transition: "border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease",
-          boxShadow: open ? "0 10px 24px rgba(0,0,0,0.08)" : "0 1px 0 rgba(0,0,0,0.02)",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            letterSpacing: "-0.01em",
-          }}
-        >
-          {displayText}
-        </span>
-        <ChevronDown
-          size={16}
-          color="var(--text-secondary)"
-          style={{
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.15s ease",
-            flexShrink: 0,
-          }}
-        />
-      </button>
-      {open &&
-        popupStyle &&
-        createPortal(
-          <div
-            ref={popupRef}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              ...popupStyle,
-              padding: 14,
-              borderRadius: 20,
-              border: `1px solid ${C.border}`,
-              boxShadow: "0 28px 72px rgba(0,0,0,0.22)",
-              background: "var(--bg-card)",
-              zIndex: 10001,
-              boxSizing: "border-box",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: 12,
-                marginBottom: 14,
-              }}
-            >
-              <div style={{ display: "grid", gap: 4 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.16em" }}>Calendar</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.02em" }}>{monthLabel}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => setViewMonth(new Date(today.getFullYear(), today.getMonth(), 1))}
-                  style={{
-                    height: 28,
-                    borderRadius: 999,
-                    border: `1px solid ${C.border}`,
-                    background: "var(--bg-card)",
-                    padding: "0 10px",
-                    cursor: "pointer",
-                    color: C.text,
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setViewMonth(
-                      (prev) =>
-                        new Date(
-                          prev.getFullYear(),
-                          prev.getMonth() - 1,
-                          1
-                        )
-                    )
-                  }
-                  style={{
-                    width: 30,
-                    height: 30,
-                    border: `1px solid ${C.border}`,
-                    background: "var(--bg-card)",
-                    boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
-                    padding: 0,
-                    cursor: "pointer",
-                    color: C.text,
-                    borderRadius: 999,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setViewMonth(
-                      (prev) =>
-                        new Date(
-                          prev.getFullYear(),
-                          prev.getMonth() + 1,
-                          1
-                        )
-                    )
-                  }
-                  style={{
-                    width: 30,
-                    height: 30,
-                    border: `1px solid ${C.border}`,
-                    background: "var(--bg-card)",
-                    boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
-                    padding: 0,
-                    cursor: "pointer",
-                    color: C.text,
-                    borderRadius: 999,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                fontSize: 10.5,
-                color: C.muted,
-                textAlign: "center",
-                marginBottom: 8,
-              }}
-            >
-              {WEEKDAYS.map((day) => (
-                <div
-                  key={day}
-                  style={{
-                    padding: "6px 0 10px",
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {day[0]}
-                </div>
-              ))}
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-                gap: 6,
-              }}
-            >
-              {cells.map((cell) => {
-                const dateForCell = cell.date;
-                const isDisabled =
-                  minimumDate && dateForCell < minimumDate;
-                const isSelected =
-                  selectedDate &&
-                  selectedDate.getFullYear() ===
-                  dateForCell.getFullYear() &&
-                  selectedDate.getMonth() === dateForCell.getMonth() &&
-                  selectedDate.getDate() === dateForCell.getDate();
-                const isToday =
-                  dateForCell.getTime() === today.getTime();
-                const isOutsideMonth = !cell.isCurrentMonth;
-                return (
-                  <button
-                    key={cell.key}
-                    type="button"
-                    onClick={() => handleSelect(dateForCell)}
-                    disabled={isDisabled}
-                    style={{
-                      height: 38,
-                      width: "100%",
-                      maxWidth: 38,
-                      margin: "0 auto",
-                      borderRadius: 12,
-                      border: isSelected
-                        ? `1px solid var(--surface-strong)`
-                        : isToday
-                          ? `1px solid ${C.border}`
-                          : "1px solid transparent",
-                      background: isSelected
-                        ? "var(--surface-strong)"
-                        : isToday
-                          ? `color-mix(in srgb, var(--surface-strong) 6%, transparent)`
-                          : "transparent",
-                      color: isDisabled
-                        ? C.muted
-                        : isSelected
-                          ? "var(--text-on-strong)"
-                          : isOutsideMonth
-                            ? C.muted
-                            : C.text,
-                      cursor: isDisabled ? "default" : "pointer",
-                      opacity: isDisabled
-                        ? 0.35
-                        : isOutsideMonth && !isSelected
-                          ? 0.7
-                          : 1,
-                      fontSize: 12.5,
-                      fontWeight: isSelected ? 700 : 600,
-                      lineHeight: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxSizing: "border-box",
-                      boxShadow: isSelected ? "0 10px 24px rgba(17,17,17,0.18)" : isToday ? "inset 0 0 0 1px color-mix(in srgb, var(--surface-strong) 18%, transparent)" : "none",
-                      transition:
-                        "background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease",
-                      transform: isSelected ? "translateY(-1px)" : "none",
-                    }}
-                  >
-                    {cell.day}
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div style={{ fontSize: 11.5, color: C.muted }}>
-                {selectedDate ? `Selected: ${displayText}` : "Pick a date to continue"}
-              </div>
-              {minimumDate && (
-                <div style={{ fontSize: 11.5, color: C.muted }}>Earliest allowed: {minimumDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-              )}
-            </div>
-          </div>,
-          document.body
-        )}
-    </div>
-  );
-}
-
-export {
-  SpendingPage,
-  CalendarPicker,
-  parseDateInputValue,
-  formatDateInputValue,
-};
+// Re-export helpers and CalendarPicker (now implemented in ../common)
+export { SpendingPage, CalendarPicker, parseDateInputValue, formatDateInputValue };

@@ -12,6 +12,7 @@ import {
 import { transactionCategoryService } from "../../services/transactionCategoryService";
 import { formatCurrencyAmount, getUserCurrency } from "../../utils/currency";
 import { useQuery } from "@tanstack/react-query";
+import CalendarPicker from "../common/CalendarPicker";
 
 // ─── small primitives ──────────────────────────────────────────────────────────
 
@@ -474,14 +475,7 @@ export default function TransactionDetailSidebar() {
 
           {/* Date */}
           <FormField label="Date">
-            <input
-              style={inputStyle}
-              type="date"
-              value={draft.date}
-              onChange={e => setDraft(d => ({ ...d, date: e.target.value }))}
-              onFocus={e => e.target.style.borderColor = C.text}
-              onBlur={e => e.target.style.borderColor = C.border}
-            />
+            <CalendarPicker C={C} value={draft.date} onChange={(v) => setDraft(d => ({ ...d, date: v }))} minDate={null} />
           </FormField>
 
           {/* Category */}
