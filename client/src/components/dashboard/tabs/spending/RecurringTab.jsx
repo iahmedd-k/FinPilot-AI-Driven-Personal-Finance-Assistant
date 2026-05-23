@@ -75,7 +75,7 @@ function Toggle({ checked, onClick, C }) {
   );
 }
 
-export default function RecurringTab({ C, apiTransactions = [], openAdd, transactionService, queryClient, pushNotif, refreshUser, txLimitReached, preferredCurrency: preferredCurrencyProp, spendingSettings, isMobile }) {
+export default function RecurringTab({ C, apiTransactions = [], openAdd, transactionService, queryClient, pushNotif, refreshUser, txLimitReached, preferredCurrency: preferredCurrencyProp, spendingSettings, isMobile, setGlobalSelectedTxId }) {
   const { user } = useAuthContext();
   const preferredCurrency = preferredCurrencyProp || getUserCurrency(user);
   const recurringSettings = spendingSettings?.recurringSettings || {};
@@ -293,19 +293,25 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                 }
 
                 return (
-                  <div key={i} style={{
-                    height: isMobile ? 44 : 64,
-                    padding: isMobile ? 4 : 8,
-                    borderRadius: isMobile ? 10 : 14,
-                    background: bg,
-                    border,
-                    boxShadow: shadow,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    opacity: day.currentMonth ? 1 : 0.3,
-                    transition: "all 0.2s"
-                  }}>
+                  <div
+                    key={i}
+                    role={day.currentMonth && hasAny ? "button" : undefined}
+                    onClick={day.currentMonth && hasAny ? () => setGlobalSelectedTxId?.(day.occurrences?.[0]?._id || day.occurrences?.[0]?.id) : undefined}
+                    style={{
+                      height: isMobile ? 44 : 64,
+                      padding: isMobile ? 4 : 8,
+                      borderRadius: isMobile ? 10 : 14,
+                      background: bg,
+                      border,
+                      boxShadow: shadow,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      opacity: day.currentMonth ? 1 : 0.3,
+                      transition: "all 0.2s",
+                      cursor: day.currentMonth && hasAny ? "pointer" : "default"
+                    }}
+                  >
                     <div style={{ fontSize: isMobile ? 11 : 12, fontWeight: hasAny && day.currentMonth ? 700 : 500, color: dayNumColor }}>
                       {day.day}
                     </div>
@@ -442,19 +448,27 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
               
             </div>
             <div style={{ maxHeight: 300, overflowY: "auto" }}>
-              {monthData.occurrences.filter(o => o.date >= new Date(new Date().setHours(0,0,0,0))).length === 0 ? (
-                <div style={{ padding: "32px 20px", textAlign: "center", color: C.muted, fontSize: 13 }}>
-                  No upcoming items
-                </div>
-              ) : (
-                monthData.occurrences.filter(o => o.date >= new Date(new Date().setHours(0,0,0,0))).map((occ, idx) => (
-                  <div key={idx} style={{ 
-                    padding: "12px 20px", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    gap: 12,
-                    borderBottom: idx < monthData.occurrences.length - 1 ? `1px solid ${C.border2}` : "none"
-                  }}>
+              {(() => {
+                const upcomingOccurrences = monthData.occurrences.filter(o => o.date >= new Date(new Date().setHours(0,0,0,0)));
+                return upcomingOccurrences.length === 0 ? (
+                  <div style={{ padding: "32px 20px", textAlign: "center", color: C.muted, fontSize: 13 }}>
+                    No upcoming items
+                  </div>
+                ) : (
+                  upcomingOccurrences.map((occ, idx) => (
+                    <div
+                      key={idx}
+                      role="button"
+                      onClick={() => setGlobalSelectedTxId?.(occ._id || occ.id)}
+                      style={{ 
+                        padding: "12px 20px", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: 12,
+                        borderBottom: idx < upcomingOccurrences.length - 1 ? `1px solid ${C.border2}` : "none",
+                        cursor: "pointer"
+                      }}
+                    >
                     <div style={{ 
                       width: 32, 
                       height: 32, 
@@ -525,7 +539,8 @@ export default function RecurringTab({ C, apiTransactions = [], openAdd, transac
                     </div>
                   </div>
                 ))
-              )}
+              );
+            })()}
             </div>
             <div style={{ padding: 16, borderTop: `1px solid ${C.border2}` }}>
               <button 

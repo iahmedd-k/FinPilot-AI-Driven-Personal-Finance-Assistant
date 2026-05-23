@@ -24,7 +24,7 @@ function FieldRow({ label, value, last }) {
     }}>
       <span style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{label}</span>
       <span style={{ fontSize: 13, color: C.text, fontWeight: 500, textAlign: "right", maxWidth: "60%", fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}>
-        {value || <span style={{ color: C.muted }}>—</span>}
+        {value || <span style={{ color: C.muted }}>ï¿½</span>}
       </span>
     </div>
   );
@@ -85,7 +85,16 @@ export default function TransactionDetailSidebar() {
   const customCategoryRecords = categoryData?.categories || [];
 
   const tx = useMemo(
-    () => apiTransactions.find(t => t._id === globalSelectedTxId),
+    () => {
+      if (!globalSelectedTxId) return null;
+      // Accept either a raw id string/number or an occurrence object containing _id or id
+      let sel = globalSelectedTxId;
+      if (typeof sel === "object" && sel !== null) {
+        sel = sel._id || sel.id || null;
+      }
+      if (!sel) return null;
+      return apiTransactions.find(t => t._id === sel || t.id === sel);
+    },
     [apiTransactions, globalSelectedTxId]
   );
 
@@ -355,7 +364,7 @@ export default function TransactionDetailSidebar() {
             </div>
           </div>
 
-          {/* category pill — read only */}
+          {/* category pill ï¿½ read only */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 8,

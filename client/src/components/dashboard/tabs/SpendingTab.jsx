@@ -1188,12 +1188,12 @@ function SpendingPage({
           navigate={navigate}
           thisSpend={thisSpend}
           thisMonthData={thisMonthData}
-          apiTransactions={analyticsTransactions}
+          apiTransactions={apiTransactions}
           recentTx={recentTx}
           fmtMoney={fmtMoney}
           preferredCurrency={preferredCurrency}
           budget={budget}
-          spendingSettings={spendingSettings}
+          spendingSettings={resolvedSettings}
           // FIX: pass the fully-transformed trendData (labeled, last-6-months)
           // instead of the raw analyticsMonthlyChart. The overview tab's chart
           // expects { label, income, expense, net } objects — not { month, ... }.
@@ -1262,6 +1262,7 @@ function SpendingPage({
           preferredCurrency={preferredCurrency}
           spendingSettings={resolvedSettings}
           isMobile={isMobileLocal || isMobile}
+          setGlobalSelectedTxId={setGlobalSelectedTxId}
         />
       )}
     </div>

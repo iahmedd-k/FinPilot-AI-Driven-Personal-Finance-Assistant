@@ -60,7 +60,7 @@ function Toggle({ checked, onClick }) {
   );
 }
 
-// ─── Helper: is this transaction an expense? ─────────────────────────────────
+// ─── Transaction type helpers ─────────────────────────────────────────────────
 function isExpenseTx(tx) {
   const t = (tx.type || "").toLowerCase();
   return t === "expense" || t === "debit" || t === "withdrawal" || t === "payment";
@@ -69,6 +69,41 @@ function isIncomeTx(tx) {
   const t = (tx.type || "").toLowerCase();
   return t === "income" || t === "deposit" || t === "credit";
 }
+
+// ─── Local date helpers ───────────────────────────────────────────────────────
+const parseLocalDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+};
+
+const normalizeLocalDate = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (raw.includes("T")) {
+    const dt = new Date(raw);
+    if (!Number.isFinite(dt.getTime())) return null;
+    return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  }
+  return parseLocalDate(raw);
+};
+
+const formatLocalDate = (value) => {
+  const d = normalizeLocalDate(value);
+  if (!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const isSameDate = (date, day, month, year) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  return date.getDate() === day && date.getMonth() === month && date.getFullYear() === year;
+};
 
 export default function OverviewTab({
   C,
@@ -107,6 +142,13 @@ export default function OverviewTab({
   const monthMenuRef = useRef(null);
   const openAdvisor = () => setShowAdvisor?.(true);
 
+  // ─── Real today (memoised once, used everywhere) ──────────────────────────
+  // Single source of truth — never call new Date() inside render loops.
+  const todayReal = useMemo(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  }, []);
+
   // ─── Derived date values from actual transaction data ─────────────────────
   const latestTransactionDate = useMemo(() => {
     const timestamps = (apiTransactions || [])
@@ -140,7 +182,7 @@ export default function OverviewTab({
       options.push({
         key,
         label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-        month: d.getMonth(),   // 0-indexed
+        month: d.getMonth(),
         year: d.getFullYear(),
         daysInMonth: new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(),
       });
@@ -148,7 +190,6 @@ export default function OverviewTab({
     return options;
   }, [currentMonth, currentYear]);
 
-  // Default to current month
   useEffect(() => {
     if (!selectedSpendMonthKey && spendMonthOptions.length > 0) {
       setSelectedSpendMonthKey(spendMonthOptions[0].key);
@@ -161,29 +202,24 @@ export default function OverviewTab({
   );
 
   // ─── Daily chart data for the selected month ──────────────────────────────
-  // FIX: Build the per-day expense map directly from apiTransactions for the
-  // chosen month. We match on (year, month) explicitly so there is no chance
-  // of an off-by-one from the key-parsing path.
   const spendChartData = useMemo(() => {
     if (!selectedSpendMonthOption) return { points: [], totalSpend: 0, daysInSelectedMonth: 0 };
 
     const { month, year, daysInMonth: daysInSelectedMonth } = selectedSpendMonthOption;
 
-    // Build per-day totals
-    const dayTotals = new Array(daysInSelectedMonth + 1).fill(0); // index 1..daysInSelectedMonth
+    const dayTotals = new Array(daysInSelectedMonth + 1).fill(0);
     (apiTransactions || []).forEach((tx) => {
       if (!isExpenseTx(tx)) return;
       if (!tx.date) return;
       const d = new Date(tx.date);
       if (isNaN(d.getTime())) return;
       if (d.getFullYear() !== year || d.getMonth() !== month) return;
-      const day = d.getDate(); // 1-based
+      const day = d.getDate();
       if (day >= 1 && day <= daysInSelectedMonth) {
         dayTotals[day] += Math.abs(tx.amount || 0);
       }
     });
 
-    // Build cumulative series
     let running = 0;
     const points = [];
     for (let day = 1; day <= daysInSelectedMonth; day += 1) {
@@ -194,7 +230,7 @@ export default function OverviewTab({
     return { points, totalSpend: running, daysInSelectedMonth };
   }, [apiTransactions, selectedSpendMonthOption, effectiveBudget]);
 
-  // ─── Current-month transaction slices (for categories, calendar, etc.) ────
+  // ─── Current-month transaction slices ────────────────────────────────────
   const monthTransactions = useMemo(() => apiTransactions.filter((t) => {
     const d = new Date(t.date);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -203,7 +239,7 @@ export default function OverviewTab({
   const expenseTransactions = useMemo(() => monthTransactions.filter(isExpenseTx), [monthTransactions]);
   const incomeTransactions = useMemo(() => monthTransactions.filter(isIncomeTx), [monthTransactions]);
 
-  // ─── Expense by day (current month) for calendar heat-map ─────────────────
+  // ─── Expense by day (current month) for spend calendar heat-map ──────────
   const expenseByDay = useMemo(() => {
     const map = new Map();
     for (let day = 1; day <= daysInMonth; day += 1) map.set(day, 0);
@@ -257,35 +293,46 @@ export default function OverviewTab({
   const categoryPercentLabel = breakdownMode === "budget" ? "of budget" : breakdownMode === "income" ? "of income" : "of expenses";
   const remainingBudget = Math.max(effectiveBudget - thisSpend, 0);
 
-  // ─── Transactions ─────────────────────────────────────────────────────────
+  // ─── Latest transactions ──────────────────────────────────────────────────
   const latestTransactions = recentTx.slice(0, 8);
 
   // ─── Upcoming calendar ────────────────────────────────────────────────────
   const upcomingCalendarDate = useMemo(
-    () => new Date(currentYear, currentMonth + upcomingMonthOffset, 1),
-    [currentMonth, currentYear, upcomingMonthOffset],
+    () => new Date(todayReal.getFullYear(), todayReal.getMonth() + upcomingMonthOffset, 1),
+    [todayReal, upcomingMonthOffset],
   );
   const upcomingCalendarMonth = upcomingCalendarDate.getMonth();
   const upcomingCalendarYear = upcomingCalendarDate.getFullYear();
   const upcomingCalendarDaysInMonth = new Date(upcomingCalendarYear, upcomingCalendarMonth + 1, 0).getDate();
 
+  // ─── Upcoming transactions ────────────────────────────────────────────────
+  // Rules:
+  //   1. Only transactions where isRecurring === true (strict, not truthy)
+  //      are projected into the viewed month via getOccurrencesInMonth.
+  //   2. futureDatedTxs path is intentionally removed — non-recurring
+  //      transactions are never highlighted regardless of their date.
+  //   3. Inferred recurring detection only runs on isRecurring !== true txs.
+  //   4. All dedup keys use stable IDs and toFixed(2) amounts, not Math.round.
   const upcomingTransactions = useMemo(() => {
     const recurringSettings = spendingSettings?.recurringSettings || {};
     const showInferred = recurringSettings?.showInferredRecurring ?? true;
 
-    const explicit = (apiTransactions || []).filter((tx) => tx.isRecurring);
+    // ── Step 1: Explicit recurring (isRecurring strictly true) ───────────
+    const explicit = (apiTransactions || []).filter((tx) => tx.isRecurring === true);
+
+    // ── Step 2: Inferred recurring (≥3 occurrences, not already marked) ──
     let inferred = [];
-    
     if (showInferred) {
       const candidates = new Map();
-      apiTransactions.forEach(tx => {
-        if (tx.isRecurring || !tx.merchant) return;
-        const amountRound = Math.round(Math.abs(tx.amount));
-        const key = `${tx.type}:${tx.merchant}:${amountRound}`;
+      apiTransactions.forEach((tx) => {
+        // Only consider txs that are NOT already marked recurring
+        if (tx.isRecurring === true || !tx.merchant) return;
+        // Use toFixed(2) — not Math.round — to avoid grouping $9.50 with $9.99
+        const key = `${(tx.type || "").toLowerCase()}:${tx.merchant}:${Math.abs(tx.amount || 0).toFixed(2)}`;
         if (!candidates.has(key)) candidates.set(key, []);
         candidates.get(key).push(tx);
       });
-      candidates.forEach(txs => {
+      candidates.forEach((txs) => {
         if (txs.length >= 3) {
           const recent = [...txs].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
           inferred.push({ ...recent, isInferred: true });
@@ -293,36 +340,60 @@ export default function OverviewTab({
       });
     }
 
+    // ── Step 3: Merge explicit + inferred, keep latest per logical bill ───
     const allRecurring = [...explicit, ...inferred];
     const merged = new Map();
-    allRecurring.forEach(tx => {
+    allRecurring.forEach((tx) => {
       const merchant = tx.merchant || tx.category || "Transaction";
-      const key = `${tx.type}:${merchant}:${tx.category || "Other"}:${Math.abs(tx.amount).toFixed(2)}`;
+      // Stable dedup key: lowercase type + merchant + category + exact amount
+      const key = `${(tx.type || "").toLowerCase()}:${merchant}:${tx.category || "Other"}:${Math.abs(tx.amount || 0).toFixed(2)}`;
       if (!merged.has(key) || new Date(tx.date) > new Date(merged.get(key).date)) {
-        merged.set(key, tx);
+        // Attach a stable ID for use in occurrence dedup
+        const stableId = tx._id || tx.id || `${merchant}:${Math.abs(tx.amount || 0).toFixed(2)}`;
+        merged.set(key, { ...tx, _stableId: stableId });
       }
     });
 
+    // ── Step 4: Project each bill into the viewed month ───────────────────
     const occurrences = [];
-    const now = new Date();
-    // Use the actual "today" for projection start
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const occurrenceKeys = new Set();
 
     [...merged.values()].forEach((tx) => {
       const dates = getOccurrencesInMonth(tx, upcomingCalendarDate);
       dates.forEach((date) => {
-        // Bug Fix 2: Only show projected occurrences that are in the future
-        // and not already represented by a "real" manual future transaction in apiTransactions
-        if (date >= today) {
-          occurrences.push({ ...tx, date: date.toISOString() });
+        // normalizeLocalDate handles both Date objects and ISO strings safely
+        const normalized = normalizeLocalDate(date);
+        if (!normalized) return;
+        // Guard: must actually fall in the viewed month (getOccurrencesInMonth
+        // should guarantee this, but be defensive)
+        if (
+          normalized.getMonth() !== upcomingCalendarMonth ||
+          normalized.getFullYear() !== upcomingCalendarYear
+        ) return;
+
+        // Stable occurrence key: stableId + date string (not _id which may be
+        // undefined on inferred txs, causing "undefined:Mon May 26" collisions)
+        const key = `${tx._stableId}:${normalized.toDateString()}`;
+        if (!occurrenceKeys.has(key)) {
+          occurrenceKeys.add(key);
+          const formattedDate = formatLocalDate(normalized);
+          if (formattedDate) occurrences.push({ ...tx, date: formattedDate });
         }
       });
     });
 
     return occurrences.sort((a, b) => new Date(a.date) - new Date(b.date));
-  }, [apiTransactions, upcomingCalendarDate, spendingSettings]);
+  }, [
+    apiTransactions,
+    upcomingCalendarDate,
+    upcomingCalendarMonth,
+    upcomingCalendarYear,
+    spendingSettings?.recurringSettings?.showInferredRecurring, // specific dep, not whole object
+  ]);
 
+  // ─── Calendar grid cells ──────────────────────────────────────────────────
   const calendarCells = useMemo(() => {
+    // Monday-first grid: (getDay()+6)%7 gives Mon=0 … Sun=6
     const firstDay = (new Date(upcomingCalendarYear, upcomingCalendarMonth, 1).getDay() + 6) % 7;
     const days = [];
     for (let i = 0; i < firstDay; i += 1) days.push(null);
@@ -331,13 +402,58 @@ export default function OverviewTab({
     return days;
   }, [upcomingCalendarDaysInMonth, upcomingCalendarMonth, upcomingCalendarYear]);
 
+  // upcomingTransactions is already scoped to the viewed month, but filter
+  // defensively so stale data from a previous month offset can't bleed through.
   const upcomingTransactionsInView = useMemo(
     () => upcomingTransactions.filter((tx) => {
-      const d = new Date(tx.date);
-      return d.getMonth() === upcomingCalendarMonth && d.getFullYear() === upcomingCalendarYear;
+      const d = normalizeLocalDate(tx.date);
+      return (
+        d &&
+        d.getMonth() === upcomingCalendarMonth &&
+        d.getFullYear() === upcomingCalendarYear
+      );
     }),
     [upcomingCalendarMonth, upcomingCalendarYear, upcomingTransactions],
   );
+
+  // Explicit-only recurring occurrences (isRecurring === true) scoped to viewed month
+  const explicitUpcomingTransactionsInView = useMemo(
+    () => (upcomingTransactionsInView || []).filter((tx) => tx.isRecurring === true),
+    [upcomingTransactionsInView],
+  );
+
+  // Non-recurring transactions that are future-dated and fall in the viewed month
+  const futureNonRecurringInView = useMemo(() => {
+    return (apiTransactions || []).filter((tx) => {
+      if (!tx?.date) return false;
+      if (tx.isRecurring === true) return false;
+      const d = normalizeLocalDate(tx.date);
+      if (!d) return false;
+      return (
+        d.getMonth() === upcomingCalendarMonth &&
+        d.getFullYear() === upcomingCalendarYear &&
+        d.getTime() >= todayReal.getTime()
+      );
+    }).map(tx => ({ ...tx }));
+  }, [apiTransactions, upcomingCalendarMonth, upcomingCalendarYear, todayReal]);
+
+  // Combined highlighted transactions (explicit recurring + future non-recurring), de-duped by stable key
+  const highlightedTransactionsInView = useMemo(() => {
+    const all = [...explicitUpcomingTransactionsInView, ...futureNonRecurringInView];
+    const seen = new Set();
+    const out = [];
+    all.forEach((tx) => {
+      const d = normalizeLocalDate(tx.date);
+      const keyDate = d ? d.toDateString() : String(tx.date || "");
+      const stableId = tx._id || tx.id || `${(tx.merchant || tx.category || "").toString()}:${Math.abs(tx.amount || 0).toFixed(2)}`;
+      const key = `${stableId}:${keyDate}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push({ ...tx, _stableId: stableId, _occurrenceDate: d });
+      }
+    });
+    return out.sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [explicitUpcomingTransactionsInView, futureNonRecurringInView]);
 
   // ─── Spend calendar heat-map rows ─────────────────────────────────────────
   const spendCalendarRows = useMemo(() => {
@@ -353,21 +469,33 @@ export default function OverviewTab({
     return rows;
   }, [daysInMonth, expenseByDay]);
 
-  // ─── Get transactions for a specific day ───────────────────────────────────
-  const getTransactionsForDay = (day) => {
-    return expenseTransactions.filter((tx) => {
+  // ─── Day click handlers ───────────────────────────────────────────────────
+  const getTransactionsForDay = (day) =>
+    expenseTransactions.filter((tx) => {
       if (!tx?.date) return false;
-      const d = new Date(tx.date);
-      if (isNaN(d.getTime())) return false;
-      return d.getDate() === day;
+      const d = parseLocalDate(tx.date);
+      return isSameDate(d, day, currentMonth, currentYear);
     });
-  };
+
+  const getUpcomingTransactionsForDay = (day) =>
+    highlightedTransactionsInView.filter((tx) => {
+      if (!tx?.date) return false;
+      const d = normalizeLocalDate(tx.date);
+      return (
+        d &&
+        isSameDate(d, day, upcomingCalendarMonth, upcomingCalendarYear) &&
+        d.getTime() >= todayReal.getTime()
+      );
+    });
 
   const handleCalendarDayClick = (day) => {
     const txsForDay = getTransactionsForDay(day);
-    if (txsForDay.length > 0) {
-      setGlobalSelectedTxId?.(txsForDay[0]._id);
-    }
+    if (txsForDay.length > 0) setGlobalSelectedTxId?.(txsForDay[0]._id);
+  };
+
+  const handleUpcomingCalendarDayClick = (day) => {
+    const txsForDay = getUpcomingTransactionsForDay(day);
+    if (txsForDay.length > 0) setGlobalSelectedTxId?.(txsForDay[0]._id || txsForDay[0].id);
   };
 
   // ─── Reports (last 6 months) ──────────────────────────────────────────────
@@ -438,7 +566,6 @@ export default function OverviewTab({
   }, [apiTransactions, currentMonthKey, selectedCategoryId]);
 
   // ─── Effects ──────────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (!selectedCategoryId) return;
     setCategoryBudget(String(budget?.amount || ""));
@@ -446,7 +573,6 @@ export default function OverviewTab({
   }, [budget?.amount, selectedCategoryId]);
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-
   const saveCategoryBudget = async () => {
     const amount = Number(categoryBudget);
     if (!amount || isNaN(amount) || amount <= 0) return;
@@ -465,23 +591,16 @@ export default function OverviewTab({
 
   const transactionDateLabel = (date) => new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-  // ─── Chart Y-axis max: tight to actual data, never hardcoded large floor ──
-  // Y-axis domain is always anchored to actual spend data.
-  // The budget reference line is shown regardless, but if budget >> spend
-  // we don't let it crush the spend curve to a flat baseline.
+  // ─── Chart Y-axis max ─────────────────────────────────────────────────────
   const spendChartMax = useMemo(() => {
     const dataMax = spendChartData.totalSpend || 0;
     if (dataMax > 0) {
-      // Give 25% headroom above actual spend so the curve has breathing room.
-      // If budget is within 3x of spend, extend to show it fully; otherwise
-      // let the ReferenceLine draw outside the visible area (still shows label).
       const headroom = dataMax * 1.25;
       if (effectiveBudget > 0 && effectiveBudget <= dataMax * 3) {
         return Math.max(headroom, effectiveBudget * 1.05);
       }
       return headroom;
     }
-    // No spend data yet — show budget scale if set, else small placeholder
     if (effectiveBudget > 0) return effectiveBudget * 1.2;
     return 100;
   }, [spendChartData.totalSpend, effectiveBudget]);
@@ -520,8 +639,6 @@ export default function OverviewTab({
               <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 {sectionLabel("Spend this month")}
                 <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-
-                  {/* Chart / Calendar toggle */}
                   <div style={{ display: "flex", background: "var(--surface-muted)", borderRadius: 10, padding: 2 }}>
                     {[{ mode: "chart", isCustom: true }, { mode: "calendar" }].map(({ mode, isCustom }) => (
                       <button key={mode} type="button" onClick={() => setSpendViewMode(mode)}
@@ -530,8 +647,6 @@ export default function OverviewTab({
                       </button>
                     ))}
                   </div>
-
-                  {/* Month picker — only shown in chart mode */}
                   {spendViewMode === "chart" && (
                     <div ref={monthMenuRef} style={{ position: "relative" }}>
                       <button type="button" onClick={() => setMonthMenuOpen((p) => !p)}
@@ -554,108 +669,87 @@ export default function OverviewTab({
                 </div>
               </div>
 
-              {/* ── Spend summary bar (spend vs budget) ── */}
-                {spendViewMode === "chart" && (
-                  <>
-                    <div style={{ padding: "16px 20px 8px", display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", fontFamily: "var(--font-sans)" }}>
-                      <div style={{ textAlign: "left" }}>
-                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Expenses</div>
-                        <div style={{ fontSize: 18, fontWeight: 500, color: C.text, letterSpacing: "-0.01em", lineHeight: 1 }}>
-                          {formatAmount(spendChartData.totalSpend || 0, { maximumFractionDigits: 0 })}
-                        </div>
-                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>spent in {selectedSpendMonthOption?.label || ""}</div>
-                      </div>
-                      <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, textAlign: "left" }}>
-                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Income</div>
-                        <div style={{ fontSize: 18, fontWeight: 500, color: C.greenMid, letterSpacing: "-0.01em", lineHeight: 1 }}>
-                          {formatAmount(thisIncome, { maximumFractionDigits: 0 })}
-                        </div>
-                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>earned in {selectedSpendMonthOption?.label || ""}</div>
-                      </div>
-                      <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, textAlign: "left" }}>
-                        <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Savings Rate</div>
-                        <div style={{ fontSize: 18, fontWeight: 500, color: (thisIncome - thisSpend) >= 0 ? C.text : C.red, letterSpacing: "-0.01em", lineHeight: 1 }}>
-                          {thisIncome > 0 ? Math.round(((thisIncome - thisSpend) / thisIncome) * 100) : 0}%
-                        </div>
-                        <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>of total income</div>
-                      </div>
-                      {effectiveBudget > 0 && (
-                        <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                          <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>Budget</div>
-                          <div style={{ fontSize: 15, fontWeight: 500, color: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#16a34a", lineHeight: 1, marginTop: 1 }}>
-                            {formatAmount(Math.max(0, effectiveBudget - (spendChartData.totalSpend || 0)), { maximumFractionDigits: 0 })} left
-                          </div>
-                          <div style={{ fontSize: 10, color: C.muted }}>of {formatAmount(effectiveBudget, { maximumFractionDigits: 0 })}</div>
-                          {/* Budget progress bar */}
-                          <div style={{ width: 100, height: 4, borderRadius: 99, background: "var(--border-subtle)", overflow: "hidden", marginTop: 2 }}>
-                            <div style={{ height: "100%", borderRadius: 99, background: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#ffb95a", width: `${Math.min(100, ((spendChartData.totalSpend || 0) / effectiveBudget) * 100)}%` }} />
-                          </div>
-                        </div>
-                      )}
+              {spendViewMode === "chart" && (
+                <div style={{ padding: "16px 20px 8px", display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", fontFamily: "var(--font-sans)" }}>
+                  <div style={{ textAlign: "left" }}>
+                    <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Expenses</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: C.text, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                      {formatAmount(spendChartData.totalSpend || 0, { maximumFractionDigits: 0 })}
                     </div>
-                  </>
-                )}
+                    <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>spent in {selectedSpendMonthOption?.label || ""}</div>
+                  </div>
+                  <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, textAlign: "left" }}>
+                    <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Income</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: C.greenMid, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                      {formatAmount(thisIncome, { maximumFractionDigits: 0 })}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>earned in {selectedSpendMonthOption?.label || ""}</div>
+                  </div>
+                  <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, textAlign: "left" }}>
+                    <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Savings Rate</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: (thisIncome - thisSpend) >= 0 ? C.text : C.red, letterSpacing: "-0.01em", lineHeight: 1 }}>
+                      {thisIncome > 0 ? Math.round(((thisIncome - thisSpend) / thisIncome) * 100) : 0}%
+                    </div>
+                    <div style={{ fontSize: 10, color: C.muted, marginTop: 4 }}>of total income</div>
+                  </div>
+                  {effectiveBudget > 0 && (
+                    <div style={{ paddingLeft: 20, borderLeft: `1px solid ${C.border2}`, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+                      <div style={{ fontSize: 10, fontWeight: 500, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>Budget</div>
+                      <div style={{ fontSize: 15, fontWeight: 500, color: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#16a34a", lineHeight: 1, marginTop: 1 }}>
+                        {formatAmount(Math.max(0, effectiveBudget - (spendChartData.totalSpend || 0)), { maximumFractionDigits: 0 })} left
+                      </div>
+                      <div style={{ fontSize: 10, color: C.muted }}>of {formatAmount(effectiveBudget, { maximumFractionDigits: 0 })}</div>
+                      <div style={{ width: 100, height: 4, borderRadius: 99, background: "var(--border-subtle)", overflow: "hidden", marginTop: 2 }}>
+                        <div style={{ height: "100%", borderRadius: 99, background: (spendChartData.totalSpend || 0) > effectiveBudget ? "#ef4444" : "#ffb95a", width: `${Math.min(100, ((spendChartData.totalSpend || 0) / effectiveBudget) * 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {/* ── Chart view ── */}
               {spendViewMode === "chart" ? (
                 spendChartData.points.length > 0 && spendChartData.totalSpend > 0 ? (
                   <div style={{ width: "100%", padding: "0" }}>
                     <ResponsiveContainer width="100%" height={248} minHeight={0}>
-                      <AreaChart
-                        data={spendChartData.points}
-                        margin={{ top: 16, right: 52, left: 0, bottom: 20 }}
-                        key={`spend-${selectedSpendMonthKey}`}
-                      >
+                      <AreaChart data={spendChartData.points} margin={{ top: 16, right: 52, left: 0, bottom: 20 }} key={`spend-${selectedSpendMonthKey}`}>
                         <defs>
                           <linearGradient id="colorSpend" gradientTransform="rotate(90)">
                             <stop offset="0%" stopColor="#ffb95a" stopOpacity={0.5} />
                             <stop offset="100%" stopColor="#ffb95a" stopOpacity={0.05} />
                           </linearGradient>
                         </defs>
-                        <XAxis
-                          dataKey="day"
-                          axisLine={false} tickLine={false}
+                        <XAxis dataKey="day" axisLine={false} tickLine={false}
                           ticks={[1, 8, 15, 22, 29].filter((d) => d <= spendChartData.daysInSelectedMonth)}
                           tickFormatter={(d) => String(d).padStart(2, "0")}
-                          tick={{ fill: C.muted, fontSize: 11 }}
-                          height={24}
-                        />
-                        <YAxis
-                          axisLine={false} tickLine={false}
-                          orientation="right"
+                          tick={{ fill: C.muted, fontSize: 11 }} height={24} />
+                        <YAxis axisLine={false} tickLine={false} orientation="right"
                           domain={[0, spendChartMax]}
                           tickFormatter={(v) => formatAmount(v, { maximumFractionDigits: 0 })}
-                          tick={{ fill: C.muted, fontSize: 11 }}
-                          width={50}
-                        />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null;
-                            const data = payload[0].payload;
-                            return (
-                              <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", boxShadow: "0 12px 30px rgba(0,0,0,0.22)" }}>
-                                <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Day {String(data.day).padStart(2, "0")}</div>
-                                <div style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>
-                                  {selectedSpendMonthOption ? MONTH_NAMES[selectedSpendMonthOption.month] : ""}: {formatAmount(data.spend, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                                {effectiveBudget > 0 && (
-                                  <div style={{ fontSize: 11, color: data.spend > effectiveBudget ? "#ef4444" : C.muted, marginTop: 3 }}>
-                                    Budget: {formatAmount(effectiveBudget, { maximumFractionDigits: 0 })}
-                                  </div>
-                                )}
+                          tick={{ fill: C.muted, fontSize: 11 }} width={50} />
+                        <Tooltip content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const data = payload[0].payload;
+                          return (
+                            <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 12px", boxShadow: "0 12px 30px rgba(0,0,0,0.22)" }}>
+                              <div style={{ fontSize: 11, color: C.muted, marginBottom: 6 }}>Day {String(data.day).padStart(2, "0")}</div>
+                              <div style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>
+                                {selectedSpendMonthOption ? MONTH_NAMES[selectedSpendMonthOption.month] : ""}: {formatAmount(data.spend, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </div>
-                            );
-                          }}
-                        />
+                              {effectiveBudget > 0 && (
+                                <div style={{ fontSize: 11, color: data.spend > effectiveBudget ? "#ef4444" : C.muted, marginTop: 3 }}>
+                                  Budget: {formatAmount(effectiveBudget, { maximumFractionDigits: 0 })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }} />
                         <CartesianGrid vertical={false} stroke="var(--border-subtle)" strokeDasharray="4 4" />
                         {effectiveBudget > 0 && effectiveBudget <= (spendChartData.totalSpend || 0) * 3 && (
                           <ReferenceLine y={effectiveBudget} stroke="#94a3b8" strokeDasharray="5 5"
-                            label={{ value: `${formatAmount(effectiveBudget, { maximumFractionDigits: 0 })} budget`, position: "insideTopRight", fill: C.muted, fontSize: 11, dx: -4 }}
-                          />
+                            label={{ value: `${formatAmount(effectiveBudget, { maximumFractionDigits: 0 })} budget`, position: "insideTopRight", fill: C.muted, fontSize: 11, dx: -4 }} />
                         )}
                         <Area type="monotone" dataKey="spend" stroke="#ffb95a" strokeWidth={2.5} fill="url(#colorSpend)" connectNulls={false}
-                          activeDot={{ r: 5, stroke: C.white, strokeWidth: 2, fill: "#ffb95a" }}
-                        />
+                          activeDot={{ r: 5, stroke: C.white, strokeWidth: 2, fill: "#ffb95a" }} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -668,11 +762,10 @@ export default function OverviewTab({
                   </div>
                 )
               ) : (
-                /* ── Calendar heat-map view ── */
                 <div style={{ padding: "20px 16px 16px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
                     {spendCalendarRows.flat().map(({ day, amount, active }) => (
-                      <div key={day} 
+                      <div key={day}
                         onClick={() => { if (amount > 0) handleCalendarDayClick(day); }}
                         style={{ height: 36, borderRadius: 8, border: `1px solid ${active ? "transparent" : C.border}`, background: active ? "#ffb95a" : "transparent", color: active ? "#fff" : C.text, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, cursor: amount > 0 ? "pointer" : "default", transition: "all 0.15s" }}
                         onMouseEnter={(e) => amount > 0 && (e.currentTarget.style.background = active ? "#f59e0b" : C.white)}
@@ -708,11 +801,10 @@ export default function OverviewTab({
                   const TxIcon = txMeta?.icon || catToIcon[tx.category] || Sparkles;
                   const isInc = isIncomeTx(tx);
                   return (
-                    <div key={tx._id || idx} 
+                    <div key={tx._id || idx}
                       onClick={() => setGlobalSelectedTxId?.(tx._id)}
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 12, background: "transparent", cursor: "pointer", transition: "all 0.15s" }}
-                      className="hover-bg-muted"
-                    >
+                      className="hover-bg-muted">
                       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                         <div style={{ width: 34, height: 34, borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", flexShrink: 0 }}>
                           <TxIcon size={14} />
@@ -742,7 +834,7 @@ export default function OverviewTab({
               </div>
             </div>
 
-            {/* Upcoming transactions */}
+            {/* ── Upcoming transactions calendar ── */}
             <div style={panelStyle(C)}>
               <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {sectionLabel("Upcoming transactions")}
@@ -761,29 +853,98 @@ export default function OverviewTab({
                     <IconChip onClick={() => setUpcomingMonthOffset((p) => p + 1)} title="Next month"><ChevronRight size={16} /></IconChip>
                   </div>
                 </div>
+
+                {/* Weekday headers */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 8 }}>
                   {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
                     <div key={d} style={{ fontSize: 10, color: C.muted, textAlign: "center", fontWeight: 700, textTransform: "uppercase" }}>{d}</div>
                   ))}
                 </div>
+
+                {/* Calendar day cells */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
                   {calendarCells.map((day, index) => {
-                    const isToday = day === latestTransactionDate.getDate() && upcomingCalendarMonth === latestTransactionDate.getMonth() && upcomingCalendarYear === latestTransactionDate.getFullYear();
-                    const hasUpcoming = day && upcomingTransactionsInView.some((tx) => new Date(tx.date).getDate() === day);
-                    let bg = "transparent", border = "1px solid transparent", color = day ? C.text : "transparent", fontWeight = 500;
-                    if (isToday) { bg = "#3b82f6"; border = "1px solid #3b82f6"; color = "#fff"; fontWeight = 700; }
-                    else if (hasUpcoming) { bg = "rgba(13,115,119,0.13)"; border = "1px solid rgba(13,115,119,0.40)"; color = "#0D7377"; fontWeight = 700; }
+                    // Null cells are padding — render blank, skip all logic
+                    if (!day) {
+                      return <div key={`pad-${index}`} style={{ height: 34 }} />;
+                    }
+
+                    // Consider both explicit recurring occurrences and future non-recurring txs
+                    const txsOnDay = highlightedTransactionsInView.filter((tx) => {
+                      if (!tx?.date) return false;
+                      const d = normalizeLocalDate(tx.date);
+                      return (
+                        d &&
+                        d.getDate() === day &&
+                        d.getMonth() === upcomingCalendarMonth &&
+                        d.getFullYear() === upcomingCalendarYear &&
+                        d.getTime() >= todayReal.getTime()
+                      );
+                    });
+
+                    const hasRecurring = txsOnDay.length > 0;
+
+                    // isToday: use todayReal memo — never new Date() inside render
+                    const isToday =
+                      day === todayReal.getDate() &&
+                      upcomingCalendarMonth === todayReal.getMonth() &&
+                      upcomingCalendarYear === todayReal.getFullYear();
+
+                    // Highlight rules:
+                    //   Green  → day has ≥1 recurring (isRecurring===true) tx
+                    //   Blue ring → today only, and ONLY if no recurring tx on it
+                    //   Plain  → everything else (including today with no tx)
+                    let bg = "transparent";
+                    let border = "1px solid transparent";
+                    let color = C.text;
+                    let fontWeight = 400;
+
+                    if (hasRecurring) {
+                      bg = "rgba(34,197,94,0.13)";
+                      border = "1px solid rgba(34,197,94,0.55)";
+                      color = "#16a34a";
+                      fontWeight = 700;
+                    }
+
                     return (
-                      <div key={`${day ?? "empty"}-${index}`} style={{ height: 34, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight, color, background: bg, border, transition: "all 0.15s" }}>
+                      <div
+                        key={`day-${day}`}
+                        onClick={() => { if (hasRecurring) handleUpcomingCalendarDayClick(day); }}
+                        title={
+                          hasRecurring
+                            ? `${txsOnDay.length} recurring transaction${txsOnDay.length > 1 ? "s" : ""} — ${MONTH_NAMES[upcomingCalendarMonth]} ${day}`
+                            : undefined
+                        }
+                        style={{
+                          height: 34,
+                          borderRadius: 8,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          fontWeight,
+                          color,
+                          background: bg,
+                          border,
+                          transition: "all 0.15s",
+                          cursor: hasRecurring ? "pointer" : "default",
+                        }}
+                      >
                         {day}
                       </div>
                     );
                   })}
                 </div>
-                <div style={{ marginTop: 20, fontSize: 13, color: C.muted, lineHeight: 1.5, textAlign: "center" }}>
-                  {upcomingTransactionsInView.length === 0
-                    ? "Add your recurring bills and subscriptions to see your schedule."
-                    : `${upcomingTransactionsInView.length} scheduled this month.`}
+
+                {/* Legend */}
+                <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: "rgba(34,197,94,0.13)", border: "1px solid rgba(34,197,94,0.55)", display: "inline-block", flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>Recurring bill</span>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 13, color: C.muted, lineHeight: 1.5, textAlign: "center" }}>
+                  {highlightedTransactionsInView.filter((tx) => normalizeLocalDate(tx.date)?.getTime() >= todayReal.getTime()).length === 0
+                    ? "Add your upcoming transactions or recurring bills to see your schedule."
+                    : `${highlightedTransactionsInView.filter((tx) => normalizeLocalDate(tx.date)?.getTime() >= todayReal.getTime()).length} upcoming item${highlightedTransactionsInView.filter((tx) => normalizeLocalDate(tx.date)?.getTime() >= todayReal.getTime()).length > 1 ? "s" : ""} scheduled this month.`}
                 </div>
                 <div style={{ marginTop: 16, textAlign: "center" }}>
                   <button type="button" onClick={() => setSpendTab("recurring")}
@@ -809,7 +970,6 @@ export default function OverviewTab({
                 </button>
               </div>
               <div style={{ padding: "20px 16px 16px" }}>
-                {/* Chart header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Last 6 months</div>
@@ -817,8 +977,6 @@ export default function OverviewTab({
                   </div>
                   <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.02em" }}>Income vs Expenses</div>
                 </div>
-
-                {/* Grouped bar chart */}
                 <div style={{ width: "100%", minHeight: 248, marginBottom: 4 }}>
                   <ResponsiveContainer width="100%" height={248} minHeight={0}>
                     <BarChart data={reportChartData} margin={{ top: 4, right: 10, bottom: 0, left: 0 }} barGap={6}>
@@ -839,15 +997,13 @@ export default function OverviewTab({
             {/* ── Monthly Overview Table ── */}
             <div style={{ ...panelStyle(C), marginTop: 4 }}>
               <div style={{ padding: "18px 24px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: "0.05em" }}>Monthly Overview</span>
-                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: "0.05em" }}>Monthly Overview</span>
                 <button type="button" onClick={() => setSpendTab("reports")} style={{ fontSize: 12, fontWeight: 600, color: C.text, background: "transparent", border: "none", cursor: "pointer" }}>View full reports</button>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
                   <thead>
-                    <tr style={{ background: "transparent" }}>
+                    <tr>
                       {["Month", "Income", "Expenses", "Net Change"].map((h, i) => (
                         <th key={h} style={{ padding: "12px 20px", textAlign: i === 0 ? "left" : "right", fontSize: 11, fontWeight: 600, color: C.text, borderBottom: `1px solid ${C.border}`, textTransform: "uppercase" }}>{h}</th>
                       ))}
@@ -855,15 +1011,10 @@ export default function OverviewTab({
                   </thead>
                   <tbody>
                     {reportChartData.slice().reverse().map((row, idx, arr) => (
-                      <tr key={row.key} className="performance-row"
-                        style={{ cursor: "pointer", transition: "background 0.15s" }}>
+                      <tr key={row.key} className="performance-row" style={{ cursor: "pointer", transition: "background 0.15s" }}>
                         <td style={{ padding: "14px 20px", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>{row.month}</td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
-                          {formatAmount(row.income, { maximumFractionDigits: 0 })}
-                        </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
-                          {formatAmount(row.expense, { maximumFractionDigits: 0 })}
-                        </td>
+                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>{formatAmount(row.income, { maximumFractionDigits: 0 })}</td>
+                        <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, color: C.text, fontWeight: 400, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>{formatAmount(row.expense, { maximumFractionDigits: 0 })}</td>
                         <td style={{ padding: "14px 20px", textAlign: "right", fontSize: 14, fontWeight: 400, color: C.text, borderBottom: idx === arr.length - 1 ? "none" : `1px solid ${C.border}` }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                             {row.net >= 0 ? <ArrowUpRight size={14} color={C.text} /> : <ArrowDownRight size={14} color={C.text} />}
@@ -901,7 +1052,6 @@ export default function OverviewTab({
                 ))}
               </div>
               <div style={{ padding: "18px 16px 16px" }}>
-                {/* Donut */}
                 <div style={{ padding: 18, borderRadius: 20, background: "var(--surface-muted)", display: "flex", justifyContent: "center", marginBottom: 18 }}>
                   <div style={{ position: "relative", width: 180, height: 180 }}>
                     <PieChart width={180} height={180}>
@@ -939,8 +1089,6 @@ export default function OverviewTab({
                     </div>
                   </div>
                 </div>
-
-                {/* Top 2 category cards */}
                 {activeRows.length > 0 ? (
                   <>
                     <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
@@ -1026,8 +1174,6 @@ export default function OverviewTab({
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{selectedCategoryMeta.label}</div>
               </div>
-
-              {/* Budget control */}
               <div style={{ border: `1px solid ${C.border}`, borderRadius: 18, overflow: "hidden", marginBottom: 28 }}>
                 <div style={{ padding: 18 }}>
                   <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>Overall monthly budget for {monthLabel}</div>
@@ -1049,8 +1195,6 @@ export default function OverviewTab({
                   <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>This updates the overall monthly budget for {monthLabel}.</div>
                 </div>
               </div>
-
-              {/* Month history */}
               <div style={{ display: "grid", gridTemplateColumns: "36px repeat(5, 1fr) 36px", alignItems: "center", gap: 8, marginBottom: 28 }}>
                 <button type="button" onClick={() => setCategoryHistoryOffset((p) => Math.min(p + 1, 24))}
                   style={{ width: 36, height: 36, borderRadius: 99, border: `1px solid ${C.border}`, background: "var(--bg-secondary)", cursor: "pointer", color: C.muted, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1069,8 +1213,6 @@ export default function OverviewTab({
                   <ChevronRight size={16} />
                 </button>
               </div>
-
-              {/* Category transactions this month */}
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>{monthLabel} transactions</div>
                 {selectedCategoryMonthTransactions.length === 0 ? (
