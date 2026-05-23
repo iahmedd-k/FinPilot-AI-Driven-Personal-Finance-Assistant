@@ -1257,7 +1257,7 @@ function OverviewInvestmentsCard({ C, isMobile, categoryBreakdown, canonicalCurr
       return Array.from({ length: 12 }, (_, i) => {
         const d2 = new Date(nowDate.getFullYear(), nowDate.getMonth() - 11 + i, 1);
         const lbl = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-        return { d: lbl, ts: d2.getTime(), v: i === 11 ? totalVal : 0 };
+        return { d: lbl, ts: d2.getTime(), v: i === 11 ? totalVal : 0, invested: i === 11 ? totalVal : 0 };
       });
     }
 
@@ -1286,15 +1286,31 @@ function OverviewInvestmentsCard({ C, isMobile, categoryBreakdown, canonicalCurr
 
     let cumCost = 0;
     const totalCurrentValue = assets.reduce((s, a) => s + (a.currentValue || 0), 0);
-    return months.map((key, idx) => {
-      cumCost += (monthMap[key]?.invested || 0);
+    // Pad months with at least 6 entries for better chart appearance
+    const minMonths = Math.max(months.length, 6);
+    const padded = months.length < minMonths 
+      ? [
+          ...Array.from({ length: minMonths - months.length }, (_, i) => {
+            const offset = (minMonths - months.length) - i;
+            const d = new Date(months[0].split("-")[0], (parseInt(months[0].split("-")[1]) || 1) - offset - 1, 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          }).reverse(),
+          ...months
+        ]
+      : months;
+
+    return padded.map((key, idx) => {
+      const monthIdx = padded.indexOf(months[0]);
+      const isHistoric = idx < monthIdx;
+      if (isHistoric) {
+        cumCost = 0;
+      } else {
+        cumCost += (monthMap[key]?.invested || 0);
+      }
       const [ky, km] = key.split("-").map(Number);
       const d2 = new Date(ky, km - 1, 1);
       const lbl = d2.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-      const isLast = idx === months.length - 1;
-      const fraction = months.length > 1 ? idx / (months.length - 1) : 1;
-      const interpolatedValue = isLast ? totalCurrentValue : Math.round(totalCurrentValue * fraction);
-      return { d: lbl, ts: d2.getTime(), v: Math.round(cumCost) };
+      return { d: lbl, ts: d2.getTime(), v: Math.round(cumCost), invested: Math.round(cumCost) };
     });
   }, [assets]);
 
@@ -1309,59 +1325,148 @@ function OverviewInvestmentsCard({ C, isMobile, categoryBreakdown, canonicalCurr
   const gainPct = totalInvested > 0 ? ((totalGain / totalInvested) * 100).toFixed(1) : null;
 
   return (
-    <Card style={{ padding: 0, overflow: "hidden", background: C.white, borderRadius: 18, marginTop: 16 }}>
-      {/* Header */}
-      <div style={{ padding: "18px 20px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.border2}` }}>
-        <div>
-          <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 700, color: C.text }}>
+    <Card style={{ padding: 0, overflow: "hidden", background: C.white, borderRadius: 18, marginTop: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+      {/* Header with label on right */}
+      <div style={{ padding: "20px 22px 16px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", borderBottom: `1px solid ${C.border2}` }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: isMobile ? 22 : 28, fontWeight: 700, color: C.text, letterSpacing: "-0.5px" }}>
             {fmtNW(totalValue)}
           </div>
-          <div style={{ fontSize: 10.5, color: C.muted, marginTop: 4 }}>
+          <div style={{ fontSize: 11.5, color: C.muted, marginTop: 6, fontWeight: 500 }}>
             Total portfolio value
           </div>
           {gainPct !== null && (
-            <div style={{ fontSize: 12, fontWeight: 600, color: totalGain >= 0 ? C.greenMid : C.red, marginTop: 2 }}>
-              {totalGain >= 0 ? "+" : ""}{fmtNW(totalGain)} ({totalGain >= 0 ? "+" : ""}{gainPct}%)
+            <div style={{ fontSize: 13, fontWeight: 600, color: totalGain >= 0 ? C.greenMid : C.red, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              <span>{totalGain >= 0 ? "+" : ""}{fmtNW(totalGain)}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: C.muted }}>({totalGain >= 0 ? "+" : ""}{gainPct}%)</span>
             </div>
           )}
         </div>
+        
+        {/* Right corner label */}
+        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Investment Trend
+          </div>
+          <div style={{ fontSize: 9.5, color: C.muted, lineHeight: 1.3, maxWidth: 100 }}>
+            Cumulative invested
+          </div>
+        </div>
       </div>
 
-      {/* Chart with visible axes */}
-      <div style={{ width: "100%", height: isMobile ? 200 : 260 }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={isMobile ? 200 : 260}>
-          <AreaChart data={investChartData} margin={{ top: 10, right: isMobile ? 44 : 56, bottom: 18, left: 0 }}>
+      {/* Chart with visible axes and better styling */}
+      <div style={{ width: "100%", height: isMobile ? 220 : 280, padding: "12px 0" }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={isMobile ? 220 : 280}>
+          <AreaChart data={investChartData} margin={{ top: 12, right: isMobile ? 48 : 64, bottom: 20, left: 0 }}>
             <defs>
               <linearGradient id="overviewInvGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.35} />
+                <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.18} />
+                <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.02} />
               </linearGradient>
+              <filter id="invShadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.08" />
+              </filter>
             </defs>
-            <XAxis dataKey="d"
+            <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="5 4" opacity={0.4} />
+            <XAxis 
+              dataKey="d"
               tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
-              axisLine={false} tickLine={false} interval="preserveStartEnd"
+              axisLine={false} 
+              tickLine={false} 
+              interval={Math.max(0, Math.floor(investChartData.length / 5) - 1)}
             />
-            <YAxis orientation="right" axisLine={false} tickLine={false} width={isMobile ? 44 : 56}
+            <YAxis 
+              orientation="right" 
+              axisLine={false} 
+              tickLine={false} 
+              width={isMobile ? 48 : 64}
               tickFormatter={v => fmtNW(v)}
               tick={{ fontSize: 10, fill: C.muted, fontFamily: "var(--font-sans)" }}
             />
-            <CartesianGrid vertical={false} stroke={C.border2} strokeDasharray="4 4" />
-            <Tooltip content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const row = payload[0]?.payload;
-              return (
-                <div style={{ background: C.white, border: `1px solid ${C.border2}`, borderRadius: 10, padding: "10px 13px", boxShadow: "0 4px 16px rgba(0,0,0,0.09)" }}>
-                  <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{row?.d}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtNW(row?.v)}</div>
-                </div>
-              );
-            }} />
-            <Area type="monotone" dataKey="v" stroke="#8b5cf6" strokeWidth={2.5}
-              fill="url(#overviewInvGrad)" dot={false}
-              activeDot={{ r: 5, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
+            <Tooltip 
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const row = payload[0]?.payload;
+                return (
+                  <div style={{ 
+                    background: C.white, 
+                    border: `1.5px solid ${C.border2}`, 
+                    borderRadius: 12, 
+                    padding: "12px 16px", 
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    backdropFilter: "blur(8px)"
+                  }}>
+                    <div style={{ fontSize: 10, color: C.muted, marginBottom: 6, fontWeight: 600, letterSpacing: "0.03em" }}>
+                      {row?.d}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: "-0.3px" }}>
+                      {fmtNW(row?.v)}
+                    </div>
+                    <div style={{ fontSize: 9, color: C.muted, marginTop: 4, fontStyle: "italic" }}>
+                      Total invested
+                    </div>
+                  </div>
+                );
+              }} 
+              cursor={{ strokeDasharray: "5 5", stroke: C.muted, opacity: 0.3 }}
             />
+            <Area 
+              type="natural" 
+              dataKey="invested" 
+              stroke="#8b5cf6" 
+              strokeWidth={2.8}
+              fill="url(#overviewInvGrad)" 
+              dot={investChartData.length <= 6 ? { r: 4, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 } : false}
+              activeDot={{ r: 6, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2.5, filter: "url(#invShadow)" }}
+            />
+            {investChartData && investChartData.length > 0 && (
+              <ReferenceDot
+                x={investChartData[investChartData.length - 1].d}
+                y={investChartData[investChartData.length - 1].invested}
+                r={4.5}
+                fill="#8b5cf6"
+                stroke="#fff"
+                strokeWidth={2}
+                isFront={true}
+              />
+            )}
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* Footer info */}
+      <div style={{ padding: "12px 22px", borderTop: `1px solid ${C.border2}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ fontSize: 10, color: C.muted }}>
+          {investChartData.length > 0 && (
+            <span>Showing <strong>{investChartData.length}</strong> months of investment history</span>
+          )}
+        </div>
+        <button 
+          onClick={() => setActiveNav("assets")}
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: `1px solid ${C.border}`,
+            background: C.bg,
+            color: C.text,
+            cursor: "pointer",
+            transition: "all 0.15s",
+            fontFamily: "inherit"
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = "var(--surface-muted)";
+            e.currentTarget.style.borderColor = C.muted;
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = C.bg;
+            e.currentTarget.style.borderColor = C.border;
+          }}
+        >
+          View details →
+        </button>
       </div>
     </Card>
   );
@@ -4074,8 +4179,8 @@ function InvestmentsChartCard({ C, setActiveNav, isMobile, summary, monthlyChart
     return fullMap.slice(-12);
   }, [assets]);
 
-  const latest = chartData.length ? chartData[chartData.length - 1].nw : 0;
-  const first = chartData.length > 1 ? chartData[0].nw : 0;
+  const latest = chartData.length ? chartData[chartData.length - 1].v : 0;
+  const first = chartData.length > 1 ? chartData[0].v : 0;
   const change = latest - first;
   const changePct = first !== 0 ? ((change / Math.abs(first)) * 100).toFixed(1) : null;
 
@@ -4160,7 +4265,8 @@ function InvestmentsChartCard({ C, setActiveNav, isMobile, summary, monthlyChart
     if (!investChartData.length) return [];
     const now = new Date();
     const sorted = [...investChartData].sort((a, b) => (a.ts || 0) - (b.ts || 0));
-    if (nwPeriod === "1W" || nwPeriod === "1M") return sorted.slice(-3); // Show last 3 months minimum for better visualization
+    if (nwPeriod === "1W") return sorted.slice(-2); // Show last 2 data points (typically 2 months minimum)
+    if (nwPeriod === "1M") return sorted.slice(-2); // Show last 2 data points
     if (nwPeriod === "3M") return sorted.slice(-3);
     if (nwPeriod === "YTD") {
       const y = now.getFullYear();
@@ -4175,7 +4281,14 @@ function InvestmentsChartCard({ C, setActiveNav, isMobile, summary, monthlyChart
     if (!chartData.length) return [];
     if (nwPeriod === "1W" || nwPeriod === "1M") return chartData.slice(-3);
     if (nwPeriod === "3M") return chartData.slice(-3);
-    if (nwPeriod === "YTD") return chartData.slice(-12);
+    if (nwPeriod === "YTD") {
+      const y = new Date().getFullYear();
+      return chartData.filter((p) => {
+        const dateStr = p.d || "";
+        const yearMatch = dateStr.match(/(\d{2}|\d{4})$/);
+        return yearMatch && dateStr.includes(String(y)) || dateStr.match(/\d{4}/) && parseInt(dateStr.match(/\d{4}/)[0]) === y;
+      });
+    }
     return chartData;
   }, [chartData, nwPeriod]);
 
@@ -4289,11 +4402,12 @@ function InvestmentsChartCard({ C, setActiveNav, isMobile, summary, monthlyChart
                   return (
                     <div style={{ background: C.white, border: `1px solid ${C.border2}`, borderRadius: 10, padding: "10px 13px", boxShadow: "0 4px 16px rgba(0,0,0,0.09)" }}>
                       <div style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}>{row?.d}</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{fmtNW(row?.v)}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 3 }}>Cost: {fmtNW(row?.v)}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Value: {fmtNW(row?.currentValue ?? row?.v)}</div>
                     </div>
                   );
                 }} />
-                <Area type="monotone" dataKey="v" stroke="#8b5cf6" strokeWidth={2.5}
+                <Area type="monotone" dataKey="currentValue" stroke="#8b5cf6" strokeWidth={2.5}
                   fill="url(#nwInvCostGrad)" dot={false}
                   activeDot={{ r: 5, fill: "#8b5cf6", stroke: "#fff", strokeWidth: 2 }}
                 />
@@ -4309,8 +4423,10 @@ function InvestmentsChartCard({ C, setActiveNav, isMobile, summary, monthlyChart
           else if (nwPeriod === "YTD") slice2 = sorted2.filter(m => (m.month || "").startsWith(String(nowD.getFullYear())));
           const lineData = slice2.map(m => {
             const [y, mo] = (m.month || "").split("-").map(Number);
-            const label = (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : m.month;
-            return { d: label, income: m.income || 0, expense: m.expense || 0 };
+            const label = (y && mo) ? new Date(y, mo - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" }) : m.month || "Unknown";
+            const income = typeof m.income === "number" ? m.income : 0;
+            const expense = typeof m.expense === "number" ? m.expense : 0;
+            return { d: label, income, expense, net: income - expense };
           });
           return (
             <>
