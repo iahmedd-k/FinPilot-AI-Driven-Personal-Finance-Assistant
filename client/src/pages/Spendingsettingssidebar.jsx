@@ -21,7 +21,9 @@ const merge = (...args) => Object.assign({}, ...args);
 
 const inputStyle = {
   width: "100%",
-  border: "1px solid var(--border-subtle)",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "var(--border-subtle)",
   borderRadius: "8px",
   padding: "10px 12px",
   fontSize: "13px",
@@ -36,7 +38,9 @@ const selectStyle = {
   width: "100%",
   fontSize: "13px",
   color: "var(--text-primary)",
-  border: "1px solid var(--border-subtle)",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "var(--border-subtle)",
   borderRadius: "8px",
   padding: "10px 12px",
   backgroundColor: "var(--bg-secondary)",
@@ -889,7 +893,7 @@ const ResetBudgetScreen = ({ back }) => {
 };
 
 // 7. Create Rule
-const CondValueInput = ({ condField, condValue, setCondValue, saving, allTags }) => {
+const CondValueInput = ({ condField, condValue, setCondValue, saving, allTags, mergedCategories }) => {
   if (condField === "type")
     return (
       <Select value={condValue} onChange={(e) => setCondValue(e.target.value)} disabled={saving}>
@@ -1074,7 +1078,7 @@ const CreateRuleScreen = ({ back }) => {
             </Select>
           </FieldRow>
           <FieldRow label="Value">
-            <CondValueInput condField={condField} condValue={condValue} setCondValue={setCondValue} saving={saving} allTags={allTags} />
+            <CondValueInput condField={condField} condValue={condValue} setCondValue={setCondValue} saving={saving} allTags={allTags} mergedCategories={mergedCategories} />
           </FieldRow>
         </Section>
       </div>

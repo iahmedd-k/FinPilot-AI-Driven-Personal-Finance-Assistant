@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -22,6 +23,7 @@ import Subscription   from "./pages/Subscription";
 import NotFound       from "./pages/NotFound";
 import ProfilePage    from "./pages/ProfilePage";
 import DocsPage       from "./pages/DocsPage";
+import api            from "./services/api";
 
 // QueryClient must be outside App() — instantiating inside would reset cache on every render
 const queryClient = new QueryClient({
@@ -35,6 +37,12 @@ const queryClient = new QueryClient({
 });
 
 export default function App() {
+  useEffect(() => {
+    api.get("/health").catch(() => {
+      // Ignore wake-up failures on first load
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>                  {/* BrowserRouter first — AuthProvider uses useNavigate */}

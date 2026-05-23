@@ -74,6 +74,11 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ success: true, message: "FinPilot API is running ✅" });
 });
 
+// ─── Root wake-up route ─────────────────────────────────
+app.get("/", (req, res) => {
+  res.status(200).json({ success: true, message: "FinPilot server awake" });
+});
+
 // ─── Routes ────────────────────────────────────────────
 // Apply stricter auth limiter to login/register only
 
