@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "FinPilot AI Platform",
+    "locale": "en",
+    "output": "docs/architecture/.archify/architecture-finpilot-platform-20261023-0038/finpilot-platform.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/iahmedd-k/FinPilot-AI-Driven-Personal-Finance-Assistant.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "3310feb08ba1f319cecd4821e50871398a6e7ad4"
+    }
+  },
+  "components": [
+    {
+      "id": "person",
+      "type": "external",
+      "label": "User",
+      "sublabel": "Browser session",
+      "pos": [40, 300],
+      "size": [140, 64],
+      "sources": [
+        {
+          "path": "client/src/App.jsx",
+          "line": 51,
+          "end_line": 72,
+          "label": "Client routes"
+        }
+      ]
+    },
+    {
+      "id": "client",
+      "type": "frontend",
+      "label": "React client",
+      "sublabel": "React 19 · Vite · dashboard state",
+      "pos": [240, 300],
+      "size": [170, 68],
+      "sources": [
+        {
+          "path": "client/src/App.jsx",
+          "line": 47,
+          "end_line": 72,
+          "label": "Client runtime"
+        },
+        {
+          "path": "client/src/services/api.js",
+          "line": 3,
+          "end_line": 11,
+          "label": "API client"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Express API",
+      "sublabel": "JWT middleware · feature routes",
+      "pos": [508, 300],
+      "size": [180, 72],
+      "sources": [
+        {
+          "path": "server/app.js",
+          "line": 24,
+          "end_line": 40,
+          "label": "Middleware"
+        },
+        {
+          "path": "server/app.js",
+          "line": 86,
+          "end_line": 98,
+          "label": "Route mounting"
+        },
+        {
+          "path": "server/server.js",
+          "line": 4,
+          "end_line": 14,
+          "label": "Startup"
+        }
+      ]
+    },
+    {
+      "id": "mongo",
+      "type": "database",
+      "label": "MongoDB",
+      "sublabel": "Mongoose · user-owned records",
+      "pos": [508, 540],
+      "size": [180, 68],
+      "sources": [
+        {
+          "path": "server/config/db.js",
+          "line": 3,
+          "end_line": 13,
+          "label": "Connection"
+        },
+        {
+          "path": "server/models/Transaction.js",
+          "line": 3,
+          "end_line": 10,
+          "label": "User-scoped model"
+        }
+      ]
+    },
+    {
+      "id": "google",
+      "type": "external",
+      "label": "Google Identity",
+      "sublabel": "Optional OAuth sign-in",
+      "pos": [508, 100],
+      "size": [180, 68],
+      "sources": [
+        {
+          "path": "server/controllers/auth.controller.js",
+          "line": 143,
+          "end_line": 160,
+          "label": "OAuth entry"
+        },
+        {
+          "path": "server/controllers/auth.controller.js",
+          "line": 166,
+          "end_line": 204,
+          "label": "Callback and token verification"
+        }
+      ]
+    },
+    {
+      "id": "groq",
+      "type": "external",
+      "label": "Groq AI",
+      "sublabel": "Optional chat / categorization",
+      "pos": [800, 100],
+      "size": [200, 68],
+      "sources": [
+        {
+          "path": "server/config/groq.js",
+          "line": 3,
+          "end_line": 31,
+          "label": "Provider client"
+        },
+        {
+          "path": "server/services/ai/chatService.js",
+          "line": 102,
+          "end_line": 121,
+          "label": "Contextual completion"
+        }
+      ]
+    },
+    {
+      "id": "stripe",
+      "type": "external",
+      "label": "Stripe",
+      "sublabel": "Optional billing and webhook",
+      "pos": [800, 540],
+      "size": [180, 68],
+      "sources": [
+        {
+          "path": "server/controllers/subscription.controller.js",
+          "line": 183,
+          "end_line": 221,
+          "label": "Checkout session"
+        },
+        {
+          "path": "server/app.js",
+          "line": 58,
+          "end_line": 60,
+          "label": "Raw-body webhook"
+        }
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP (reset email)",
+      "sublabel": "Undefined export blocks current runtime path",
+      "pos": [250, 540],
+      "size": [200, 68],
+      "sources": [
+        {
+          "path": "server/services/emailService.js",
+          "line": 34,
+          "end_line": 70,
+          "label": "Transport and reset email"
+        },
+        {
+          "path": "server/controllers/auth.controller.js",
+          "line": 327,
+          "end_line": 344,
+          "label": "Password-reset caller"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-client",
+      "from": "person",
+      "to": "client",
+      "label": "Uses"
+    },
+    {
+      "id": "client-api",
+      "from": "client",
+      "to": "api",
+      "label": "JSON REST /api",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-mongo",
+      "from": "api",
+      "to": "mongo",
+      "label": "Mongoose",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-google",
+      "from": "api",
+      "to": "google",
+      "label": "OAuth exchange",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-groq",
+      "from": "api",
+      "to": "groq",
+      "label": "AI completions",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-stripe",
+      "from": "api",
+      "to": "stripe",
+      "label": "Checkout / billing",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-smtp",
+      "from": "api",
+      "to": "smtp",
+      "label": "Password-reset email",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Client and API",
+      "items": [
+        "React routes call the Express API under /api",
+        "Protected feature routes validate the access token"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Persistence",
+      "items": [
+        "MongoDB is connected before the API starts listening",
+        "Financial records carry a user ownership reference"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Optional integrations",
+      "items": [
+        "Google OAuth, Groq AI, and Stripe billing are configured separately",
+        "Password-reset email is blocked by an undefined service export",
+        "AI prompts include selected personal financial context"
+      ]
+    }
+  ]
+}
